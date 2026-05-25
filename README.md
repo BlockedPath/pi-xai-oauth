@@ -14,7 +14,7 @@
 npx pi-xai-oauth
 ```
 
-This package adds **Grok 4.3** as a fully-integrated provider in pi, with proper OAuth login, automatic token refresh, and a suite of custom tools (`xai_generate_text`, `xai_web_search`, `xai_x_search`, etc.).
+This package adds **Grok models** (including Grok 4.3 and Grok Build 0.1 for agentic coding) as a fully-integrated provider in pi, with proper OAuth login, automatic token refresh, and a suite of custom tools (`xai_generate_text`, `xai_web_search`, `xai_x_search`, etc.).
 
 ---
 
@@ -144,6 +144,7 @@ pi --model grok-4.3 "Write a poem about Rust"
 
 | Model ID | Description |
 |----------|-------------|
+| `grok-build-0.1` | **Fast coding model** for agentic software engineering. 256K context, native tool calling + structured outputs + vision. |
 | `grok-4.3` | **Default.** Full reasoning, 1M context. |
 | `grok-4.20-0309-reasoning` | Legacy Grok 4.2 with reasoning. |
 | `grok-4.20-0309-non-reasoning` | Legacy Grok 4.2, fast responses. |

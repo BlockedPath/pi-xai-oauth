@@ -39,6 +39,15 @@ type CallbackResult = {
 
 const MODELS = [
   {
+    id: "grok-build-0.1",
+    name: "Grok Build 0.1",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0.5 },
+    contextWindow: 256_000,
+    maxTokens: 256_000,
+  },
+  {
     id: "grok-4.3",
     name: "Grok 4.3",
     reasoning: true,
