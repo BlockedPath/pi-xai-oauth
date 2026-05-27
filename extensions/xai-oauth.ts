@@ -41,7 +41,8 @@ const MODELS = [
   {
     id: "grok-build-0.1",
     name: "Grok Build 0.1",
-    reasoning: true,
+    // Grok Build can reason internally, but xAI currently rejects controllable reasoning effort.
+    reasoning: false,
     input: ["text", "image"],
     // xAI bills cached prompt tokens at the cached input rate.
     cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0.2 },
@@ -445,7 +446,8 @@ function extractResponsesText(data: any): string {
 
 function grokSupportsReasoningEffort(modelId: string): boolean {
   const normalized = (modelId || "").toLowerCase().split("/").pop() || "";
-  return normalized.startsWith("grok-build") || normalized.startsWith("grok-3-mini") || normalized.startsWith("grok-4.20-multi-agent") || normalized.startsWith("grok-4.3");
+  // Keep grok-build excluded: xAI returns 400 for controllable reasoning effort on grok-build-0.1.
+  return normalized.startsWith("grok-3-mini") || normalized.startsWith("grok-4.20-multi-agent") || normalized.startsWith("grok-4.3");
 }
 
 function textFromResponsesContent(content: unknown): string {
