@@ -43,7 +43,8 @@ const MODELS = [
     name: "Grok Build 0.1",
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0.5 },
+    // xAI bills cached prompt tokens at the cached input rate.
+    cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0.2 },
     contextWindow: 256_000,
     maxTokens: 256_000,
   },
@@ -444,7 +445,7 @@ function extractResponsesText(data: any): string {
 
 function grokSupportsReasoningEffort(modelId: string): boolean {
   const normalized = (modelId || "").toLowerCase().split("/").pop() || "";
-  return normalized.startsWith("grok-3-mini") || normalized.startsWith("grok-4.20-multi-agent") || normalized.startsWith("grok-4.3");
+  return normalized.startsWith("grok-build") || normalized.startsWith("grok-3-mini") || normalized.startsWith("grok-4.20-multi-agent") || normalized.startsWith("grok-4.3");
 }
 
 function textFromResponsesContent(content: unknown): string {
