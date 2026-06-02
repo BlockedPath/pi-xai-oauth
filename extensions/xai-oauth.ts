@@ -79,6 +79,33 @@ const MODELS = [
     contextWindow: 2_000_000,
     maxTokens: 131_072,
   },
+  {
+    id: "grok-build",
+    name: "Grok Build",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0 },
+    contextWindow: 512_000,
+    maxTokens: 131_072,
+  },
+  {
+    id: "grok-build-0.1",
+    name: "Grok Build 0.1",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0 },
+    contextWindow: 256_000,
+    maxTokens: 131_072,
+  },
+  {
+    id: "grok-composer-2.5-fast",
+    name: "Composer 2.5",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0 },
+    contextWindow: 200_000,
+    maxTokens: 131_072,
+  },
 ];
 
 const xaiToolRegistrations = new WeakSet<object>();

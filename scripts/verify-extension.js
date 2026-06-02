@@ -143,6 +143,10 @@ async function main() {
     assert.equal(provider.models.find((model) => model.id === "grok-4.3")?.contextWindow, 1_000_000);
     assert.equal(provider.models.find((model) => model.id === "grok-4.20-0309-reasoning")?.contextWindow, 2_000_000);
     assert.ok(provider.models.some((model) => model.id === "grok-4.20-multi-agent-0309"));
+    assert.equal(provider.models.find((model) => model.id === "grok-build")?.contextWindow, 512_000);
+    assert.equal(provider.models.find((model) => model.id === "grok-build-0.1")?.contextWindow, 256_000);
+    assert.equal(provider.models.find((model) => model.id === "grok-composer-2.5-fast")?.contextWindow, 200_000);
+    assert.equal(provider.models.find((model) => model.id === "grok-composer-2.5-fast")?.reasoning, true);
 
     await verifyOAuthCallbackState(provider);
 

@@ -162,6 +162,9 @@ pi --model grok-4.3 "Write a poem about Rust"
 | `grok-4.20-0309-reasoning` | Grok 4.20 with automatic reasoning, 2M context. |
 | `grok-4.20-0309-non-reasoning` | Grok 4.20 fast responses, 2M context. |
 | `grok-4.20-multi-agent-0309` | Grok 4.20 multi-agent research model, 2M context. |
+| `grok-build` | Grok Build — xAI's agentic coding model (Grok CLI default), 512k context. |
+| `grok-build-0.1` | Grok Build 0.1 — same family on the public API, 256k context. |
+| `grok-composer-2.5-fast` | Composer 2.5 — fast coding model with automatic reasoning, 200k context. |
 
 From the pi TUI:
 
@@ -169,6 +172,8 @@ From the pi TUI:
 /model grok-4.3
 /model grok-4.20-0309-reasoning
 /model grok-4.20-multi-agent-0309
+/model grok-build
+/model grok-composer-2.5-fast
 ```
 
 From the command line:
@@ -199,7 +204,7 @@ pi --model grok-4.3:low "What's the weather?"
 - **`medium`** — Balanced speed and depth.
 - **`low`** — Fast responses, minimal reasoning. Good for simple Q&A.
 
-`grok-4.20-0309-reasoning` reasons automatically and does not accept a configurable effort parameter. `grok-4.20-multi-agent-0309` uses `medium` for 4 agents and `high` for 16 agents.
+`grok-4.20-0309-reasoning` and `grok-composer-2.5-fast` reason automatically and do not accept a configurable effort parameter. `grok-4.20-multi-agent-0309` uses `medium` for 4 agents and `high` for 16 agents. `grok-build` and `grok-build-0.1` do not accept configurable reasoning effort.
 
 ---
 
