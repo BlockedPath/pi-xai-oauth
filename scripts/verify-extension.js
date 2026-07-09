@@ -219,16 +219,40 @@ async function verifyCursorToolShims(tools) {
 
 async function verifyCursorToolActivation(loadResult) {
   const { handlers, getActiveTools } = loadResult;
-  const ctx = {
-    getActiveTools,
-    setActiveTools: loadResult.setActiveTools,
-  };
+  // The real pi ExtensionContext does NOT expose getActiveTools/setActiveTools;
+  // those accessors live on the `pi` api object passed at load time. Mirror that
+  // here (empty ctx) so the handlers are forced to use the pi accessors. This is
+  // the regression guard for the "400 tools: Tool names must be unique" bug where
+  // reading the accessors off ctx made the sync silently bail and left the
+  // Read/Write/Edit shims colliding with pi's built-in tools.
+  const ctx = {};
+  const selectModel = (id, provider = "xai-auth") =>
+    handlers.get("model_select")?.({ model: { provider, id } }, ctx);
 
-  await handlers.get("model_select")?.({ model: { provider: "xai-auth", id: "grok-composer-2.5-fast" } }, ctx);
+  await selectModel("grok-composer-2.5-fast");
   assert.ok(getActiveTools().includes("Grep"), "Cursor shims should be enabled for Composer 2.5");
 
-  await handlers.get("model_select")?.({ model: { provider: "xai-auth", id: "grok-4.3" } }, ctx);
+  await selectModel("grok-4.3");
   assert.ok(!getActiveTools().includes("Grep"), "Cursor shims should be disabled for non-Grok-CLI xAI models");
+
+  // session_start reads the model from ctx.model (not the event). Verify it prunes
+  // the shims for a non-Grok model so their names can't duplicate the built-ins.
+  await selectModel("grok-composer-2.5-fast");
+  assert.ok(getActiveTools().includes("Grep"), "Cursor shims should re-enable for Composer 2.5");
+  await handlers.get("session_start")?.({}, { model: { provider: "anthropic", id: "claude-opus-4-8" } });
+  assert.ok(!getActiveTools().includes("Grep"), "session_start should prune Cursor shims for non-Grok models");
+  for (const shim of ["Read", "Write", "Edit"]) {
+    assert.ok(
+      !getActiveTools().includes(shim),
+      `${shim} shim must not stay active for non-Grok models (would duplicate pi's built-in tool name)`,
+    );
+  }
+
+  // before_agent_start also reads the model from ctx.model.
+  await selectModel("grok-composer-2.5-fast");
+  assert.ok(getActiveTools().includes("Grep"), "Cursor shims should re-enable before before_agent_start check");
+  await handlers.get("before_agent_start")?.({}, { model: { provider: "anthropic", id: "claude-opus-4-8" } });
+  assert.ok(!getActiveTools().includes("Grep"), "before_agent_start should prune Cursor shims for non-Grok models");
 }
 
 function lastResultErrorMessage(result) {

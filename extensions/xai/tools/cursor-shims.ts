@@ -313,17 +313,40 @@ function uniqueToolNames(toolNames: string[]): string[] {
   return [...new Set(toolNames)];
 }
 
-/** Enable Cursor/Grok CLI shims only for Grok CLI proxy models. */
-export function syncCursorToolShimsForModel(ctx: any, model?: Model<Api>) {
-  if (typeof ctx?.getActiveTools !== "function" || typeof ctx?.setActiveTools !== "function") return;
+/**
+ * Enable Cursor/Grok CLI shims only for Grok CLI proxy models.
+ *
+ * The tool-registry accessors (`getActiveTools`/`setActiveTools`) live on the
+ * `pi` ExtensionAPI object, NOT on the per-event `ExtensionContext` that pi
+ * passes as the second handler argument. Passing the event `ctx` here made the
+ * guard below always fail, so the shims were never pruned and their names
+ * (`Read`/`Write`/`Edit`) collided with pi's built-in tools, producing
+ * `400 tools: Tool names must be unique` on every request for non-Grok models.
+ * Always pass the `pi` api object.
+ */
+export function syncCursorToolShimsForModel(api: any, model?: Model<Api>) {
+  if (typeof api?.getActiveTools !== "function" || typeof api?.setActiveTools !== "function") return;
 
-  const activeTools = Array.isArray(ctx.getActiveTools()) ? (ctx.getActiveTools() as string[]) : [];
+  let activeTools: string[];
+  try {
+    const current = api.getActiveTools();
+    activeTools = Array.isArray(current) ? (current as string[]) : [];
+  } catch {
+    // Tool registry not bound yet (e.g. called during early startup before the
+    // session finished initializing). It will be re-synced on before_agent_start.
+    return;
+  }
+
   const withoutCursorShims = activeTools.filter((toolName) => !XAI_CURSOR_TOOL_NAMES.includes(toolName));
   const shouldEnableCursorShims = model?.provider === XAI_PROVIDER_ID && isGrokCliProxyModel(model.id);
   const nextTools = shouldEnableCursorShims ? uniqueToolNames([...withoutCursorShims, ...XAI_CURSOR_TOOL_NAMES]) : withoutCursorShims;
 
   if (nextTools.length !== activeTools.length || nextTools.some((toolName, index) => toolName !== activeTools[index])) {
-    ctx.setActiveTools(nextTools);
+    try {
+      api.setActiveTools(nextTools);
+    } catch {
+      // Ignore if the registry is not ready; a later before_agent_start will retry.
+    }
   }
 }
 

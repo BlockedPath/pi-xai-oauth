@@ -21,8 +21,10 @@ export default function (pi: ExtensionAPI) {
   registerXaiTools(pi);
 
   if (typeof (pi as any).on === "function") {
-    (pi as any).on("session_start", (_event: any, ctx: any) => syncCursorToolShimsForModel(ctx, ctx?.model));
-    (pi as any).on("model_select", (event: any, ctx: any) => syncCursorToolShimsForModel(ctx, event?.model));
-    (pi as any).on("before_agent_start", (_event: any, ctx: any) => syncCursorToolShimsForModel(ctx, ctx?.model));
+    // The tool-registry accessors are on `pi`, not on the event `ctx`; the model
+    // is read from the event/ctx. See syncCursorToolShimsForModel for details.
+    (pi as any).on("session_start", (_event: any, ctx: any) => syncCursorToolShimsForModel(pi, ctx?.model));
+    (pi as any).on("model_select", (event: any, ctx: any) => syncCursorToolShimsForModel(pi, event?.model ?? ctx?.model));
+    (pi as any).on("before_agent_start", (_event: any, ctx: any) => syncCursorToolShimsForModel(pi, ctx?.model));
   }
 }
