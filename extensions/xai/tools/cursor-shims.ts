@@ -7,7 +7,6 @@ import {
   createReadToolDefinition,
   createWriteToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { Api, Model } from "@earendil-works/pi-ai";
 import { readdir, readFile, rm, stat } from "fs/promises";
 import { join, relative, sep } from "path";
 import { Type } from "typebox";
@@ -313,17 +312,52 @@ function uniqueToolNames(toolNames: string[]): string[] {
   return [...new Set(toolNames)];
 }
 
-/** Enable Cursor/Grok CLI shims only for Grok CLI proxy models. */
-export function syncCursorToolShimsForModel(ctx: any, model?: Model<Api>) {
-  if (typeof ctx?.getActiveTools !== "function" || typeof ctx?.setActiveTools !== "function") return;
+type ActiveToolsApi = {
+  getActiveTools?: () => string[];
+  setActiveTools?: (toolNames: string[]) => void;
+};
 
-  const activeTools = Array.isArray(ctx.getActiveTools()) ? (ctx.getActiveTools() as string[]) : [];
+type ShimModelRef = {
+  id: string;
+  provider: string;
+};
+
+function resolveActiveToolsApi(primary?: ActiveToolsApi, fallback?: ActiveToolsApi): ActiveToolsApi | undefined {
+  for (const candidate of [primary, fallback]) {
+    if (typeof candidate?.getActiveTools === "function" && typeof candidate?.setActiveTools === "function") {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+/** Enable Cursor/Grok CLI shims only for Grok CLI proxy models. */
+export function syncCursorToolShimsForModel(
+  primaryApi: ActiveToolsApi,
+  model?: ShimModelRef,
+  fallbackApi?: ActiveToolsApi,
+) {
+  const api = resolveActiveToolsApi(primaryApi, fallbackApi);
+  if (!api?.getActiveTools || !api?.setActiveTools) return;
+
+  let activeTools: string[];
+  try {
+    const listed = api.getActiveTools();
+    activeTools = Array.isArray(listed) ? listed : [];
+  } catch (error) {
+    throw new Error(`Cursor shim sync: failed to read active tools: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   const withoutCursorShims = activeTools.filter((toolName) => !XAI_CURSOR_TOOL_NAMES.includes(toolName));
   const shouldEnableCursorShims = model?.provider === XAI_PROVIDER_ID && isGrokCliProxyModel(model.id);
   const nextTools = shouldEnableCursorShims ? uniqueToolNames([...withoutCursorShims, ...XAI_CURSOR_TOOL_NAMES]) : withoutCursorShims;
 
   if (nextTools.length !== activeTools.length || nextTools.some((toolName, index) => toolName !== activeTools[index])) {
-    ctx.setActiveTools(nextTools);
+    try {
+      api.setActiveTools(nextTools);
+    } catch (error) {
+      throw new Error(`Cursor shim sync: failed to apply active tools: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
 
