@@ -8,5 +8,5 @@
 - [x] Reproduce: `setXaiNetworkToolActive` starts from an empty set and deletes the WeakMap scope when `!xaiModel`
 - [x] Fix `setXaiNetworkToolActive` to always copy `previousSelection` and persist remaining authorizations
 - [x] Add regression in `scripts/verify-extension.js` for multi-tool disable without an xAI command model
-- [ ] Run `npm run typecheck` and `npm test`
-- [ ] Commit, push, open PR
+- [x] Run `npm run typecheck` and `npm test`
+- [x] Commit, push, open PR
