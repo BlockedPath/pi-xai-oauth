@@ -616,6 +616,28 @@ async function verifyXaiToolsCommand(loadResult) {
   assert.match(notifications.at(-1).message, /Select an xAI\/Grok model/);
 
   await handlers.get("model_select")?.({ model: TEST_XAI_MODEL }, { model: TEST_XAI_MODEL });
+  await runCommand("enable xai_web_search", TEST_XAI_MODEL);
+  await runCommand("enable xai_generate_image", TEST_XAI_MODEL);
+  assert.ok(getActiveTools().includes("xai_web_search"), "fixture: web search should be authorized");
+  assert.ok(getActiveTools().includes("xai_generate_image"), "fixture: image generation should be authorized");
+  // Disable with a non-xAI command model (without model_select sync) must remove
+  // only the named tool — not wipe every remaining authorization (issue #60).
+  await runCommand("disable xai_web_search", anthropicModel);
+  assert.ok(!getActiveTools().includes("xai_web_search"), "disable without an xAI model should remove the named tool");
+  assert.ok(
+    getActiveTools().includes("xai_generate_image"),
+    "disable without an xAI model must preserve other authorized tools in the registry",
+  );
+  await handlers.get("before_agent_start")?.({}, { model: TEST_XAI_MODEL });
+  assert.ok(
+    getActiveTools().includes("xai_generate_image"),
+    "remaining authorization must survive lifecycle sync after a selective disable",
+  );
+  await runCommand("status", TEST_XAI_MODEL);
+  assert.match(notifications.at(-1).message, /xai_web_search=disabled/);
+  assert.match(notifications.at(-1).message, /xai_generate_image=enabled/);
+  await runCommand("disable xai_generate_image", TEST_XAI_MODEL);
+
   let pickerPass = 0;
   let pickerTitle = "";
   let pickerOptions = [];

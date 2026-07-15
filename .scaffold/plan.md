@@ -1,12 +1,12 @@
-# Plan: Fix Page Up/Down no-op at ten items (issue #59)
+# Plan: Fix disable clearing all authorized tools (issue #60)
 
-**Branch:** cursor/fix-page-keys-ten-items-7537
+**Branch:** cursor/fix-disable-clears-all-tools-c1c0
 
-**Goal:** Page Up/Down in `/xai-tools` TUI must wrap when exactly ten eligible tools are shown (Grok Build/Composer + WebSearch).
+**Goal:** `/xai-tools disable <tool>` without an active xAI model must remove only the named tool from the opt-in set and active-tool registry, preserving every other authorized network tool.
 
 ## Steps
-- [x] Reproduce: `moveSelection(±maxVisible)` with `options.length === 10` is a modulo no-op
-- [x] Fix `moveSelection` to fall back to ±1 when `offset % length === 0`
-- [x] Add Composer (10-tool) regression in `scripts/verify-extension.js`
-- [x] Run `npm run typecheck` and `npm test`
-- [x] Commit, push, open PR
+- [x] Reproduce: `setXaiNetworkToolActive` starts from an empty set and deletes the WeakMap scope when `!xaiModel`
+- [x] Fix `setXaiNetworkToolActive` to always copy `previousSelection` and persist remaining authorizations
+- [x] Add regression in `scripts/verify-extension.js` for multi-tool disable without an xAI command model
+- [ ] Run `npm run typecheck` and `npm test`
+- [ ] Commit, push, open PR

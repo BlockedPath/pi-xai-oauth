@@ -89,7 +89,10 @@ export function setXaiNetworkToolActive(
 
   const scope = api as object;
   const previousSelection = new Set(explicitlyEnabledXaiNetworkTools.get(scope) ?? []);
-  const nextSelection = xaiModel ? new Set(previousSelection) : new Set<XaiNetworkToolName>();
+  // Always copy the prior opt-in set. Disable without an active xAI model must
+  // remove only the named tool — never replace the whole authorization set with
+  // an empty set or delete every remaining opt-in.
+  const nextSelection = new Set(previousSelection);
   if (xaiModel && !isGrokCliProxyModel(xaiModel.id)) nextSelection.delete("WebSearch");
   if (active) nextSelection.add(toolName);
   else nextSelection.delete(toolName);
@@ -112,7 +115,7 @@ export function setXaiNetworkToolActive(
     const unchanged = nextTools.length === activeTools.length
       && nextTools.every((name, index) => name === activeTools[index]);
     if (!unchanged) api.setActiveTools(nextTools);
-    if (xaiModel) explicitlyEnabledXaiNetworkTools.set(scope, nextSelection);
+    if (nextSelection.size > 0) explicitlyEnabledXaiNetworkTools.set(scope, nextSelection);
     else explicitlyEnabledXaiNetworkTools.delete(scope);
     return { ok: true, active };
   } catch {
