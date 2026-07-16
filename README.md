@@ -55,6 +55,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
   - [Switching Models](#switching-models)
   - [Reasoning / Thinking Levels](#reasoning--thinking-levels)
 - [Custom Tools](#custom-tools)
+- [Usage limits (`/xai-usage`)](#usage-limits-xai-usage)
 - [Quick Reference](#quick-reference)
 - [Troubleshooting](#troubleshooting)
 - [Updating](#updating)
@@ -463,6 +464,24 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 
 ---
 
+
+## Usage limits (`/xai-usage`)
+
+Show your SuperGrok / Grok Build **account** weekly (or monthly) usage pool — the same billing surface as the official Grok Build CLI `/usage` command.
+
+```text
+/xai-usage            # show limit %, reset time, product breakdown
+/xai-usage refresh    # force re-fetch (skip short cache)
+/xai-usage manage     # print billing / upgrade URLs
+```
+
+- Footer status: `xAI Weekly N%` (or `xAI Monthly N%`) after session start
+- Auto-refresh: once at session start, then every hour while the session is open
+- Account-level pool (not per-model). Switching away from `xai-auth` does not change the number
+- Manage credits in the browser: https://grok.com/?_s=usage
+
+Requires `/login xai-auth` (or an existing `grok login` session). Uses the Grok CLI chat proxy billing endpoint; fail-soft if the payload changes.
+
 ## Quick Reference
 
 | Action | Command |
@@ -477,6 +496,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 | Set default model | `/model grok-4.5` (in TUI) |
 | Set thinking level | `/think high` (in TUI) |
 | Manage outbound xAI tools | `/xai-tools` (in TUI) |
+| SuperGrok weekly/monthly usage | `/xai-usage` (footer: `xAI Weekly N%`) |
 | Recreate extension/catalog state | `/reload` (respects the 15-minute cache TTL) |
 
 ---

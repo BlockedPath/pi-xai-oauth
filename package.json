@@ -23,7 +23,7 @@
   "scripts": {
     "scaffold": "node bin/setup.js --scaffold",
     "setup": "node bin/setup.js",
-    "test": "node scripts/verify-device-auth.js && node scripts/verify-catalog.js && node scripts/verify-extension.js && node scripts/verify-setup.js",
+    "test": "node scripts/verify-device-auth.js && node scripts/verify-catalog.js && node scripts/verify-usage.js && node scripts/verify-extension.js && node scripts/verify-setup.js",
     "typecheck": "npx tsc --noEmit"
   },
   "pi": {

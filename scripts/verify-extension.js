@@ -2368,6 +2368,8 @@ async function main() {
     assert.ok(provider, "xai-auth provider should be registered");
     assert.equal(secondLoad.tools.size, tools.size, "extension reloads should register tools on the new pi API object");
     assert.ok(firstLoad.commands.has("xai-tools"), "the xAI paid-tool command should be registered");
+    assert.ok(firstLoad.commands.has("xai-usage"), "the SuperGrok /xai-usage command should be registered");
+    assert.ok(!firstLoad.commands.has("usage"), "bare /usage should not be registered by this package");
     assert.equal(secondLoad.commands.size, firstLoad.commands.size, "extension reloads should register commands on the new pi API object");
     assert.equal(provider.api, "xai-responses");
     assert.equal(provider.baseUrl, "https://cli-chat-proxy.grok.com/v1", "xai-auth should register the OAuth session endpoint");
