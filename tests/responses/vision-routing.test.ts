@@ -224,6 +224,63 @@ describe("opt-in vision routing", () => {
     expect(JSON.stringify(requests[0])).toMatch(/historical user image omitted/);
   });
 
+  it("re-routes user images across a mid tool-loop turn without an assistant message", async () => {
+    const controller = createXaiVisionRoutingController();
+    controller.replaceCatalog([source, target]);
+    controller.enable(sourceModel);
+    const requests: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: any, init: RequestInit = {}) => {
+      const body = requestBody(init);
+      requests.push(body);
+      return body.model === target.id
+        ? jsonResponse({ id: "vision", output_text: "screenshot of a stack trace" })
+        : streamResponse("calling tools");
+    }));
+
+    const stream = streamSimpleXaiResponses(
+      sourceModel,
+      { messages: [{ role: "user", content: "continue tools", timestamp: Date.now() }] } as any,
+      {
+        apiKey: "oauth-token",
+        onPayload(payload: any) {
+          payload.input = [
+            {
+              role: "user",
+              content: [
+                { type: "input_text", text: "Fix the bug in this screenshot." },
+                { type: "input_image", image_url: "https://example.test/bug.png" },
+              ],
+            },
+            {
+              type: "function_call",
+              call_id: "call_1",
+              name: "read_file",
+              arguments: "{\"path\":\"app.ts\"}",
+            },
+            {
+              type: "function_call_output",
+              call_id: "call_1",
+              output: "export function main() {}",
+            },
+          ];
+        },
+      } as any,
+      controller,
+    );
+    const result = await stream.result();
+
+    expect(result.errorMessage).toBeUndefined();
+    expect(requests).toHaveLength(2);
+    expect(requests[0].model).toBe(target.id);
+    expect(containsImage(requests[0])).toBe(true);
+    expect(JSON.stringify(requests[0])).toContain("bug.png");
+    expect(requests[1].model).toBe(source.id);
+    expect(containsImage(requests[1])).toBe(false);
+    expect(JSON.stringify(requests[1])).toMatch(/xAI-generated visual description/);
+    expect(JSON.stringify(requests[1])).toMatch(/screenshot of a stack trace/);
+    expect(JSON.stringify(requests[1])).not.toMatch(/historical user image omitted/);
+  });
+
   it("reapplies history pruning after a payload hook while preserving the current image", async () => {
     const controller = createXaiVisionRoutingController();
     controller.replaceCatalog([source, target]);

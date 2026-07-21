@@ -251,6 +251,17 @@ function isAssistantResponseItem(value: unknown): boolean {
   return item.type === "reasoning" || item.type === "function_call";
 }
 
+/**
+ * Vision-routing descriptions are request-ephemeral and never enter session
+ * history. Only a completed assistant message proves the source model already
+ * consumed prior visual context; reasoning/function_call items alone must not
+ * strip user images or screenshots mid tool-loop.
+ */
+function isCompletedAssistantMessage(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  return (value as Record<string, any>).role === "assistant";
+}
+
 const OMIT_CONSUMED_VISION_IMAGE = Symbol("omit-consumed-xai-vision-image");
 
 interface StrippedVisionImages {
@@ -327,10 +338,10 @@ export function omitConsumedXaiResponsesVisionImages(
 
   const input = payload.input as unknown[];
   const hasLaterAssistantOutput = new Array<boolean>(input.length).fill(false);
-  let assistantOutputSeen = false;
+  let assistantMessageSeen = false;
   for (let index = input.length - 1; index >= 0; index--) {
-    hasLaterAssistantOutput[index] = assistantOutputSeen;
-    if (isAssistantResponseItem(input[index])) assistantOutputSeen = true;
+    hasLaterAssistantOutput[index] = assistantMessageSeen;
+    if (isCompletedAssistantMessage(input[index])) assistantMessageSeen = true;
   }
 
   let changed = false;

@@ -159,6 +159,35 @@ describe("Responses payload normalization", () => {
     expect(JSON.stringify(routed)).toMatch(/historical user image omitted/);
     expect(inlineImages(rewriteXaiResponsesPayload(payload, TEST_MODEL))).toHaveLength(1);
   });
+  it("keeps user images alive across reasoning and function_call until an assistant message", () => {
+    const content = [
+      { type: "input_text", text: "fix this screenshot" },
+      { type: "input_image", image_url: tiny, detail: "auto" },
+    ];
+    for (const midToolBoundary of [
+      { type: "reasoning", summary: [] },
+      { type: "function_call", call_id: "tool_1", name: "read_file", arguments: "{}" },
+    ]) {
+      const routed = rewriteXaiResponsesPayload(
+        {
+          model: TEST_MODEL.id,
+          input: [
+            { role: "user", content },
+            midToolBoundary,
+            {
+              type: "function_call_output",
+              call_id: "tool_1",
+              output: "file contents",
+            },
+          ],
+        },
+        TEST_MODEL,
+        { omitConsumedVisionImages: true },
+      );
+      expect(inlineImages(routed)).toHaveLength(1);
+      expect(JSON.stringify(routed)).not.toMatch(/historical user image omitted/);
+    }
+  });
   it("retains non-image user text while replacing a consumed mixed-content historical image", () => {
     const payload = {
       model: TEST_MODEL.id,
