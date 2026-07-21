@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { convertResponsesMessages } from "@earendil-works/pi-ai/api/openai-responses-shared";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   XAI_GROK_NATIVE_TOOL_NAME_MAP,
@@ -50,6 +51,77 @@ const inlineImages = (value: any): string[] => {
   };
   walk(value);
   return urls;
+};
+const piToolCall = (index: number) => ({
+  type: "toolCall",
+  id: `tool_${index}|fc_${index}`,
+  name: "read_file",
+  arguments: { path: `app-${index}.ts` },
+});
+const piReasoning = {
+  type: "thinking",
+  thinking: "",
+  thinkingSignature: JSON.stringify({
+    id: "rs_1",
+    type: "reasoning",
+    summary: [],
+    encrypted_content: "opaque-reasoning",
+    status: "completed",
+  }),
+};
+const piAssistantMessage = (content: any[], stopReason: "stop" | "toolUse", timestamp: number) => ({
+  role: "assistant",
+  content,
+  api: TEST_MODEL.api,
+  provider: TEST_MODEL.provider,
+  model: TEST_MODEL.id,
+  usage: {
+    input: 1,
+    output: 1,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 2,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  },
+  stopReason,
+  timestamp,
+});
+const convertVisionHistory = (assistantContent: any[], terminalAfterTools = false) => {
+  const toolCalls = assistantContent.filter((item) => item.type === "toolCall");
+  const messages: any[] = [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "fix this screenshot" },
+        { type: "image", data: Buffer.from("tiny").toString("base64"), mimeType: "image/png" },
+      ],
+      timestamp: 1,
+    },
+    piAssistantMessage(assistantContent, toolCalls.length > 0 ? "toolUse" : "stop", 2),
+  ];
+  if (toolCalls.length > 0) {
+    messages.push(...toolCalls.map((toolCall, index) => ({
+      role: "toolResult",
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: [{ type: "text", text: `file contents ${index + 1}` }],
+      isError: false,
+      timestamp: index + 3,
+    })));
+    if (terminalAfterTools) {
+      messages.push(
+        piAssistantMessage([{ type: "text", text: "The screenshot shows an error." }], "stop", toolCalls.length + 3),
+        { role: "user", content: "next question", timestamp: toolCalls.length + 4 },
+      );
+    }
+  } else {
+    messages.push({ role: "user", content: "next question", timestamp: 3 });
+  }
+  return convertResponsesMessages(
+    TEST_MODEL,
+    { messages } as any,
+    new Set([TEST_MODEL.provider]),
+  );
 };
 
 describe("Responses payload normalization", () => {
@@ -187,6 +259,69 @@ describe("Responses payload normalization", () => {
       expect(inlineImages(routed)).toHaveLength(1);
       expect(JSON.stringify(routed)).not.toMatch(/historical user image omitted/);
     }
+  });
+  it.each([
+    {
+      name: "progress text before one call",
+      content: [{ type: "text", text: "I will inspect it." }, piToolCall(1)],
+      expectedTypes: ["user", "message", "function_call", "function_call_output"],
+    },
+    {
+      name: "one call before progress text",
+      content: [piToolCall(1), { type: "text", text: "I am inspecting it." }],
+      expectedTypes: ["user", "function_call", "message", "function_call_output"],
+    },
+    {
+      name: "multiple calls before progress text",
+      content: [
+        piToolCall(1),
+        piReasoning,
+        piToolCall(2),
+        { type: "text", text: "I have both files now." },
+      ],
+      expectedTypes: [
+        "user",
+        "function_call",
+        "reasoning",
+        "function_call",
+        "message",
+        "function_call_output",
+        "function_call_output",
+      ],
+    },
+  ])("keeps converted images alive for $name", ({ content, expectedTypes }) => {
+    const converted = convertVisionHistory(content);
+    expect(converted.map((item: any) => item.type ?? item.role)).toEqual(expectedTypes);
+
+    const routed = rewriteXaiResponsesPayload(
+      { model: TEST_MODEL.id, input: converted },
+      TEST_MODEL,
+      { omitConsumedVisionImages: true },
+    );
+    expect(inlineImages(routed)).toHaveLength(1);
+    expect(JSON.stringify(routed)).not.toMatch(/historical user image omitted/);
+  });
+  it("still consumes images after a separate converted terminal turn", () => {
+    const converted = convertVisionHistory(
+      [piToolCall(1), { type: "text", text: "I am inspecting it." }],
+      true,
+    );
+    expect(converted.map((item: any) => item.type ?? item.role)).toEqual([
+      "user",
+      "function_call",
+      "message",
+      "function_call_output",
+      "message",
+      "user",
+    ]);
+
+    const routed = rewriteXaiResponsesPayload(
+      { model: TEST_MODEL.id, input: converted },
+      TEST_MODEL,
+      { omitConsumedVisionImages: true },
+    );
+    expect(inlineImages(routed)).toHaveLength(0);
+    expect(JSON.stringify(routed)).toMatch(/historical user image omitted/);
   });
   it("retains non-image user text while replacing a consumed mixed-content historical image", () => {
     const payload = {
