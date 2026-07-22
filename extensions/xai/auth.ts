@@ -144,14 +144,22 @@ export function getStartupXaiCatalogAuth(now = Date.now()): StartupXaiCatalogAut
   return { credential: null, needsRegistryRefresh, credentialChangedAt };
 }
 
+/**
+ * Providers to consult for managed credential resolution.
+ *
+ * When the active model is already an xAI-compatible provider, stay on that
+ * provider only. Falling through to the sibling provider would silently reuse
+ * another account's credential for network tools / usage and can mis-tag
+ * `catalogScope: "host"` onto package `xai-auth` OAuth.
+ *
+ * Without an active compatible provider, keep scanning both for callers that
+ * only supply a registry.
+ */
 function xaiRegistryProviderIds(ctx: any): XaiToolCompatibleProviderId[] {
-  const activeProvider = isXaiToolCompatibleProvider(ctx?.model?.provider)
-    ? ctx.model.provider
-    : undefined;
-  return [activeProvider, ...XAI_TOOL_COMPATIBLE_PROVIDER_IDS].filter(
-    (providerId, index, values): providerId is XaiToolCompatibleProviderId =>
-      typeof providerId === "string" && values.indexOf(providerId) === index,
-  );
+  if (isXaiToolCompatibleProvider(ctx?.model?.provider)) {
+    return [ctx.model.provider];
+  }
+  return [...XAI_TOOL_COMPATIBLE_PROVIDER_IDS];
 }
 
 function xaiRegistryCandidateIds(ctx: any, providerId: XaiToolCompatibleProviderId): string[] {
@@ -344,7 +352,10 @@ export async function resolvePiManagedXaiCredential(ctx: any): Promise<XaiCreden
         : "oauth-session";
       const credential = credentialFromResolvedAuth(auth, kind);
       if (credential) {
-        return kind === "oauth-session" && ctx?.model?.provider === XAI_BUNDLED_PROVIDER_ID
+        // Host catalog scope follows the credential's provider, not merely the
+        // active model id — otherwise a cross-provider token could skip package
+        // entitlement checks while riding the built-in model surface.
+        return kind === "oauth-session" && providerId === XAI_BUNDLED_PROVIDER_ID
           ? { ...credential, catalogScope: "host" }
           : credential;
       }

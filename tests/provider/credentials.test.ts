@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getGrokAuthCredentials,
   getStartupXaiCatalogAuth,
+  hasPiManagedXaiOAuth,
   resolveXaiCredential,
   resolvePiManagedXaiCredential,
   resolvePiManagedXaiOAuthCredential,
@@ -244,6 +245,65 @@ describe("credential resolution", () => {
     });
     await expect(resolvePiManagedXaiOAuthCredential(ctx)).resolves.toBeNull();
     expect(getApiKeyAndHeaders).toHaveBeenCalledTimes(1);
+  });
+  it("does not reuse sibling-provider credentials when the active provider has none", async () => {
+    const lookups: string[] = [];
+    const builtinCtx = {
+      model: BUILTIN_XAI_TEST_MODEL,
+      modelRegistry: {
+        authStorage: {
+          get: (provider: string) => provider === "xai-auth"
+            ? {
+                type: "oauth",
+                access: "package-oauth",
+                refresh: "refresh",
+                expires: Date.now() + 60_000,
+              }
+            : undefined,
+        },
+        find: (provider: string, id: string) => {
+          lookups.push(provider);
+          // Both providers can resolve models; only xai-auth has usable auth.
+          return { ...(provider === "xai" ? BUILTIN_XAI_TEST_MODEL : TEST_MODEL), provider, id };
+        },
+        isUsingOAuth: (model: any) => model.provider === "xai-auth",
+        getApiKeyAndHeaders: async (model: any) => model.provider === "xai-auth"
+          ? { ok: true, apiKey: "package-oauth" }
+          : { ok: false, error: "missing" },
+      },
+    };
+
+    await expect(resolvePiManagedXaiCredential(builtinCtx)).resolves.toBeNull();
+    await expect(resolvePiManagedXaiOAuthCredential(builtinCtx)).resolves.toBeNull();
+    expect(hasPiManagedXaiOAuth(builtinCtx)).toBe(false);
+    expect(lookups.length).toBeGreaterThan(0);
+    expect(lookups.every((provider) => provider === "xai")).toBe(true);
+
+    lookups.length = 0;
+    const packageCtx = {
+      model: TEST_MODEL,
+      modelRegistry: {
+        authStorage: {
+          get: (provider: string) => provider === "xai"
+            ? { type: "api_key", key: "BUILTIN_API_KEY" }
+            : undefined,
+        },
+        find: (provider: string, id: string) => {
+          lookups.push(provider);
+          return { ...(provider === "xai" ? BUILTIN_XAI_TEST_MODEL : TEST_MODEL), provider, id };
+        },
+        isUsingOAuth: () => false,
+        getApiKeyAndHeaders: async (model: any) => model.provider === "xai"
+          ? { ok: true, apiKey: "BUILTIN_API_KEY" }
+          : { ok: false, error: "missing" },
+      },
+    };
+
+    await expect(resolvePiManagedXaiCredential(packageCtx)).resolves.toBeNull();
+    await expect(resolvePiManagedXaiOAuthCredential(packageCtx)).resolves.toBeNull();
+    expect(hasPiManagedXaiOAuth(packageCtx)).toBe(false);
+    expect(lookups.length).toBeGreaterThan(0);
+    expect(lookups.every((provider) => provider === "xai-auth")).toBe(true);
   });
   it("uses Authorization bearer when registry omits apiKey", async () => {
     const credential = await resolveXaiCredential({
