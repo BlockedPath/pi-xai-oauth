@@ -972,7 +972,15 @@ PRs welcome! If you find issues or want to improve the OAuth flow, feel free to 
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=BlockedPath/pi-xai-oauth&type=Date)](https://star-history.com/#BlockedPath/pi-xai-oauth&Date)
+## Star History
+
+<a href="https://www.star-history.com/?repos=BlockedPath%2Fpi-xai-oauth">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=BlockedPath/pi-xai-oauth&type=date&theme=dark&legend=top-left&sealed_token=mplONFTi7X9l3tzDSSZh6eeGnqJAae-xE51busDleWBO26slBQcI7T5PA9ta0VUoFND50IzF8ZcyP6wMmCYvjMTeBMid-issegaVBHXGGNIeS8EoiIcWYA" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=BlockedPath/pi-xai-oauth&type=date&legend=top-left&sealed_token=mplONFTi7X9l3tzDSSZh6eeGnqJAae-xE51busDleWBO26slBQcI7T5PA9ta0VUoFND50IzF8ZcyP6wMmCYvjMTeBMid-issegaVBHXGGNIeS8EoiIcWYA" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=BlockedPath/pi-xai-oauth&type=date&legend=top-left&sealed_token=mplONFTi7X9l3tzDSSZh6eeGnqJAae-xE51busDleWBO26slBQcI7T5PA9ta0VUoFND50IzF8ZcyP6wMmCYvjMTeBMid-issegaVBHXGGNIeS8EoiIcWYA" />
+ </picture>
+</a>
 
 ---
 
