@@ -969,9 +969,4 @@ npm publish
 PRs welcome! If you find issues or want to improve the OAuth flow, feel free to open an issue or pull request on [GitHub](https://github.com/BlockedPath/pi-xai-oauth).
 
 ---
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/chart?repos=BlockedPath/pi-xai-oauth&type=date&legend=top-left&sealed_token=mplONFTi7X9l3tzDSSZh6eeGnqJAae-xE51busDleWBO26slBQcI7T5PA9ta0VUoFND50IzF8ZcyP6wMmCYvjMTeBMid-issegaVBHXGGNIeS8EoiIcWYA)](https://www.star-history.com/?repos=BlockedPath%2Fpi-xai-oauth)
-
 *Powered by Grok 4.5 — flagship reasoning, agentic coding, and the full xAI API.*
