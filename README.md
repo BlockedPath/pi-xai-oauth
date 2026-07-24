@@ -972,8 +972,6 @@ PRs welcome! If you find issues or want to improve the OAuth flow, feel free to 
 
 ## Star History
 
-## Star History
-
 <a href="https://www.star-history.com/?repos=BlockedPath%2Fpi-xai-oauth">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=BlockedPath/pi-xai-oauth&type=date&theme=dark&legend=top-left&sealed_token=mplONFTi7X9l3tzDSSZh6eeGnqJAae-xE51busDleWBO26slBQcI7T5PA9ta0VUoFND50IzF8ZcyP6wMmCYvjMTeBMid-issegaVBHXGGNIeS8EoiIcWYA" />
@@ -981,7 +979,6 @@ PRs welcome! If you find issues or want to improve the OAuth flow, feel free to 
    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=BlockedPath/pi-xai-oauth&type=date&legend=top-left&sealed_token=mplONFTi7X9l3tzDSSZh6eeGnqJAae-xE51busDleWBO26slBQcI7T5PA9ta0VUoFND50IzF8ZcyP6wMmCYvjMTeBMid-issegaVBHXGGNIeS8EoiIcWYA" />
  </picture>
 </a>
-
 ---
 
 *Powered by Grok 4.5 — flagship reasoning, agentic coding, and the full xAI API.*
