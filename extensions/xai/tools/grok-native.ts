@@ -18,6 +18,7 @@ import {
 import { Worker } from "node:worker_threads";
 import { basename, dirname, extname, isAbsolute, join, relative, sep } from "node:path";
 import { Type } from "typebox";
+import { throwIfAborted as assertNotAborted } from "../abort";
 import { resolveXaiCredential } from "../auth";
 import {
   XAI_GROK_NATIVE_AUTO_TOOL_NAMES,
@@ -215,7 +216,7 @@ function globMatches(pattern: string | undefined, relativePath: string): boolean
 }
 
 function throwIfAborted(signal: AbortSignal | undefined) {
-  if (signal?.aborted) throw new Error("Operation aborted");
+  assertNotAborted(signal, () => new Error("Operation aborted"));
 }
 
 function isRegexQuantifierStart(char: string | undefined): boolean {

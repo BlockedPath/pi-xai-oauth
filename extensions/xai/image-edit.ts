@@ -1,3 +1,5 @@
+import { cancellationError, composeTimeoutSignal } from "./abort";
+import { readBoundedResponseText } from "./bounded-body";
 import type { XaiCredential } from "./routing";
 import { resolveXaiRoute } from "./routing";
 import {
@@ -194,36 +196,16 @@ export function buildXaiImageEditPayload(
   return payload;
 }
 
-async function readBoundedResponse(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  const abortError = () => new DOMException("The operation was cancelled.", "AbortError");
-  let rejectOnAbort: ((reason: unknown) => void) | undefined;
-  const aborted = new Promise<never>((_resolve, reject) => {
-    rejectOnAbort = reject;
+function readBoundedResponse(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
+  return readBoundedResponseText(response, {
+    maxBytes,
+    signal,
+    emptyBody: "empty",
+    checkDeclaredLength: false,
+    abortError: () => cancellationError(),
+    overflowError: () =>
+      new ImageEditOperationError("xAI image edit response exceeded the byte limit.", "invalid_response"),
   });
-  const onAbort = () => rejectOnAbort?.(abortError());
-  signal.addEventListener("abort", onAbort, { once: true });
-  try {
-    if (signal.aborted) throw abortError();
-    while (true) {
-      const { done, value } = await Promise.race([reader.read(), aborted]);
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel().catch(() => undefined);
-        throw new ImageEditOperationError("xAI image edit response exceeded the byte limit.", "invalid_response");
-      }
-      chunks.push(value);
-    }
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-    if (signal.aborted) await reader.cancel().catch(() => undefined);
-    reader.releaseLock();
-  }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total).toString("utf8");
 }
 
 async function postBoundedImageEdit(
@@ -232,15 +214,10 @@ async function postBoundedImageEdit(
   callerSignal: AbortSignal | undefined,
   dependencies: ImageEditDependencies,
 ): Promise<unknown> {
-  const controller = new AbortController();
-  let timedOut = false;
-  const forwardAbort = () => controller.abort();
-  callerSignal?.addEventListener("abort", forwardAbort, { once: true });
-  if (callerSignal?.aborted) controller.abort();
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, dependencies.requestTimeoutMs ?? IMAGE_EDIT_REQUEST_TIMEOUT_MS);
+  const abort = composeTimeoutSignal(
+    callerSignal,
+    dependencies.requestTimeoutMs ?? IMAGE_EDIT_REQUEST_TIMEOUT_MS,
+  );
 
   try {
     if (callerSignal?.aborted) {
@@ -254,11 +231,11 @@ async function postBoundedImageEdit(
         headers: xaiDirectMediaJsonHeaders(credential.token),
         body: JSON.stringify(body),
         redirect: "error",
-        signal: controller.signal,
+        signal: abort.signal,
       });
     } catch (error) {
       if (callerSignal?.aborted) throw new ImageEditOperationError("xAI image edit was cancelled.", "cancelled");
-      if (timedOut) throw new ImageEditOperationError("xAI image edit timed out.", "timeout");
+      if (abort.timedOut()) throw new ImageEditOperationError("xAI image edit timed out.", "timeout");
       if (isAbortError(error)) throw new ImageEditOperationError("xAI image edit was cancelled.", "cancelled");
       throw new ImageEditOperationError("xAI image edit request failed. Check the network and try again.", "network_failure");
     }
@@ -276,7 +253,7 @@ async function postBoundedImageEdit(
     const text = await readBoundedResponse(
       response,
       dependencies.responseMaxBytes ?? IMAGE_EDIT_MAX_RESPONSE_JSON_BYTES,
-      controller.signal,
+      abort.signal,
     );
     try {
       return JSON.parse(text);
@@ -286,11 +263,10 @@ async function postBoundedImageEdit(
   } catch (error) {
     if (error instanceof ImageEditOperationError) throw error;
     if (callerSignal?.aborted) throw new ImageEditOperationError("xAI image edit was cancelled.", "cancelled");
-    if (timedOut) throw new ImageEditOperationError("xAI image edit timed out.", "timeout");
+    if (abort.timedOut()) throw new ImageEditOperationError("xAI image edit timed out.", "timeout");
     throw new ImageEditOperationError("xAI image edit response could not be read safely.", "invalid_response");
   } finally {
-    clearTimeout(timeout);
-    callerSignal?.removeEventListener("abort", forwardAbort);
+    abort.dispose();
   }
 }
 

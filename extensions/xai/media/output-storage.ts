@@ -1,16 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { throwIfAborted } from "../abort";
 import { IMAGE_EDIT_OUTPUT_DIRECTORY_MODE, IMAGE_EDIT_OUTPUT_FILE_MODE } from "./constants";
 import type { SavedImageOutput, VerifiedImageBytes } from "./types";
 
 interface ReadonlySessionLocation {
   getSessionDir(): string;
   getSessionId(): string;
-}
-
-function throwIfAborted(signal?: AbortSignal) {
-  if (signal?.aborted) throw new DOMException("The operation was cancelled.", "AbortError");
 }
 
 function isWithin(root: string, target: string): boolean {
@@ -97,11 +94,12 @@ export async function savePrivateStreamedOutput<T>(options: {
   extension: string;
   stemPrefix: string;
   signal?: AbortSignal;
+  invalidPathMessage?: string;
   write: (writer: PrivateOutputWriter) => Promise<T>;
 }): Promise<{ path: string; value: T }> {
   throwIfAborted(options.signal);
   if (!isAbsolute(options.outputRoot) || !isAbsolute(options.sessionRoot)) {
-    throw new Error("Output path is invalid.");
+    throw new Error(options.invalidPathMessage ?? "Output path is invalid.");
   }
   const realOutputRoot = await ensurePrivateOutputDirectory(options.outputRoot, options.sessionRoot);
   const stem = `${options.stemPrefix}-${Date.now()}-${randomUUID()}`;
@@ -133,6 +131,7 @@ export async function savePrivateStreamedOutput<T>(options: {
     throwIfAborted(options.signal);
     await rename(temporaryPath, finalPath);
     finalCreated = true;
+    throwIfAborted(options.signal);
     await chmod(finalPath, IMAGE_EDIT_OUTPUT_FILE_MODE);
     throwIfAborted(options.signal);
     return { path: finalPath, value };
@@ -149,46 +148,20 @@ export async function saveVerifiedOutputImage(
   image: VerifiedImageBytes,
   options: { outputRoot: string; sessionRoot: string; signal?: AbortSignal },
 ): Promise<SavedImageOutput> {
-  throwIfAborted(options.signal);
-  if (!isAbsolute(options.outputRoot) || !isAbsolute(options.sessionRoot)) {
-    throw new Error("Image output path is invalid.");
-  }
-
-  const realOutputRoot = await ensurePrivateOutputDirectory(
-    options.outputRoot,
-    options.sessionRoot,
-  );
-  throwIfAborted(options.signal);
-
-  const extension = image.mimeType === "image/png" ? "png" : "jpg";
-  const stem = `xai-edit-${Date.now()}-${randomUUID()}`;
-  const finalPath = join(realOutputRoot, `${stem}.${extension}`);
-  const temporaryPath = join(realOutputRoot, `.${stem}.${extension}.tmp`);
-  let handle: Awaited<ReturnType<typeof open>> | undefined;
-  let finalCreated = false;
-  try {
-    handle = await open(temporaryPath, "wx", IMAGE_EDIT_OUTPUT_FILE_MODE);
-    await handle.writeFile(image.bytes);
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    throwIfAborted(options.signal);
-    await rename(temporaryPath, finalPath);
-    finalCreated = true;
-    throwIfAborted(options.signal);
-    await chmod(finalPath, IMAGE_EDIT_OUTPUT_FILE_MODE);
-    throwIfAborted(options.signal);
-    return {
-      path: finalPath,
-      mimeType: image.mimeType,
-      width: image.width,
-      height: image.height,
-      byteLength: image.bytes.length,
-    };
-  } catch (error) {
-    await handle?.close().catch(() => undefined);
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-    if (finalCreated) await rm(finalPath, { force: true }).catch(() => undefined);
-    throw error;
-  }
+  const saved = await savePrivateStreamedOutput({
+    outputRoot: options.outputRoot,
+    sessionRoot: options.sessionRoot,
+    signal: options.signal,
+    extension: image.mimeType === "image/png" ? "png" : "jpg",
+    stemPrefix: "xai-edit",
+    invalidPathMessage: "Image output path is invalid.",
+    write: (writer) => writer.write(image.bytes),
+  });
+  return {
+    path: saved.path,
+    mimeType: image.mimeType,
+    width: image.width,
+    height: image.height,
+    byteLength: image.bytes.length,
+  };
 }
