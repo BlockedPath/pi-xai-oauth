@@ -17,6 +17,9 @@
 - [x] Passed exact packed Pi 0.80.1 and 0.82.1 boundaries, including each boundary's full tests, loader smoke, and typecheck. The first 0.82.1 run hit an unrelated 30-second real-registry timeout; the clean rerun passed in 296 ms.
 - [x] Passed pi-lens diagnostics, `git diff --check`, and independent read-only review with no findings.
 - [x] Created two focused commits: `09e649e` (evidence/decision docs) and `cc7f42f` (custom-tool omission regression).
+- [x] Independent standards/spec review found no implementation or acceptance gaps.
+- [x] Re-ran both exact packed boundaries during review: 0.80.1 and 0.82.1 each pass all 545 tests, loader smoke, and typecheck.
+- [x] Added the Unreleased changelog documentation entry for the evidence-based no-go decision.
 
 
 ## In Progress
@@ -26,4 +29,4 @@
 
 ## Next
 
-Report evidence, decision, validation, and residual risk.
+Push the branch and open a PR closing #146.
