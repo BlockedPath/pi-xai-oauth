@@ -57,6 +57,11 @@ describe("custom xAI tools", () => {
       XAI_NETWORK_TOOL_NAMES.filter((name) => !name.startsWith("xai_grok_")).sort(),
     );
   });
+  it("does not advertise unverified constrained-sampling capability", () => {
+    for (const tool of h.tools.values()) {
+      expect(tool).not.toHaveProperty("constrainedSampling");
+    }
+  });
   it.each([
     ["xai_generate_text", { prompt: "guard" }],
     ["xai_x_search", { query: "guard" }],
