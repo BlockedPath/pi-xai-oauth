@@ -12,6 +12,7 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 - Reviewed the Pi 0.82 line and adopted it as the latest exact tested boundary after clean packed candidate validation, while preserving the 0.80.1 minimum. Pi 0.82's `bash` factory reads the tool execution context's session manager, active model, and thinking level to expose `PI_*` session metadata; the Grok-native `run_terminal_command` adapter delegates that context unchanged and is now covered by a realistic session-context test.
 - Widened aligned Pi peers to `>=0.80.1 <0.83.0` and pinned development metadata and the lockfile exactly to 0.82.1, the latest release inside the allowed line at review time.
 - Audited Pi's built-in `xai` reasoning levels against the package-owned `xai-auth` catalog and found no stale mappings; every difference is intentional and is now pinned by tests. No advertised reasoning level changed.
+- Suppressed Pi's `PI_SESSION_ID`, `PI_SESSION_FILE`, `PI_PROVIDER`, `PI_MODEL`, and `PI_REASONING_LEVEL` metadata from Grok-native terminal child processes, including stale parent values on older supported Pi versions, while preserving all unrelated environment variables and standard shell behavior.
 
 ### Documentation
 

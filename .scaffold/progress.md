@@ -16,11 +16,15 @@
 - [x] Exact packed Pi 0.80.1 boundary passes all 544 tests, loader smoke, and typecheck.
 - [x] Issue-owned Grok-native tests pass repeatedly on exact packed Pi 0.82.1.
 - [x] Committed implementation and regression as `368fc4f`.
+- [x] Independent standards/spec review found no implementation or acceptance gaps.
+- [x] Full local suite passes (45 files / 544 tests), loader smoke and TypeScript pass.
+- [x] Exact packed Pi 0.80.1 and 0.82.1 boundaries both pass all 544 tests, loader smoke, and typecheck.
+- [x] Added the missing Unreleased changelog entry for the user-visible privacy behavior.
 
 ## In Progress
 
-- [ ] Full local and Pi 0.82.1 packed gates remain blocked by pre-existing intermittent 30s ModelRuntime timeouts in `auth-storage.integration`, `credentials`, and `registry-reregistration`; each has passed on separate reruns and no failure touches this lane.
+- None.
 
 ## Next
 
-Commit documentation and report the residual unrelated gate flake with exact passing/failing evidence.
+Push the branch and open a PR closing #145.
