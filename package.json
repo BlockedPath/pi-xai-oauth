@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.81.1",
-    "@earendil-works/pi-coding-agent": "0.81.1",
+    "@earendil-works/pi-coding-agent": "0.82.0",
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "4.1.10",
     "jiti": "^2.7.0",
