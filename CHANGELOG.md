@@ -11,7 +11,7 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 - Setup no longer forces `defaultProvider: xai-auth`. When no provider is configured it seeds Pi's built-in `xai` chat provider, preserves any existing provider choice (including package-owned `xai-auth`), and still installs opt-in tools plus `/xai-usage` for both providers.
 - Reviewed the Pi 0.82 line and adopted it as the latest exact tested boundary after clean packed candidate validation, while preserving the 0.80.1 minimum. Pi 0.82's `bash` factory reads the tool execution context's session manager, active model, and thinking level to expose `PI_*` session metadata; the Grok-native `run_terminal_command` adapter delegates that context unchanged and is now covered by a realistic session-context test.
 - Widened aligned Pi peers to `>=0.80.1 <0.83.0` and pinned development metadata and the lockfile exactly to 0.82.1, the latest release inside the allowed line at review time.
-- Grok 4.5 known metadata now denies Pi's `max` thinking level explicitly instead of omitting the key, matching the shape of both Pi's built-in `xai` catalog and this package's authenticated `/models-v2` normalizer. Advertised levels are unchanged.
+- Audited Pi's built-in `xai` reasoning levels against the package-owned `xai-auth` catalog and found no stale mappings; every difference is intentional and is now pinned by tests. No advertised reasoning level changed.
 
 ### Documentation
 
