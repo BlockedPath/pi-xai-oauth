@@ -9,6 +9,8 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 ### Changed
 
 - Setup no longer forces `defaultProvider: xai-auth`. When no provider is configured it seeds Pi's built-in `xai` chat provider, preserves any existing provider choice (including package-owned `xai-auth`), and still installs opt-in tools plus `/xai-usage` for both providers.
+- Reviewed the Pi 0.82 line and adopted it as the latest exact tested boundary after clean packed candidate validation, while preserving the 0.80.1 minimum. Pi 0.82's `bash` factory reads the tool execution context's session manager, active model, and thinking level to expose `PI_*` session metadata; the Grok-native `run_terminal_command` adapter delegates that context unchanged and is now covered by a realistic session-context test.
+- Widened aligned Pi peers to `>=0.80.1 <0.83.0` and pinned development metadata and the lockfile exactly to 0.82.1, the latest release inside the allowed line at review time.
 
 ## 1.4.0 - 2026-07-23
 

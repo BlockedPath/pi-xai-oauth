@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { TEST_MODEL } from "./models";
 
 export type AnyHandler = (event: any, context: any) => any;
 
@@ -94,6 +95,26 @@ export function createExtensionHarness(
       failGet = options.get === true;
       failSet = options.set === true;
     },
+  };
+}
+
+/**
+ * Build a realistic pi tool execution context. Pi 0.82's bash factory reads
+ * `sessionManager`, the active model, and the thinking level to expose `PI_*`
+ * session metadata to spawned commands.
+ */
+export function toolExecutionContext(cwd: string, overrides: any = {}) {
+  const sessionId = overrides.sessionId ?? "pi-xai-test-session";
+  const sessionFile = overrides.sessionFile ?? `${cwd}/.pi-session.jsonl`;
+  return {
+    cwd,
+    model: overrides.model ?? TEST_MODEL,
+    thinkingLevel: overrides.thinkingLevel ?? "high",
+    sessionManager: {
+      getSessionId: () => sessionId,
+      getSessionFile: () => sessionFile,
+    },
+    ...overrides,
   };
 }
 
