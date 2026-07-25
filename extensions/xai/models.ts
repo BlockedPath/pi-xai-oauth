@@ -57,6 +57,10 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
       medium: "medium",
       high: "high",
       xhigh: null,
+      // `max` is intentionally omitted rather than spelled out as null: Pi
+      // 0.80.1's ModelThinkingLevel has no `max` member, and Pi treats an
+      // absent key and an explicit null identically. Advertised levels are the
+      // same either way.
     },
   },
   {

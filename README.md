@@ -387,6 +387,18 @@ pi --model grok-4.5:low "What's the weather?"   # fast / latency-sensitive
 
 `grok-4.5` defaults to **high** when no effort is specified; reasoning **cannot be disabled** (`/think off` is not supported for this model). Every model selected through the OAuth-only `xai-auth` runtime catalog sends Responses traffic through xAI's Grok CLI session endpoint using the same X account OAuth token. An entitled `grok-build` entry still receives its legacy Responses payload/header compatibility behavior, while every `xai-auth` model uses the same Grok-native local tool adapters. The Composer alias (`grok-composer-2.5-fast`) follows the Grok 4.5 payload path. `grok-4.20-0309-reasoning` reasons automatically and does not accept a configurable effort parameter. `grok-4.20-multi-agent-0309` uses `medium` for 4 agents and `high` for 16 agents.
 
+#### Switching between `xai` and `xai-auth`
+
+Setup seeds Pi's built-in `xai` provider when no provider is configured, so the same Grok model can be reached through two separate catalogs. They are deliberately **not** merged: built-in `xai` is Pi's generated API-key catalog, while `xai-auth` derives levels from your authenticated `/models-v2` entitlements plus bounded known metadata. Levels can therefore differ:
+
+| Model | Built-in `xai` | `xai-auth` | Why |
+|-------|----------------|------------|-----|
+| `grok-4.5` | `low` / `medium` / `high` | `minimal` / `low` / `medium` / `high` | **Intentional.** `xai-auth` maps Pi's `minimal` onto xAI's `low`, so `/think minimal` and `/think low` send the same `reasoning_effort: "low"` request. Selecting `minimal` never sends an effort xAI did not advertise. |
+| `grok-4.3` | `off` / `minimal` / `low` / `medium` / `high` | same | Identical on both paths. |
+| `grok-build-0.1` | available | **never advertised** | API-key-only model; it is excluded from `xai-auth` regardless of what a catalog response contains. |
+
+Authenticated evidence always wins on the `xai-auth` path. If `/models-v2` reports `supports_reasoning_effort: false`, the model drops to `off` only even when known metadata lists `low`/`medium`/`high`. Levels absent from `reasoning_efforts` stay hidden, and Pi clamps a request for a hidden level down to the nearest advertised one. `xhigh` appears only when the catalog names xAI's `max` effort; Pi's own `max` level is never advertised for Grok.
+
 ### Grok 4.5 source notes
 
 Official xAI sources used for this catalog update:
