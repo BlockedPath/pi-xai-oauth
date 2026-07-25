@@ -18,7 +18,7 @@ import {
   syncGrokNativeToolsForModel,
 } from "../../extensions/xai/tools/grok-native";
 import { setXaiNetworkToolActive } from "../../extensions/xai/tools/model-scope";
-import { createExtensionHarness } from "../fixtures/extension-api";
+import { createExtensionHarness, toolExecutionContext } from "../fixtures/extension-api";
 import { authContext, BUILTIN_XAI_TEST_MODEL, TEST_MODEL } from "../fixtures/models";
 import { jsonResponse, requestBody } from "../fixtures/http";
 import { createTempDir } from "../fixtures/temp";
@@ -63,9 +63,13 @@ function tool(name: string) {
 }
 
 async function run(name: string, params: any) {
-  return tool(name).execute("call", params, new AbortController().signal, () => {}, {
-    cwd: temp.path,
-  });
+  return tool(name).execute(
+    "call",
+    params,
+    new AbortController().signal,
+    () => {},
+    toolExecutionContext(temp.path),
+  );
 }
 
 describe("Grok-native tools", () => {
@@ -381,6 +385,24 @@ describe("Grok-native tools", () => {
     } finally {
       await outside.cleanup();
     }
+  });
+
+  it("executes the terminal adapter with a realistic pi session execution context", async () => {
+    const ctx = toolExecutionContext(temp.path);
+    expect(ctx.sessionManager.getSessionId()).toBeTruthy();
+    const result = await tool("run_terminal_command").execute(
+      "call",
+      {
+        command: "printf session-context-ok",
+        description: "verify the terminal adapter under a realistic session context",
+        background: false,
+        timeout: 1_000,
+      },
+      new AbortController().signal,
+      () => {},
+      ctx,
+    );
+    expect(result.content[0].text).toMatch(/session-context-ok/);
   });
 
   it("refuses an explicit grep symlink that escapes the workspace", async () => {
