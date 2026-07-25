@@ -186,4 +186,33 @@ describe("OAuth login method and device integration", () => {
       } as any),
     ).rejects.toThrow("Login cancelled");
   });
+
+  it("keeps a valid login and reports why the catalog handoff failed", async () => {
+    const clock = makeClock();
+    const progress: string[] = [];
+    const oauth = createXaiOAuth({
+      getExistingCredentials: () => null,
+      deviceAuth: {
+        now: clock.now,
+        sleep: clock.sleep,
+        fetchImpl: async (url) =>
+          String(url) === XAI_OAUTH_DEVICE_URL
+            ? jsonResponse(devicePayload({ interval: 1 }))
+            : jsonResponse(tokenPayload()),
+      },
+      onLoginCredentials: async () => {
+        throw new Error("catalog endpoint unavailable");
+      },
+    });
+    const credentials = await oauth.login({
+      onPrompt: async () => "n",
+      onAuth: () => {},
+      onDeviceCode: () => {},
+      onSelect: async () => XAI_DEVICE_LOGIN_METHOD,
+      onProgress: (message: string) => progress.push(message),
+    } as any);
+    expect(credentials).toMatchObject({ access: "device-access-token" });
+    expect(progress.at(-1)).toMatch(/catalog endpoint unavailable/);
+    expect(progress.at(-1)).toMatch(/curated fallback/);
+  });
 });

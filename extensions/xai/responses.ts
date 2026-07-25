@@ -587,6 +587,15 @@ export function streamSimpleXaiResponses(
     } finally {
       releaseRedirectGuard();
     }
-  })();
+  })().catch((error) => {
+    // A failure inside the pump's own error path must still terminate the
+    // stream: an unobserved rejection would hang every consumer awaiting it.
+    const message = streamErrorMessage(model, error);
+    try {
+      stream.push({ type: "error", reason: "error", error: message });
+    } finally {
+      stream.end(message);
+    }
+  });
   return stream;
 }

@@ -56,7 +56,7 @@ function installPackage() {
     console.log(color("\n✅ Package installed successfully!", "green"));
     return true;
   } catch (err) {
-    console.error(color("\n❌ Failed to run 'pi install'.", "red"));
+    console.error(color(`\n❌ Failed to run 'pi install': ${err && err.message ? err.message : err}`, "red"));
     console.log(`Please run manually:  ${color(`pi install ${NPM_SPEC}`, "yellow")}`);
     return false;
   }
@@ -149,9 +149,11 @@ function updateSettings(settingsPath = SETTINGS_PATH) {
       const backupPath = `${settingsPath}.bak-${new Date().toISOString().replace(/[:.]/g, "-")}`;
       try {
         fs.copyFileSync(settingsPath, backupPath);
-        console.log(color(`   Warning: Could not parse existing settings.json; backed it up to ${backupPath}`, "yellow"));
-      } catch {
-        console.log(color("   Warning: Could not parse existing settings.json and could not create a backup", "yellow"));
+        console.log(color(`   Warning: Could not parse existing settings.json (${e.message}); backed it up to ${backupPath}`, "yellow"));
+      } catch (backupError) {
+        console.error(color(`   ❌ Could not parse existing settings.json (${e.message}) and could not back it up (${backupError.message}).`, "red"));
+        console.log(`   Fix or move ${settingsPath} and re-run, or configure pi manually.\n`);
+        return false;
       }
     }
   }
@@ -206,11 +208,14 @@ function updateSettings(settingsPath = SETTINGS_PATH) {
       fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
       console.log(color("   ✅ Settings updated!", "green"));
     } catch (e) {
-      console.log(color("   ⚠️  Could not write settings.json (you can configure manually)", "yellow"));
+      console.error(color(`   ❌ Could not write settings.json: ${e.message}`, "red"));
+      console.log(`   Configure ${settingsPath} manually and re-run if needed.\n`);
+      return false;
     }
   } else {
     console.log(color("   (Settings already configured)", "reset"));
   }
+  return true;
 }
 
 function printNextSteps(nonInteractive = false) {
@@ -434,11 +439,15 @@ function main() {
     process.exit(1);
   }
 
-  const success = installPackage();
-  if (success) {
-    updateSettings();
-    printNextSteps(yes);
+  if (!installPackage()) {
+    process.exit(1);
   }
+
+  if (!updateSettings()) {
+    process.exit(1);
+  }
+
+  printNextSteps(yes);
 }
 
 if (require.main === module) {

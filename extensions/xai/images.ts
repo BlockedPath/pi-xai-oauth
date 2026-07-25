@@ -174,6 +174,7 @@ export async function compactXaiInlineImages(
     }
 
     let resized;
+    let compressionError: unknown;
     try {
       resized = await resizeImage(bytes, reference.mimeType, {
         maxWidth: MAX_XAI_IMAGE_DIMENSION,
@@ -181,11 +182,15 @@ export async function compactXaiInlineImages(
         maxBytes: reference.targetSize + 1,
         jpegQuality: XAI_JPEG_QUALITY,
       });
-    } catch {
+    } catch (error) {
+      compressionError = error;
       resized = null;
     }
     if (!resized || Buffer.byteLength(resized.data, "utf8") > reference.targetSize) {
-      throw new Error("xAI inline image payload exceeds the safe transport budget and could not be compacted");
+      throw new Error(
+        "xAI inline image payload exceeds the safe transport budget and could not be compacted",
+        compressionError === undefined ? undefined : { cause: compressionError },
+      );
     }
     reference.imagePart.image_url = `data:${resized.mimeType};base64,${resized.data}`;
   }

@@ -1,13 +1,14 @@
 import { createRequire } from "node:module";
+import nodeFs from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTempDir } from "../fixtures/temp";
 const require = createRequire(import.meta.url);
 const setup = require("../../bin/setup.js") as {
   getNpmPackageName(source: string): string | undefined;
   pruneDuplicatePackageEntries(entries: any[], settingsPath: string): any;
-  updateSettings(path: string): void;
+  updateSettings(path: string): boolean;
 };
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 let settingsPath: string;
@@ -77,7 +78,7 @@ describe("setup settings", () => {
         unrelated: true,
       }),
     );
-    setup.updateSettings(settingsPath);
+    expect(setup.updateSettings(settingsPath)).toBe(true);
     const value = JSON.parse(await readFile(settingsPath, "utf8"));
     expect(value).toMatchObject({
       packages: ["npm:pi-xai-oauth"],
@@ -121,5 +122,23 @@ describe("setup settings", () => {
       defaultModel: "grok-4.5",
       defaultThinkingLevel: "high",
     });
+  });
+  it("keeps unparseable settings intact when no backup can be written", async () => {
+    await mkdir(join(settingsPath, ".."), { recursive: true });
+    await writeFile(settingsPath, "{ not json");
+    vi.spyOn(nodeFs, "copyFileSync").mockImplementation(() => {
+      throw new Error("backup denied");
+    });
+    const write = vi.spyOn(nodeFs, "writeFileSync");
+
+    expect(setup.updateSettings(settingsPath)).toBe(false);
+    expect(write).not.toHaveBeenCalled();
+    expect(await readFile(settingsPath, "utf8")).toBe("{ not json");
+  });
+  it("reports a failed settings write instead of claiming success", async () => {
+    vi.spyOn(nodeFs, "writeFileSync").mockImplementation(() => {
+      throw new Error("read-only filesystem");
+    });
+    expect(setup.updateSettings(settingsPath)).toBe(false);
   });
 });
