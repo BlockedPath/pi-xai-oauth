@@ -95,6 +95,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 
 `pi-xai-oauth` owns the xAI-specific integration needed to use entitled Grok models through pi: authentication and credentials, account-specific catalogs, transport and payload behavior, Grok-native compatibility adapters, opt-in network tools, and media integrations. It intentionally does not provide generic `/goal` or `/plan` commands, autonomous continuation, a runtime plan-file protocol, generic task/subagent orchestration, or plan-mode write restriction. See [ADR 0001](docs/decisions/0001-goal-plan-package-scope.md) for the decision and alternatives.
 
+Pi 0.82 constrained JSON-schema sampling remains disabled for package custom tools because public xAI strict-tool documentation has not been verified for the separate OAuth CLI Responses proxy. [ADR 0002](docs/decisions/0002-xai-oauth-constrained-sampling.md) records the first-party evidence, bounded live probe, safe Pi fallback, and no-runtime-flag decision.
+
 Tool hiding, active-tool filtering, and shell-command filtering are workflow controls, not an enforced read-only boundary. Pi and its extensions run with the user's permissions; strong isolation requires an external sandbox, container, or VM that constrains every tool and extension involved.
 
 The optional [`--scaffold`](#agent-scaffolding) command is separate: it performs one-time generation of `AGENTS.md` and `.scaffold/*` guidance files in the current directory. It is not a runtime workflow controller, an authoritative plan-state protocol, or a security mechanism.

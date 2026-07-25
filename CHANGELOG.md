@@ -17,6 +17,7 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 ### Documentation
 
 - Documented the intentional reasoning-level differences between Pi's built-in `xai` provider and package-owned `xai-auth`, including the Grok 4.5 `minimal` → xAI `low` mapping, identical Grok 4.3 levels, and the never-advertised API-key-only `grok-build-0.1`.
+- Recorded the evidence-based decision to keep Pi 0.82 constrained JSON-schema sampling disabled for package custom tools until the pinned xAI OAuth Responses route has route-specific strict-tool support evidence; no runtime capability flag or catalog metadata was added.
 
 ## 1.4.0 - 2026-07-23
 
