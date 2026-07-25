@@ -1,30 +1,26 @@
-# Execution Progress — Issue #132
+# Execution Progress — Issue #145
 
-**Branch:** `feat/132-builtin-xai-tools`
-**Issue:** https://github.com/BlockedPath/pi-xai-oauth/issues/132
-**Linear:** BLO-15
+**Branch:** `issue/145-pi-session-env`
+**Issue:** https://github.com/BlockedPath/pi-xai-oauth/issues/145
 
 ## Completed
 
-- [x] Confirmed the active feature branch and clean baseline except the caller-owned `.agent-task.md`.
-- [x] Read GitHub #132 and Linear BLO-15; Linear is already In Progress.
-- [x] Read required entrypoint/setup files and mapped network-tool, auth, usage, route, native-adapter, and test behavior.
-- [x] Inspected Pi 0.81.1's built-in `xai` provider, OAuth flow, ModelRuntime provenance, and ModelRegistry compatibility facade.
-- [x] Ran parallel scout/planner review and synthesized the active-first provider/provenance plan.
-- [x] Baseline focused tests pass (4 files, 50 tests) and TypeScript passes.
-
-- [x] Added narrow tool-compatible provider constants and broadened only network-tool scope.
-- [x] Added active-first two-provider credential lookup with built-in OAuth/API-key provenance.
-- [x] Extended OAuth-only usage status to built-in SuperGrok OAuth while rejecting active API keys.
-- [x] Added command, lifecycle, route, credential, usage, and local-adapter isolation regressions.
-- [x] Updated README and Unreleased changelog documentation.
-- [x] Full suite passes (44 files, 506 tests), loader and TypeScript checks pass.
-- [x] Compatibility policy/pack checks and exact Pi 0.80.1 / 0.81.1 packed boundaries pass.
+- [x] Read issue #145 and confirmed the active branch and scoped files.
+- [x] Installed dependencies with `npm install`.
+- [x] Chose to suppress Pi session metadata from Grok-native terminal children.
+- [x] Implemented the policy with the cross-range bash `spawnHook`, removing injected Pi 0.82 values and stale Pi 0.80.1 parent values.
+- [x] Added a focused real-child-process regression that preserves an unrelated environment value without printing session paths or metadata.
+- [x] Documented the privacy rationale and preserved shell behavior in README.
+- [x] Focused Grok-native tests pass (23 tests); edited-file LSP diagnostics are clean.
+- [x] TypeScript passes.
+- [x] Exact packed Pi 0.80.1 boundary passes all 544 tests, loader smoke, and typecheck.
+- [x] Issue-owned Grok-native tests pass repeatedly on exact packed Pi 0.82.1.
+- [x] Committed implementation and regression as `368fc4f`.
 
 ## In Progress
 
-- [ ] Run independent review and final diagnostics; resolve any findings.
+- [ ] Full local and Pi 0.82.1 packed gates remain blocked by pre-existing intermittent 30s ModelRuntime timeouts in `auth-storage.integration`, `credentials`, and `registry-reregistration`; each has passed on separate reruns and no failure touches this lane.
 
 ## Next
 
-Complete independent review, then commit, push, open a PR closing #132, and update BLO-15.
+Commit documentation and report the residual unrelated gate flake with exact passing/failing evidence.
