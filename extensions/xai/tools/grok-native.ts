@@ -866,6 +866,51 @@ async function executeReadFile(
   );
 }
 
+/**
+ * Pi session metadata that Pi 0.82+ injects into bash-tool child processes.
+ *
+ * Official semantics: https://github.com/earendil-works/pi/blob/v0.82.0/packages/coding-agent/docs/environment-variables.md#bash-tool-session-environment
+ */
+const PI_SESSION_ENVIRONMENT_KEYS = [
+  "PI_SESSION_ID",
+  "PI_SESSION_FILE",
+  "PI_PROVIDER",
+  "PI_MODEL",
+  "PI_REASONING_LEVEL",
+] as const;
+
+/**
+ * Session-environment policy for `xai_grok_run_terminal_command` (issue #145).
+ *
+ * Decision: **do not** inherit Pi's session metadata. The Grok-native terminal
+ * adapter executes commands authored by a third-party model (xAI/Grok), not
+ * commands authored directly by the local operator. Pi's built-in bash tool
+ * exposes `PI_*` for the user's own agent; this adapter instead runs commands chosen by
+ * a remote model, so the same values become a passive disclosure channel:
+ * `PI_SESSION_FILE` points at the live transcript JSONL (which this package's
+ * own docs note holds encrypted reasoning and full conversation state), and
+ * `PI_PROVIDER`/`PI_MODEL`/`PI_REASONING_LEVEL` let a command fingerprint the
+ * operator's configuration. The adapter already documents that its filesystem
+ * access is intentionally unsandboxed, so a single `cat "$PI_SESSION_FILE"`
+ * would turn "broad local shell" into "one-step transcript exfiltration".
+ * Suppressing five variables costs nothing: no Grok tool contract references
+ * them, and the shell keeps every other inherited variable.
+ *
+ * Implementation note: the 0.82-only `exposeSessionEnvironment: false` option is
+ * deliberately not used. It does not exist in `BashToolOptions` on 0.80.1, so
+ * passing it would be a silent no-op there rather than a policy. `spawnHook`
+ * exists across the whole supported range and runs last, after Pi has populated
+ * the environment, which makes deletion authoritative on every boundary: on
+ * 0.82 it removes the values Pi just injected, and on 0.80.1 it removes any
+ * stale `PI_*` inherited from the parent process instead of leaving them.
+ */
+function applyTerminalSessionEnvironmentPolicy<T extends { env: NodeJS.ProcessEnv }>(
+  context: T,
+): T {
+  for (const key of PI_SESSION_ENVIRONMENT_KEYS) delete context.env[key];
+  return context;
+}
+
 function uniqueToolNames(toolNames: string[]): string[] {
   return [...new Set(toolNames)];
 }
@@ -976,7 +1021,9 @@ export function registerGrokNativeTools(pi: ExtensionAPI) {
           "run_terminal_command background=true is unavailable: pi has no managed background-task lifecycle",
         );
       }
-      return createBashToolDefinition(ctx.cwd).execute(
+      return createBashToolDefinition(ctx.cwd, {
+        spawnHook: applyTerminalSessionEnvironmentPolicy,
+      }).execute(
         toolCallId,
         { command: normalized.command, timeout: normalized.timeout },
         signal,
