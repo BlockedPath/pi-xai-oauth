@@ -1,0 +1,36 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "grok-4.5",
+      "model": "grok-4.5",
+      "name": "Grok 4.5",
+      "object": "model",
+      "api_backend": "responses",
+      "context_window": 500000,
+      "supports_reasoning_effort": true,
+      "reasoning_effort": "high",
+      "reasoning_efforts": ["low", "medium", "high"]
+    },
+    {
+      "id": "reasoning-denied-known",
+      "model": "grok-4.3",
+      "name": "Grok 4.3",
+      "object": "model",
+      "api_backend": "responses",
+      "context_window": 1000000,
+      "supports_reasoning_effort": false,
+      "reasoning_efforts": ["low", "medium", "high"]
+    },
+    {
+      "id": "grok-partial-effort",
+      "model": "grok-partial-effort",
+      "name": "Grok Partial Effort",
+      "object": "model",
+      "api_backend": "responses",
+      "context_window": 262144,
+      "supports_reasoning_effort": true,
+      "reasoning_efforts": ["low"]
+    }
+  ]
+}
