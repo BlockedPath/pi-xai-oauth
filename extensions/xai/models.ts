@@ -57,10 +57,10 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
       medium: "medium",
       high: "high",
       xhigh: null,
-      // Pi 0.82's built-in `xai` Grok 4.5 entry denies `max` explicitly, and the
-      // authenticated normalizer always emits the key. Keep the denial explicit
-      // here so known metadata and catalog-derived metadata have one shape.
-      max: null,
+      // `max` is intentionally omitted rather than spelled out as null: Pi
+      // 0.80.1's ModelThinkingLevel has no `max` member, and Pi treats an
+      // absent key and an explicit null identically. Advertised levels are the
+      // same either way.
     },
   },
   {

@@ -29,6 +29,14 @@ const fixture = async (name: string) =>
 const supportedLevels = (model: XaiCatalogModel) =>
   getSupportedThinkingLevels(model as unknown as Model<Api>);
 
+/**
+ * Look up a built-in model by id without assuming it exists on every supported
+ * Pi line. `XAI_MODELS` is a literal type whose membership changes across the
+ * range (0.80.1 has no `grok-4.5`), so index it through a widened record.
+ */
+const builtIn = (id: string): Model<Api> | undefined =>
+  (XAI_MODELS as unknown as Record<string, Model<Api> | undefined>)[id];
+
 const known = (id: string) => {
   const model = KNOWN_XAI_MODEL_METADATA.find((entry) => entry.id === id);
   if (!model) throw new Error(`missing known metadata for ${id}`);
@@ -37,11 +45,16 @@ const known = (id: string) => {
 
 describe("built-in xai vs xai-auth reasoning parity", () => {
   it("inventories the built-in Grok models this package advertises or aliases", () => {
-    expect(Object.keys(XAI_MODELS).sort()).toEqual([
-      "grok-4.3",
-      "grok-4.5",
-      "grok-build-0.1",
-    ]);
+    // Built-in catalog membership changes across the supported Pi range: 0.80.1
+    // still ships grok-3 / grok-code-fast-1 and has no grok-4.5, while 0.81+
+    // drops the legacy entries. Assert the invariants that must hold on every
+    // supported boundary rather than one line's exact membership.
+    const ids = Object.keys(XAI_MODELS);
+    expect(ids).toContain("grok-4.3");
+    expect(ids).toContain("grok-build-0.1");
+    // Package-owned entitlement models never appear in Pi's API-key catalog.
+    expect(ids).not.toContain("grok-build");
+    expect(ids).not.toContain("grok-composer-2.5-fast");
   });
 
   it("keeps grok-4.3 levels identical across both providers", () => {
@@ -51,13 +64,18 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
   });
 
   it("documents the intentional grok-4.5 minimal difference", () => {
-    // Built-in `xai` denies `minimal`; `xai-auth` maps Pi's `minimal` onto the
-    // xAI wire value `low`, which is the same request xAI receives for `low`.
-    expect(getSupportedThinkingLevels(XAI_MODELS["grok-4.5"])).toEqual([
-      "low",
-      "medium",
-      "high",
-    ]);
+    // grok-4.5 only exists in the built-in catalog from Pi 0.81 onward; the
+    // xai-auth side is asserted unconditionally either way.
+    const builtIn45 = builtIn("grok-4.5");
+    if (builtIn45) {
+      // Built-in `xai` denies `minimal`; `xai-auth` maps Pi's `minimal` onto the
+      // xAI wire value `low`, which is the same request xAI receives for `low`.
+      expect(getSupportedThinkingLevels(builtIn45)).toEqual([
+        "low",
+        "medium",
+        "high",
+      ]);
+    }
     expect(supportedLevels(known("grok-4.5"))).toEqual([
       "minimal",
       "low",
@@ -66,13 +84,19 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     ]);
     expect(known("grok-4.5").thinkingLevelMap?.minimal).toBe("low");
     // Neither provider ever offers `off`, `xhigh`, or `max` for Grok 4.5.
-    // Pi treats an absent key and an explicit null alike for these levels, so
-    // assert the effective levels rather than the raw map shape: Pi 0.81 leaves
-    // built-in `xhigh`/`max` undefined while 0.82 spells them out as null.
+    // Assert effective levels rather than the raw map shape: the supported Pi
+    // range spells these differently (0.80.1 has no `max` level at all, 0.81
+    // leaves built-in `xhigh`/`max` undefined, 0.82 sets them to null) while
+    // meaning the same thing.
+    const map = known("grok-4.5").thinkingLevelMap as
+      | Record<string, string | null | undefined>
+      | undefined;
     for (const level of ["off", "xhigh", "max"] as const) {
-      expect(getSupportedThinkingLevels(XAI_MODELS["grok-4.5"])).not.toContain(level);
+      if (builtIn45) {
+        expect(getSupportedThinkingLevels(builtIn45)).not.toContain(level);
+      }
       expect(supportedLevels(known("grok-4.5"))).not.toContain(level);
-      expect(known("grok-4.5").thinkingLevelMap?.[level]).toBeNull();
+      expect(map?.[level] ?? null).toBeNull();
     }
   });
 
@@ -160,6 +184,6 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
     });
     // xAI's `max` canonicalizes to Pi's `xhigh`; `max` itself stays denied.
     expect(supportedLevels(extended)).toContain("xhigh");
-    expect(extended.thinkingLevelMap?.max).toBeNull();
+    expect(supportedLevels(extended)).not.toContain("max");
   });
 });
