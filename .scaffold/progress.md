@@ -16,13 +16,14 @@
 - [x] Passed the focused custom-tool suite (34 tests), full `npm test` (45 files / 545 tests), root typecheck, and loader smoke.
 - [x] Passed exact packed Pi 0.80.1 and 0.82.1 boundaries, including each boundary's full tests, loader smoke, and typecheck. The first 0.82.1 run hit an unrelated 30-second real-registry timeout; the clean rerun passed in 296 ms.
 - [x] Passed pi-lens diagnostics, `git diff --check`, and independent read-only review with no findings.
+- [x] Created two focused commits: `09e649e` (evidence/decision docs) and `cc7f42f` (custom-tool omission regression).
 
 
 ## In Progress
 
-- [ ] Create focused commits.
+- None.
 
 
 ## Next
 
-Commit the documentation/evidence decision and focused regression, then report evidence, decision, validation, and residual risk.
+Report evidence, decision, validation, and residual risk.
