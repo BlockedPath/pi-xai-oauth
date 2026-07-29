@@ -102,6 +102,7 @@ export async function savePrivateStreamedOutput<T>(options: {
     throw new Error(options.invalidPathMessage ?? "Output path is invalid.");
   }
   const realOutputRoot = await ensurePrivateOutputDirectory(options.outputRoot, options.sessionRoot);
+  throwIfAborted(options.signal);
   const stem = `${options.stemPrefix}-${Date.now()}-${randomUUID()}`;
   const finalPath = join(realOutputRoot, `${stem}.${options.extension}`);
   const temporaryPath = join(realOutputRoot, `.${stem}.${options.extension}.tmp`);

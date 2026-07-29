@@ -68,6 +68,7 @@ export async function readBoundedResponseText(
   const abortError = options.abortError ?? (() => signal?.reason ?? cancellationError());
 
   if (options.checkDeclaredLength !== false && exceedsDeclaredLength(response, maxBytes)) {
+    void response.body?.cancel().catch(() => undefined);
     throw overflowError();
   }
   if (!response.body) {

@@ -89,6 +89,18 @@ describe("shared bounded body readers", () => {
     })).rejects.toThrow("too large");
   });
 
+  it("cancels declared over-length bodies before rejecting", async () => {
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream<Uint8Array>({ cancel }), {
+      headers: { "content-length": "4096" },
+    });
+    await expect(readBoundedResponseText(response, {
+      maxBytes: 8,
+      overflowError: () => new Error("too large"),
+    })).rejects.toThrow("too large");
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   it("cancels the reader and rejects with the caller error on cancellation", async () => {
     const cancel = vi.fn();
     const controller = new AbortController();
