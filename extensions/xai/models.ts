@@ -222,14 +222,24 @@ export const MODELS = CURATED_FALLBACK_MODELS;
 
 let runtimeModels: readonly XaiCatalogModel[] = CURATED_FALLBACK_MODELS;
 
-/** Replace request-helper metadata with the current entitlement snapshot. */
-export function setXaiRuntimeModels(models: readonly XaiCatalogModel[]): void {
-  runtimeModels = models.map((model) => ({
+/** Deep-copy a catalog entry so callers never share mutable model state. */
+export function cloneXaiCatalogModel(model: XaiCatalogModel): XaiCatalogModel {
+  return {
     ...model,
     input: [...model.input],
     cost: { ...model.cost },
     ...(model.thinkingLevelMap ? { thinkingLevelMap: { ...model.thinkingLevelMap } } : {}),
-  }));
+  };
+}
+
+/** Deep-copy a catalog snapshot so callers never share mutable model state. */
+export function cloneXaiCatalogModels(models: readonly XaiCatalogModel[]): XaiCatalogModel[] {
+  return models.map(cloneXaiCatalogModel);
+}
+
+/** Replace request-helper metadata with the current entitlement snapshot. */
+export function setXaiRuntimeModels(models: readonly XaiCatalogModel[]): void {
+  runtimeModels = cloneXaiCatalogModels(models);
 }
 
 /** Return the current entitlement snapshot used by direct request helpers. */
@@ -300,12 +310,7 @@ export function expandXaiCatalogWithAliases(
 ): XaiCatalogModel[] {
   const entitled = new Map<string, XaiCatalogModel>();
   for (const model of models) {
-    entitled.set(model.id.toLowerCase(), {
-      ...model,
-      input: [...model.input],
-      cost: { ...model.cost },
-      ...(model.thinkingLevelMap ? { thinkingLevelMap: { ...model.thinkingLevelMap } } : {}),
-    });
+    entitled.set(model.id.toLowerCase(), cloneXaiCatalogModel(model));
   }
 
   const expanded: XaiCatalogModel[] = [...entitled.values()];

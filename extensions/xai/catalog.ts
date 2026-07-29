@@ -1,6 +1,8 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { chmod, lstat, mkdir, open, readFile, rename, unlink } from "fs/promises";
 import { dirname, join } from "path";
+import { composeTimeoutSignal } from "./abort";
+import { readBoundedResponseText } from "./bounded-body";
 import {
   XAI_CLI_MODELS_URL,
   XAI_MODEL_CATALOG_CACHE_SCHEMA,
@@ -10,6 +12,7 @@ import {
   XAI_MODEL_CATALOG_TIMEOUT_MS,
 } from "./constants";
 import {
+  cloneXaiCatalogModels,
   CURATED_FALLBACK_MODELS,
   knownXaiModelMetadata,
   XaiModelInputProvenance,
@@ -387,18 +390,9 @@ export function normalizeXaiCatalogPayload(payload: unknown): XaiCatalogModel[] 
   return models;
 }
 
-function cloneModels(models: readonly XaiCatalogModel[]): XaiCatalogModel[] {
-  return models.map((model) => ({
-    ...model,
-    input: [...model.input],
-    cost: { ...model.cost },
-    ...(model.thinkingLevelMap ? { thinkingLevelMap: { ...model.thinkingLevelMap } } : {}),
-  }));
-}
-
 function fallbackSelection(needsAuthenticatedRefresh: boolean): XaiCatalogSelection {
   return {
-    models: cloneModels(CURATED_FALLBACK_MODELS),
+    models: cloneXaiCatalogModels(CURATED_FALLBACK_MODELS),
     source: "curated-fallback",
     needsAuthenticatedRefresh,
   };
@@ -664,61 +658,13 @@ async function invalidateCache(
   }
 }
 
-async function readBoundedBody(response: Response): Promise<string> {
-  const contentLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > XAI_MODEL_CATALOG_MAX_BYTES) {
-    throw new XaiCatalogValidationError();
-  }
-  if (!response.body) {
-    const text = await response.text();
-    if (Buffer.byteLength(text) > XAI_MODEL_CATALOG_MAX_BYTES) throw new XaiCatalogValidationError();
-    return text;
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      total += value.byteLength;
-      if (total > XAI_MODEL_CATALOG_MAX_BYTES) throw new XaiCatalogValidationError();
-      chunks.push(value);
-    }
-  } catch (error) {
-    await reader.cancel().catch(() => {});
-    throw error;
-  }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
-}
-
-function composeAbortSignal(signal: AbortSignal | undefined, timeoutMs: number): {
-  signal: AbortSignal;
-  dispose: () => void;
-} {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const abort = () => controller.abort();
-  signal?.addEventListener("abort", abort, { once: true });
-  if (signal?.aborted) controller.abort();
-  return {
-    signal: controller.signal,
-    dispose: () => {
-      clearTimeout(timeout);
-      signal?.removeEventListener("abort", abort);
-    },
-  };
-}
-
 /** Fetch and normalize the authenticated OAuth-visible catalog from the pinned proxy. */
 export async function fetchXaiModelCatalog(
   credential: XaiCatalogCredential,
   options: Pick<XaiCatalogOptions, "signal" | "fetchImpl" | "timeoutMs"> = {},
 ): Promise<FetchOutcome> {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const abort = composeAbortSignal(options.signal, options.timeoutMs ?? XAI_MODEL_CATALOG_TIMEOUT_MS);
+  const abort = composeTimeoutSignal(options.signal, options.timeoutMs ?? XAI_MODEL_CATALOG_TIMEOUT_MS);
   try {
     let response: Response;
     try {
@@ -742,7 +688,10 @@ export async function fetchXaiModelCatalog(
     }
 
     try {
-      const body = await readBoundedBody(response);
+      const body = await readBoundedResponseText(response, {
+        maxBytes: XAI_MODEL_CATALOG_MAX_BYTES,
+        overflowError: () => new XaiCatalogValidationError(),
+      });
       if (options.signal?.aborted) return { kind: "cancelled" };
       const models = normalizeXaiCatalogPayload(JSON.parse(body));
       if (options.signal?.aborted) return { kind: "cancelled" };
@@ -776,7 +725,7 @@ export async function selectXaiModelCatalog(options: XaiCatalogOptions = {}): Pr
     options.credentialChangedAt > cache.fetchedAt;
   if (!forceRefresh && !credentialsChanged && cache && now - cache.fetchedAt < XAI_MODEL_CATALOG_FRESH_TTL_MS) {
     return {
-      models: cloneModels(cache.models),
+      models: cloneXaiCatalogModels(cache.models),
       source: "fresh-cache",
       needsAuthenticatedRefresh: refreshWhenCredentialsAvailable,
     };
@@ -792,7 +741,7 @@ export async function selectXaiModelCatalog(options: XaiCatalogOptions = {}): Pr
     const record: CacheRecord = {
       schemaVersion: XAI_MODEL_CATALOG_CACHE_SCHEMA,
       fetchedAt: now,
-      models: cloneModels(outcome.models),
+      models: cloneXaiCatalogModels(outcome.models),
     };
     try {
       await withCacheWriteQueue(cachePath, async () => {
@@ -827,7 +776,7 @@ export async function selectXaiModelCatalog(options: XaiCatalogOptions = {}): Pr
       throw new XaiCatalogCancelledError();
     }
     return {
-      models: cloneModels(outcome.models),
+      models: cloneXaiCatalogModels(outcome.models),
       source: "remote",
       needsAuthenticatedRefresh: refreshWhenCredentialsAvailable,
     };
@@ -847,7 +796,7 @@ export async function selectXaiModelCatalog(options: XaiCatalogOptions = {}): Pr
     return fallbackSelection(true);
   }
   if (cache) {
-    return { models: cloneModels(cache.models), source: "stale-cache", needsAuthenticatedRefresh: false };
+    return { models: cloneXaiCatalogModels(cache.models), source: "stale-cache", needsAuthenticatedRefresh: false };
   }
   return fallbackSelection(true);
 }

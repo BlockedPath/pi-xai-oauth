@@ -184,6 +184,16 @@ describe("atomic session image storage", () => {
     await expect(lstat(outputRoot)).rejects.toThrow();
   });
 
+  it("does not create a file when cancellation lands during directory setup", async () => {
+    const outputRoot = imageEditOutputRoot(manager());
+    await expect(saveVerifiedOutputImage(image(), {
+      outputRoot,
+      sessionRoot,
+      signal: abortSignalOnRead(2),
+    })).rejects.toMatchObject({ name: "AbortError" });
+    expect(await readdir(outputRoot)).toEqual([]);
+  });
+
   it.each([
     ["temporary write", 3],
     ["final rename", 4],

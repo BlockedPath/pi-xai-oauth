@@ -334,6 +334,26 @@ function registrySupportsRequestAuth(registry: any, modelRuntime?: any): boolean
     || typeof registry?.getProviderAuth === "function";
 }
 
+/**
+ * Collect one provider's xAI registry models plus the OAuth-eligibility facts
+ * every managed-credential scan needs.
+ */
+function xaiRegistryProviderScan(
+  ctx: any,
+  registry: any,
+  providerId: XaiToolCompatibleProviderId,
+): { models: any[]; hasNonOAuthCredential: boolean; isActiveProvider: boolean } {
+  const models = xaiRegistryCandidateIds(ctx, providerId)
+    .map((modelId) => registry.find(providerId, modelId))
+    .filter(Boolean);
+  return {
+    models,
+    hasNonOAuthCredential: models.length > 0
+      && providerHasNonOAuthCredential(registry, providerId, models),
+    isActiveProvider: ctx?.model?.provider === providerId,
+  };
+}
+
 /** Resolve a tagged xAI credential through pi's managed model registry. */
 export async function resolvePiManagedXaiCredential(ctx: any): Promise<XaiCredential | null> {
   const registry = ctx?.modelRegistry;
@@ -379,16 +399,13 @@ export async function resolvePiManagedXaiOAuthCredential(ctx: any): Promise<XaiC
     return null;
   }
   for (const providerId of xaiRegistryProviderIds(ctx)) {
-    const registryModels = xaiRegistryCandidateIds(ctx, providerId)
-      .map((modelId) => registry.find(providerId, modelId))
-      .filter(Boolean);
-    if (registryModels.length === 0) continue;
-    const activeProvider = ctx?.model?.provider === providerId;
-    if (providerHasNonOAuthCredential(registry, providerId, registryModels)) {
-      if (activeProvider) return null;
+    const scan = xaiRegistryProviderScan(ctx, registry, providerId);
+    if (scan.models.length === 0) continue;
+    if (scan.hasNonOAuthCredential) {
+      if (scan.isActiveProvider) return null;
       continue;
     }
-    for (const registryModel of registryModels) {
+    for (const registryModel of scan.models) {
       if (!registryModelUsesOAuth(registry, providerId, registryModel)) continue;
       const storedBefore = legacyStoredAuth(registry, providerId);
       const credential = credentialFromResolvedAuth(
@@ -423,16 +440,13 @@ export function hasPiManagedXaiOAuth(ctx: any): boolean {
     return false;
   }
   for (const providerId of xaiRegistryProviderIds(ctx)) {
-    const registryModels = xaiRegistryCandidateIds(ctx, providerId)
-      .map((modelId) => registry.find(providerId, modelId))
-      .filter(Boolean);
-    if (registryModels.length === 0) continue;
-    const activeProvider = ctx?.model?.provider === providerId;
-    if (providerHasNonOAuthCredential(registry, providerId, registryModels)) {
-      if (activeProvider) return false;
+    const scan = xaiRegistryProviderScan(ctx, registry, providerId);
+    if (scan.models.length === 0) continue;
+    if (scan.hasNonOAuthCredential) {
+      if (scan.isActiveProvider) return false;
       continue;
     }
-    if (registryModels.some((model) => registryModelUsesOAuth(registry, providerId, model))) {
+    if (scan.models.some((model) => registryModelUsesOAuth(registry, providerId, model))) {
       return true;
     }
   }

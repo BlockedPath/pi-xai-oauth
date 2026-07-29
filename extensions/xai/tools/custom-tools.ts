@@ -21,7 +21,7 @@ import { defaultXaiRuntimeModelId, grokSupportsReasoningEffort, normalizedXaiMod
 import { createXaiResponse, postXaiJson } from "../responses";
 import { resolveXaiRoute } from "../routing";
 import { extractResponsesText, messageFromError, statusFromError } from "../text";
-import { xaiTextInput, xaiToolError } from "./common";
+import { XAI_IMAGE_REFERENCE_SCHEMA, xaiTextInput, xaiToolError } from "./common";
 import { activeXaiModel, isXaiNetworkToolActive, type XaiNetworkToolName } from "./model-scope";
 
 function activeModelForXaiTool(pi: ExtensionAPI, ctx: any, toolName: XaiNetworkToolName) {
@@ -44,7 +44,12 @@ function invalidXaiImageInputError() {
   );
 }
 
-/** Register OAuth-backed custom xAI tools. */
+/**
+ * Register OAuth-backed custom xAI tools.
+ *
+ * Registrations deliberately omit constrainedSampling until the pinned OAuth
+ * Responses route has route-specific strict-tool evidence (see ADR 0002).
+ */
 export function registerCustomXaiTools(pi: ExtensionAPI) {
     pi.registerTool({
       name: "xai_generate_text",
@@ -374,22 +379,7 @@ Be specific and cite examples where helpful.`;
             minItems: 1,
             maxItems: IMAGE_EDIT_MAX_REFERENCES,
             description: "One to three bounded local workspace or data-URL references",
-            items: {
-              oneOf: [
-                {
-                  type: "object",
-                  properties: { path: { type: "string", description: "PNG/JPEG path inside the current workspace" } },
-                  required: ["path"],
-                  additionalProperties: false,
-                },
-                {
-                  type: "object",
-                  properties: { data_url: { type: "string", description: "Strict bounded PNG/JPEG base64 data URL" } },
-                  required: ["data_url"],
-                  additionalProperties: false,
-                },
-              ],
-            },
+            items: XAI_IMAGE_REFERENCE_SCHEMA,
           },
           aspect_ratio: {
             type: "string",
@@ -462,22 +452,7 @@ Be specific and cite examples where helpful.`;
       parameters: {
         type: "object",
         properties: {
-          image: {
-            oneOf: [
-              {
-                type: "object",
-                properties: { path: { type: "string", description: "PNG/JPEG path inside the current workspace" } },
-                required: ["path"],
-                additionalProperties: false,
-              },
-              {
-                type: "object",
-                properties: { data_url: { type: "string", description: "Strict bounded PNG/JPEG base64 data URL" } },
-                required: ["data_url"],
-                additionalProperties: false,
-              },
-            ],
-          },
+          image: XAI_IMAGE_REFERENCE_SCHEMA,
           prompt: {
             type: "string",
             minLength: 1,

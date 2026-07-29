@@ -1,3 +1,4 @@
+import { readTruncatedResponseText } from "./bounded-body";
 import {
   XAI_CLIENT_IDENTIFIER,
   XAI_CLI_RESPONSES_URL,
@@ -269,37 +270,6 @@ export function safeXaiTransportErrorMessage(
   return `xAI API error: ${routeLabel(routeKind)} failed${statusText}`;
 }
 
-async function readBoundedErrorBody(response: Response): Promise<string> {
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_ERROR_BODY_BYTES) {
-    await response.body?.cancel().catch(() => {});
-    return "";
-  }
-  if (!response.body) return "";
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      const remaining = MAX_ERROR_BODY_BYTES - total;
-      if (remaining > 0) chunks.push(value.subarray(0, remaining));
-      total += value.byteLength;
-      if (total >= MAX_ERROR_BODY_BYTES) {
-        await reader.cancel().catch(() => {});
-        break;
-      }
-    }
-  } catch {
-    await reader.cancel().catch(() => {});
-    return "";
-  }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
-}
-
 /** HTTP error carrying only stable route/status classification. */
 export class XaiHttpError extends Error {
   readonly status: number;
@@ -324,6 +294,6 @@ export async function xaiHttpErrorFromResponse(
   response: Response,
   url: string,
 ): Promise<XaiHttpError> {
-  const detail = await readBoundedErrorBody(response);
+  const detail = await readTruncatedResponseText(response, MAX_ERROR_BODY_BYTES);
   return new XaiHttpError(response.status, routeKindForUrl(url), detail);
 }

@@ -387,22 +387,57 @@ describe("Grok-native tools", () => {
     }
   });
 
-  it("executes the terminal adapter with a realistic pi session execution context", async () => {
-    const ctx = toolExecutionContext(temp.path);
-    expect(ctx.sessionManager.getSessionId()).toBeTruthy();
-    const result = await tool("run_terminal_command").execute(
-      "call",
-      {
-        command: "printf session-context-ok",
-        description: "verify the terminal adapter under a realistic session context",
-        background: false,
-        timeout: 1_000,
-      },
-      new AbortController().signal,
-      () => {},
-      ctx,
+  it("removes Pi session metadata, including stale parent values, from terminal commands", async () => {
+    const sessionEnvironmentKeys = [
+      "PI_SESSION_ID",
+      "PI_SESSION_FILE",
+      "PI_PROVIDER",
+      "PI_MODEL",
+      "PI_REASONING_LEVEL",
+    ] as const;
+    const originalEnvironment = Object.fromEntries(
+      [...sessionEnvironmentKeys, "GROK_ENV_CONTROL"].map((key) => [key, process.env[key]]),
     );
-    expect(result.content[0].text).toMatch(/session-context-ok/);
+    for (const key of sessionEnvironmentKeys) process.env[key] = `stale-parent-${key}`;
+    process.env.GROK_ENV_CONTROL = "preserved";
+
+    try {
+      const probeScript = [
+        "const keys = ",
+        JSON.stringify(sessionEnvironmentKeys),
+        "; console.log(JSON.stringify({",
+        "control: process.env.GROK_ENV_CONTROL,",
+        "present: keys.filter((key) => process.env[key] !== undefined)",
+        "}));",
+      ].join("");
+      const ctx = toolExecutionContext(temp.path, {
+        sessionId: "synthetic-session-id",
+        sessionFile: "/synthetic/session-file.jsonl",
+        model: TEST_MODEL,
+        thinkingLevel: "high",
+      });
+      const result = await tool("run_terminal_command").execute(
+        "call",
+        {
+          command: `node -e ${JSON.stringify(probeScript)}`,
+          description: "verify the terminal session-environment policy",
+          background: false,
+          timeout: 1_000,
+        },
+        new AbortController().signal,
+        () => {},
+        ctx,
+      );
+
+      expect(result.content[0].text.trim()).toBe(
+        JSON.stringify({ control: "preserved", present: [] }),
+      );
+    } finally {
+      for (const [key, value] of Object.entries(originalEnvironment)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it("refuses an explicit grep symlink that escapes the workspace", async () => {

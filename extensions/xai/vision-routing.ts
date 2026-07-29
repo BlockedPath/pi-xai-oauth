@@ -1,6 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { normalizeXaiImageInput } from "./images";
 import {
+  cloneXaiCatalogModels,
   isExplicitAuthenticatedTextOnlyXaiModel,
   isExplicitAuthenticatedVisionXaiModel,
   normalizedXaiModelId,
@@ -55,15 +56,6 @@ export interface XaiVisionRoutingController {
   signalFor(modelId: string): AbortSignal | undefined;
   plan(modelId: string, payload: unknown): XaiVisionRoutingPlan | undefined;
   validate(plan: XaiVisionRoutingPlan): boolean;
-}
-
-function cloneCatalog(models: readonly XaiCatalogModel[]): XaiCatalogModel[] {
-  return models.map((model) => ({
-    ...model,
-    input: [...model.input],
-    cost: { ...model.cost },
-    ...(model.thinkingLevelMap ? { thinkingLevelMap: { ...model.thinkingLevelMap } } : {}),
-  }));
 }
 
 function exactModel(models: readonly XaiCatalogModel[], modelId: string): XaiCatalogModel | undefined {
@@ -131,7 +123,7 @@ export function createXaiVisionRoutingController(): XaiVisionRoutingController {
 
   return {
     replaceCatalog(nextModels) {
-      models = cloneCatalog(nextModels);
+      models = cloneXaiCatalogModels(nextModels);
       reset();
     },
     reset,

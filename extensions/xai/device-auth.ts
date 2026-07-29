@@ -1,4 +1,12 @@
 import {
+  abortableSleep as sharedAbortableSleep,
+  awaitAbortable,
+  cancellationError,
+  composeTimeoutSignal,
+  throwIfAborted,
+} from "./abort";
+import { hasJsonContentType, readBoundedResponseText } from "./bounded-body";
+import {
   XAI_CLIENT_IDENTIFIER,
   XAI_OAUTH_CLIENT_ID,
   XAI_OAUTH_DEVICE_DEFAULT_INTERVAL_SECONDS,
@@ -52,101 +60,24 @@ function isRecord(value: unknown): value is JsonRecord {
 }
 
 function assertNotCancelled(signal?: AbortSignal): void {
-  if (signal?.aborted) throw new Error(CANCEL_MESSAGE);
+  throwIfAborted(signal, () => new Error(CANCEL_MESSAGE));
 }
 
 function abortableSleep(milliseconds: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new Error(CANCEL_MESSAGE));
-      return;
-    }
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new Error(CANCEL_MESSAGE));
-    };
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, milliseconds);
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
-function composeAbortSignal(signal: AbortSignal | undefined, timeoutMs: number): {
-  signal: AbortSignal;
-  timedOut: () => boolean;
-  dispose: () => void;
-} {
-  const controller = new AbortController();
-  let didTimeOut = false;
-  const timeout = setTimeout(() => {
-    didTimeOut = true;
-    controller.abort();
-  }, Math.max(1, timeoutMs));
-  const abort = () => controller.abort();
-  signal?.addEventListener("abort", abort, { once: true });
-  if (signal?.aborted) controller.abort();
-  return {
-    signal: controller.signal,
-    timedOut: () => didTimeOut,
-    dispose: () => {
-      clearTimeout(timeout);
-      signal?.removeEventListener("abort", abort);
-    },
-  };
+  return sharedAbortableSleep(milliseconds, signal, () => new Error(CANCEL_MESSAGE));
 }
 
 async function readBoundedJson(response: Response, label: string, signal?: AbortSignal): Promise<JsonRecord> {
-  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-  if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
+  if (!hasJsonContentType(response)) {
     throw new Error(`${label} did not return JSON`);
   }
-  const contentLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > XAI_OAUTH_DEVICE_MAX_RESPONSE_BYTES) {
-    throw new Error(`${label} was too large`);
-  }
 
-  let text: string;
-  if (!response.body) {
-    text = await response.text();
-    if (Buffer.byteLength(text) > XAI_OAUTH_DEVICE_MAX_RESPONSE_BYTES) {
-      throw new Error(`${label} was too large`);
-    }
-  } else {
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    const cancel = () => { void reader.cancel().catch(() => {}); };
-    signal?.addEventListener("abort", cancel, { once: true });
-    try {
-      // Cancellation can land between the completed fetch and body-reader
-      // setup. Check after subscribing, inside the cleanup boundary, so that
-      // gap neither starts an orphaned read nor retains the listener.
-      if (signal?.aborted) {
-        cancel();
-        throw new DOMException("The operation was aborted", "AbortError");
-      }
-      while (true) {
-        const read = reader.read();
-        const { value, done } = signal ? await awaitAbortable(read, signal) : await read;
-        if (done) break;
-        if (!value) continue;
-        total += value.byteLength;
-        if (total > XAI_OAUTH_DEVICE_MAX_RESPONSE_BYTES) {
-          cancel();
-          throw new Error(`${label} was too large`);
-        }
-        chunks.push(value);
-      }
-    } catch (error) {
-      cancel();
-      throw error;
-    } finally {
-      signal?.removeEventListener("abort", cancel);
-    }
-    text = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
-  }
+  const text = await readBoundedResponseText(response, {
+    maxBytes: XAI_OAUTH_DEVICE_MAX_RESPONSE_BYTES,
+    signal,
+    overflowError: () => new Error(`${label} was too large`),
+    abortError: () => cancellationError("The operation was aborted"),
+  });
 
   try {
     const value = JSON.parse(text) as unknown;
@@ -187,30 +118,6 @@ function validateVerificationUri(value: unknown): string | undefined {
   }
 }
 
-async function awaitAbortable<T>(request: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const onAbort = () => {
-      signal.removeEventListener("abort", onAbort);
-      reject(new DOMException("The operation was aborted", "AbortError"));
-    };
-    // Observe the operation before checking an already-aborted signal. The
-    // operation is created by the caller first, so this ordering prevents a
-    // synchronous abort plus rejected promise from becoming unhandled.
-    request.then(
-      (response) => {
-        signal.removeEventListener("abort", onAbort);
-        resolve(response);
-      },
-      (error) => {
-        signal.removeEventListener("abort", onAbort);
-        reject(error);
-      },
-    );
-    if (signal.aborted) onAbort();
-    else signal.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
 async function withPostFormResponse<T>(
   url: string,
   form: Record<string, string>,
@@ -224,7 +131,7 @@ async function withPostFormResponse<T>(
     throw new Error("Refusing to send xAI device credentials to an untrusted endpoint");
   }
   assertNotCancelled(signal);
-  const abort = composeAbortSignal(signal, Math.min(timeoutMs, dependencies.requestTimeoutMs ?? XAI_OAUTH_DEVICE_REQUEST_TIMEOUT_MS));
+  const abort = composeTimeoutSignal(signal, Math.min(timeoutMs, dependencies.requestTimeoutMs ?? XAI_OAUTH_DEVICE_REQUEST_TIMEOUT_MS));
   try {
     let response: Response;
     try {
