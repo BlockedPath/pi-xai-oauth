@@ -44,7 +44,12 @@ function invalidXaiImageInputError() {
   );
 }
 
-/** Register OAuth-backed custom xAI tools. */
+/**
+ * Register OAuth-backed custom xAI tools.
+ *
+ * Registrations deliberately omit constrainedSampling until the pinned OAuth
+ * Responses route has route-specific strict-tool evidence (see ADR 0002).
+ */
 export function registerCustomXaiTools(pi: ExtensionAPI) {
     pi.registerTool({
       name: "xai_generate_text",
