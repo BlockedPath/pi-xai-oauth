@@ -249,4 +249,33 @@ describe("xAI streaming adapter", () => {
     expect(result.errorMessage).toMatch(/^xAI API error/i);
     expect(result.errorMessage).not.toMatch(/^OpenAI API error/i);
   });
+
+  it("terminates when terminal error rendering also throws", async () => {
+    let poisonErrorRendering = false;
+    const model = {
+      ...TEST_MODEL,
+      get api() {
+        if (poisonErrorRendering) throw new Error("must not escape the terminal fallback");
+        return TEST_MODEL.api;
+      },
+    } as any;
+    const stream = streamSimpleXaiResponses(
+      model,
+      { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] } as any,
+      {
+        apiKey: "oauth-token",
+        onPayload() {
+          poisonErrorRendering = true;
+          throw new Error("payload hook failed");
+        },
+      } as any,
+    );
+    const events: unknown[] = [];
+    const iteration = (async () => {
+      for await (const event of stream) events.push(event);
+    })();
+    await expect(stream.result()).resolves.toBeUndefined();
+    await expect(iteration).resolves.toBeUndefined();
+    expect(events).toEqual([]);
+  });
 });

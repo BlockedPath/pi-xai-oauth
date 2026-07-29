@@ -414,6 +414,18 @@ function checkGrepBudget(signal: AbortSignal | undefined, deadline: number): voi
   if (Date.now() > deadline) throw new Error("grep timed out after 20 seconds");
 }
 
+const SKIPPABLE_SEARCH_ERROR_CODES = new Set(["ENOENT", "EACCES", "EPERM", "ENOTDIR", "ELOOP"]);
+
+/**
+ * Skip a search entry that is legitimately unreadable, and rethrow every other
+ * failure so a truncated search never looks like a complete one.
+ */
+function skipUnreadableSearchEntry(error: unknown): undefined {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  if (code && SKIPPABLE_SEARCH_ERROR_CODES.has(code)) return undefined;
+  throw error;
+}
+
 async function collectLocalFiles(
   searchPath: string,
   rootPath: string,
@@ -430,7 +442,10 @@ async function collectLocalFiles(
   const files: string[] = [];
   async function visit(directory: string): Promise<void> {
     checkGrepBudget(signal, deadline);
-    const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+    const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
+      skipUnreadableSearchEntry(error);
+      return [];
+    });
     for (const entry of entries) {
       checkGrepBudget(signal, deadline);
       if (entry.isDirectory() && SKIPPED_SEARCH_DIRS.has(entry.name)) continue;
@@ -612,14 +627,14 @@ async function runLocalGrep(
       limitReached = true;
       break;
     }
-    const info = await lstat(filePath).catch(() => undefined);
+    const info = await lstat(filePath).catch(skipUnreadableSearchEntry);
     if (!info?.isFile() || info.size > MAX_GROK_GREP_FILE_BYTES) continue;
     if (totalScannedBytes + info.size > MAX_GROK_GREP_TOTAL_BYTES) {
       scanLimitReached = true;
       break;
     }
     totalScannedBytes += info.size;
-    const rawContent = await readFile(filePath, "utf8").catch(() => undefined);
+    const rawContent = await readFile(filePath, "utf8").catch(skipUnreadableSearchEntry);
     if (rawContent === undefined) continue;
     checkGrepBudget(signal, deadline);
     const content = rawContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
