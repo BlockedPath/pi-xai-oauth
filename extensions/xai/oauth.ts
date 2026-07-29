@@ -412,7 +412,7 @@ export function createXaiOAuth({
       if (callbacks.signal?.aborted) throw new Error("Login cancelled");
       // Catalog discovery must never discard an otherwise valid OAuth login.
       callbacks.onProgress?.(
-        `xAI login succeeded, but the model catalog could not be refreshed (${messageFromError(error)}); using the curated fallback.`,
+        "xAI login succeeded, but the model catalog could not be refreshed; using the curated fallback.",
       );
     }
     return credentials;

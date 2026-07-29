@@ -590,9 +590,12 @@ export function streamSimpleXaiResponses(
   })().catch((error) => {
     // A failure inside the pump's own error path must still terminate the
     // stream: an unobserved rejection would hang every consumer awaiting it.
-    const message = streamErrorMessage(model, error);
+    let message: ReturnType<typeof streamErrorMessage> | undefined;
     try {
+      message = streamErrorMessage(model, error);
       stream.push({ type: "error", reason: "error", error: message });
+    } catch {
+      // The terminal fallback must not create another unobserved rejection.
     } finally {
       stream.end(message);
     }

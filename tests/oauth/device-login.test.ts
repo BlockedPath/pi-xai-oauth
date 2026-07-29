@@ -187,7 +187,7 @@ describe("OAuth login method and device integration", () => {
     ).rejects.toThrow("Login cancelled");
   });
 
-  it("keeps a valid login and reports why the catalog handoff failed", async () => {
+  it("keeps a valid login without reflecting the catalog handoff error", async () => {
     const clock = makeClock();
     const progress: string[] = [];
     const oauth = createXaiOAuth({
@@ -201,7 +201,7 @@ describe("OAuth login method and device integration", () => {
             : jsonResponse(tokenPayload()),
       },
       onLoginCredentials: async () => {
-        throw new Error("catalog endpoint unavailable");
+        throw new Error("catalog failure included secret-access-token");
       },
     });
     const credentials = await oauth.login({
@@ -212,7 +212,8 @@ describe("OAuth login method and device integration", () => {
       onProgress: (message: string) => progress.push(message),
     } as any);
     expect(credentials).toMatchObject({ access: "device-access-token" });
-    expect(progress.at(-1)).toMatch(/catalog endpoint unavailable/);
     expect(progress.at(-1)).toMatch(/curated fallback/);
+    expect(progress.at(-1)).not.toContain("catalog failure");
+    expect(progress.at(-1)).not.toContain("secret-access-token");
   });
 });
