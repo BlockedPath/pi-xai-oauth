@@ -3,7 +3,13 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { selectXaiModelCatalog, type XaiCatalogSelection } from "./xai/catalog";
 import { getGrokAuthCredentials, getStartupXaiCatalogAuth, resolveRegistryRequestAuth } from "./xai/auth";
 import { DEFAULT_XAI_MODEL, XAI_PROVIDER_ID } from "./xai/constants";
-import { CURATED_FALLBACK_MODELS, expandXaiCatalogWithAliases, setXaiRuntimeModels, type XaiCatalogModel } from "./xai/models";
+import {
+  cloneXaiCatalogModels,
+  CURATED_FALLBACK_MODELS,
+  expandXaiCatalogWithAliases,
+  setXaiRuntimeModels,
+  type XaiCatalogModel,
+} from "./xai/models";
 import { createXaiOAuth } from "./xai/oauth";
 import { streamSimpleXaiResponses } from "./xai/responses";
 import { resolveXaiRoute } from "./xai/routing";
@@ -40,12 +46,7 @@ export default async function (pi: ExtensionAPI) {
   });
 
   const curatedFallbackSelection = (): XaiCatalogSelection => ({
-    models: CURATED_FALLBACK_MODELS.map((model) => ({
-      ...model,
-      input: [...model.input],
-      cost: { ...model.cost },
-      ...(model.thinkingLevelMap ? { thinkingLevelMap: { ...model.thinkingLevelMap } } : {}),
-    })),
+    models: cloneXaiCatalogModels(CURATED_FALLBACK_MODELS),
     source: "curated-fallback",
     needsAuthenticatedRefresh: true,
   });

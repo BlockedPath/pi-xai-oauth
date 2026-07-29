@@ -1,3 +1,5 @@
+import { abortableSleep as sharedAbortableSleep, cancellationError, composeTimeoutSignal } from "./abort";
+import { hasJsonContentType, readBoundedResponseText } from "./bounded-body";
 import { defaultImageCodec, prepareImageReferences, type ImageCodec } from "./media/compression";
 import {
   IMAGE_TO_VIDEO_CREATE_TIMEOUT_MS,
@@ -143,20 +145,7 @@ export function validateVideoRequestId(value: unknown): string {
 }
 
 function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.reject(new DOMException("Cancelled", "AbortError"));
-  return new Promise((resolve, reject) => {
-    const cleanup = () => signal?.removeEventListener("abort", abort);
-    const timer = setTimeout(() => {
-      cleanup();
-      resolve();
-    }, ms);
-    const abort = () => {
-      clearTimeout(timer);
-      cleanup();
-      reject(new DOMException("Cancelled", "AbortError"));
-    };
-    signal?.addEventListener("abort", abort, { once: true });
-  });
+  return sharedAbortableSleep(ms, signal, () => cancellationError("Cancelled"));
 }
 
 async function readBoundedJson(
@@ -165,50 +154,31 @@ async function readBoundedJson(
   signal: AbortSignal,
   timeoutMs: number,
 ): Promise<any> {
-  const mime = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-  if (mime !== "application/json" && !mime?.endsWith("+json")) {
+  if (!hasJsonContentType(response)) {
     await response.body?.cancel().catch(() => undefined);
     throw new ImageToVideoOperationError("xAI video generation returned an invalid response type.", "invalid_response");
   }
   if (!response.body) throw new ImageToVideoOperationError("xAI video generation returned an empty response.", "invalid_response");
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  const controller = new AbortController();
-  let timedOut = false;
-  const forward = () => controller.abort();
-  signal.addEventListener("abort", forward, { once: true });
-  if (signal.aborted) controller.abort();
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-  const aborted = new Promise<never>((_resolve, reject) => controller.signal.addEventListener(
-    "abort",
-    () => reject(new DOMException("Cancelled", "AbortError")),
-    { once: true },
-  ));
+  const abort = composeTimeoutSignal(signal, timeoutMs);
+  let text: string;
   try {
-    while (true) {
-      const { value, done } = await Promise.race([reader.read(), aborted]);
-      if (done) break;
-      if (!value) continue;
-      total += value.byteLength;
-      if (total > maxBytes) throw new ImageToVideoOperationError("xAI video response exceeded the byte limit.", "invalid_response");
-      chunks.push(value);
-    }
+    text = await readBoundedResponseText(response, {
+      maxBytes,
+      signal: abort.signal,
+      checkDeclaredLength: false,
+      abortError: () => cancellationError("Cancelled"),
+      overflowError: () =>
+        new ImageToVideoOperationError("xAI video response exceeded the byte limit.", "invalid_response"),
+    });
   } catch (error) {
-    await reader.cancel().catch(() => undefined);
     if (signal.aborted) throw new ImageToVideoOperationError("Local video generation tracking was cancelled.", "cancelled");
-    if (timedOut) throw new ImageToVideoOperationError("xAI video response timed out.", "timeout");
+    if (abort.timedOut()) throw new ImageToVideoOperationError("xAI video response timed out.", "timeout");
     throw error;
   } finally {
-    clearTimeout(timer);
-    signal.removeEventListener("abort", forward);
-    reader.releaseLock();
+    abort.dispose();
   }
   try {
-    const parsed = JSON.parse(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total).toString("utf8"));
+    const parsed = JSON.parse(text);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
     return parsed;
   } catch {
@@ -223,24 +193,15 @@ async function fetchTimed(options: {
   timeoutMs: number;
   fetch: typeof fetch;
 }): Promise<Response> {
-  const controller = new AbortController();
-  let timedOut = false;
-  const forward = () => controller.abort();
-  options.callerSignal?.addEventListener("abort", forward, { once: true });
-  if (options.callerSignal?.aborted) controller.abort();
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, options.timeoutMs);
+  const abort = composeTimeoutSignal(options.callerSignal, options.timeoutMs);
   try {
-    return await options.fetch(options.url, { ...options.init, signal: controller.signal, redirect: "error" });
+    return await options.fetch(options.url, { ...options.init, signal: abort.signal, redirect: "error" });
   } catch {
     if (options.callerSignal?.aborted) throw new ImageToVideoOperationError("Local video generation tracking was cancelled.", "cancelled");
-    if (timedOut) throw new ImageToVideoOperationError("xAI video request timed out.", "timeout");
+    if (abort.timedOut()) throw new ImageToVideoOperationError("xAI video request timed out.", "timeout");
     throw new ImageToVideoOperationError("xAI video request failed. Check the network and try again.", "network_failure");
   } finally {
-    clearTimeout(timer);
-    options.callerSignal?.removeEventListener("abort", forward);
+    abort.dispose();
   }
 }
 

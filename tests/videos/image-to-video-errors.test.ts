@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import {
   executeXaiImageToVideo,
@@ -299,18 +300,35 @@ describe("image-to-video polling", () => {
     );
   });
 
-  it("reports cancellation raised while downloading", async () => {
+  it("reports cancellation raised during an active download stream", async () => {
     const controller = new AbortController();
+    const response = Readable.from((async function* () {
+      yield Buffer.alloc(16);
+      controller.abort();
+      yield Buffer.alloc(16);
+    })()) as Readable & { statusCode: number; headers: Record<string, string> };
+    response.statusCode = 200;
+    response.headers = { "content-type": "video/mp4" };
+    const request = vi.fn((_options: any, callback: (value: typeof response) => void) => ({
+      once() { return this; },
+      end() { callback(response); },
+      destroy() {},
+    }));
     await expectFailure(
       run({ signal: controller.signal }, {
-        fetch: pollingFetch([() => {
-          controller.abort();
-          return jsonResponse({ status: "done", video: { url: "https://cdn.example.test/a.mp4" } });
-        }]) as any,
+        fetch: pollingFetch([() => jsonResponse({
+          status: "done",
+          video: { url: "https://cdn.example.test/a.mp4" },
+        })]) as any,
+        videoDownload: {
+          lookup: vi.fn(async () => [{ address: "93.184.216.34", family: 4 }]) as any,
+          request: request as any,
+        },
       }),
       "cancelled",
       /Local download was cancelled/,
     );
+    expect(request).toHaveBeenCalledOnce();
   });
 
   it("waits with the built-in abortable sleep between polls", async () => {

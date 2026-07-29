@@ -4,10 +4,12 @@ import type {
   ExtensionContext,
   ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
+import { composeTimeoutSignal } from "./abort";
 import {
   hasPiManagedXaiOAuth,
   resolvePiManagedXaiOAuthCredential,
 } from "./auth";
+import { readBoundedResponseText } from "./bounded-body";
 import {
   XAI_CLI_BILLING_URL,
   XAI_CLI_USER_URL,
@@ -317,49 +319,18 @@ export function parseXaiUsage(value: unknown): XaiUsageSnapshot {
 }
 
 async function readBoundedBody(response: Response, signal: AbortSignal): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8", { fatal: true });
-  let bytes = 0;
-  let text = "";
-  const abortError = () => new DOMException("The operation was cancelled.", "AbortError");
-  let rejectOnAbort: ((reason: unknown) => void) | undefined;
-  const aborted = new Promise<never>((_resolve, reject) => {
-    rejectOnAbort = reject;
-  });
-  const onAbort = () => rejectOnAbort?.(signal.reason ?? abortError());
-  const cancelReader = () => {
-    try {
-      void reader.cancel().catch(() => undefined);
-    } catch {
-      // Cancellation is best-effort cleanup and must never extend the request bound.
-    }
-  };
-  signal.addEventListener("abort", onAbort, { once: true });
   try {
-    if (signal.aborted) throw signal.reason ?? abortError();
-    while (true) {
-      const { done, value } = await Promise.race([reader.read(), aborted]);
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > XAI_USAGE_MAX_RESPONSE_BYTES) {
-        cancelReader();
-        throw new XaiUsageError("oversize", "xAI usage returned an oversized response.");
-      }
-      text += decoder.decode(value, { stream: true });
-    }
-    return text + decoder.decode();
+    return await readBoundedResponseText(response, {
+      maxBytes: XAI_USAGE_MAX_RESPONSE_BYTES,
+      signal,
+      emptyBody: "empty",
+      checkDeclaredLength: false,
+      strictUtf8: true,
+      overflowError: () => new XaiUsageError("oversize", "xAI usage returned an oversized response."),
+    });
   } catch (error) {
     if (error instanceof XaiUsageError) throw error;
     throw new XaiUsageError("invalid", "xAI usage returned an invalid response body.");
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-    if (signal.aborted) cancelReader();
-    try {
-      reader.releaseLock();
-    } catch {
-      // A hostile pending read may retain the lock; request completion stays bounded.
-    }
   }
 }
 
@@ -396,15 +367,7 @@ async function requestBoundedJson(
       "xAI OAuth credentials are required. Run /login xai or /login xai-auth first.",
     );
   }
-  const controller = new AbortController();
-  let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, XAI_USAGE_TIMEOUT_MS);
-  const forwardAbort = () => controller.abort();
-  signal?.addEventListener("abort", forwardAbort, { once: true });
-  if (signal?.aborted) controller.abort();
+  const abort = composeTimeoutSignal(signal, XAI_USAGE_TIMEOUT_MS);
 
   try {
     let response: Response;
@@ -412,12 +375,12 @@ async function requestBoundedJson(
       response = await fetch(url, {
         method: "GET",
         redirect: "error",
-        signal: controller.signal,
+        signal: abort.signal,
         headers: xaiUsageHeaders(credential.token, userId),
       });
     } catch {
       if (signal?.aborted) throw new XaiUsageError("cancelled", "xAI usage request was cancelled.");
-      if (timedOut) throw new XaiUsageError("timeout", "xAI usage request timed out.");
+      if (abort.timedOut()) throw new XaiUsageError("timeout", "xAI usage request timed out.");
       throw new XaiUsageError("transport", "xAI usage request failed.");
     }
     if (!response.ok) {
@@ -426,10 +389,10 @@ async function requestBoundedJson(
     }
     let body: string;
     try {
-      body = await readBoundedBody(response, controller.signal);
+      body = await readBoundedBody(response, abort.signal);
     } catch (error) {
       if (signal?.aborted) throw new XaiUsageError("cancelled", "xAI usage request was cancelled.");
-      if (timedOut) throw new XaiUsageError("timeout", "xAI usage request timed out.");
+      if (abort.timedOut()) throw new XaiUsageError("timeout", "xAI usage request timed out.");
       if (error instanceof XaiUsageError) throw error;
       throw new XaiUsageError("transport", "xAI usage request failed.");
     }
@@ -439,8 +402,7 @@ async function requestBoundedJson(
       throw new XaiUsageError("invalid", "xAI usage returned malformed JSON.");
     }
   } finally {
-    clearTimeout(timeout);
-    signal?.removeEventListener("abort", forwardAbort);
+    abort.dispose();
   }
 }
 

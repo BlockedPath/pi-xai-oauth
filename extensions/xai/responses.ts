@@ -1,6 +1,7 @@
 import type { Api, Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/compat";
 import { randomUUID } from "crypto";
+import { readBoundedResponseText } from "./bounded-body";
 import { compactXaiInlineImages } from "./images";
 import {
   getXaiRuntimeModel,
@@ -264,35 +265,10 @@ export async function postXaiJson(
   }
 
   if (maxResponseBytes !== undefined) {
-    const contentLength = Number(response.headers.get("content-length"));
-    if (Number.isFinite(contentLength) && contentLength > maxResponseBytes) {
-      throw new Error(XAI_VISION_DESCRIPTION_ERROR);
-    }
-    let text: string;
-    if (!response.body) {
-      text = await response.text();
-      if (Buffer.byteLength(text, "utf8") > maxResponseBytes) {
-        throw new Error(XAI_VISION_DESCRIPTION_ERROR);
-      }
-    } else {
-      const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let total = 0;
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          if (!value) continue;
-          total += value.byteLength;
-          if (total > maxResponseBytes) throw new Error(XAI_VISION_DESCRIPTION_ERROR);
-          chunks.push(value);
-        }
-      } catch (error) {
-        await reader.cancel().catch(() => {});
-        throw error;
-      }
-      text = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
-    }
+    const text = await readBoundedResponseText(response, {
+      maxBytes: maxResponseBytes,
+      overflowError: () => new Error(XAI_VISION_DESCRIPTION_ERROR),
+    });
     try {
       return JSON.parse(text);
     } catch {

@@ -1,4 +1,5 @@
 import { resizeImage } from "@earendil-works/pi-coding-agent";
+import { awaitAbortable, cancellationError } from "../abort";
 import {
   IMAGE_EDIT_MAX_AGGREGATE_REFERENCE_BYTES,
   IMAGE_EDIT_MAX_REFERENCES,
@@ -26,28 +27,8 @@ export interface ImageCodec {
   ): Promise<VerifiedImageBytes | null>;
 }
 
-function abortError() {
-  return new DOMException("The operation was cancelled.", "AbortError");
-}
-
 function abortable<T>(task: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) return task;
-  if (signal.aborted) return Promise.reject(abortError());
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(abortError());
-    signal.addEventListener("abort", onAbort, { once: true });
-    const cleanup = () => signal.removeEventListener("abort", onAbort);
-    task.then(
-      (value) => {
-        cleanup();
-        resolve(value);
-      },
-      (error) => {
-        cleanup();
-        reject(error);
-      },
-    );
-  });
+  return signal ? awaitAbortable(task, signal) : task;
 }
 
 function maxEncodedLength(rawBytes: number): number {
@@ -118,7 +99,7 @@ export async function prepareImageReferences(
   let aggregateBytes = 0;
 
   for (const image of images) {
-    if (options.signal?.aborted) throw abortError();
+    if (options.signal?.aborted) throw cancellationError();
     const decodedDimensions = await codec.verify(image, options.signal);
     if (
       !Number.isSafeInteger(decodedDimensions.width)
