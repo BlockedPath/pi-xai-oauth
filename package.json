@@ -40,6 +40,11 @@
     ],
     "image": "https://raw.githubusercontent.com/BlockedPath/pi-xai-oauth/main/preview.jpeg"
   },
+  "overrides": {
+    "@napi-rs/wasm-runtime": "1.1.6",
+    "brace-expansion": "^5.0.8",
+    "protobufjs": "^7.6.5"
+  },
   "peerDependencies": {
     "@earendil-works/pi-ai": ">=0.80.1 <0.83.0",
     "@earendil-works/pi-coding-agent": ">=0.80.1 <0.83.0"
