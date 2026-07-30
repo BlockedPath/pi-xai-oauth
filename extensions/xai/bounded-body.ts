@@ -125,10 +125,13 @@ export async function readBoundedResponseText(
 /**
  * Read at most `maxBytes` of a body for classification only, truncating instead
  * of failing and returning `""` whenever the body is missing or unreadable.
+ * When `signal` aborts, cancel the reader and reject so a stalled peer under
+ * the byte cap cannot hang the request past the caller deadline.
  */
 export async function readTruncatedResponseText(
   response: Response,
   maxBytes: number,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (exceedsDeclaredLength(response, maxBytes)) {
     await response.body?.cancel().catch(() => {});
@@ -139,9 +142,27 @@ export async function readTruncatedResponseText(
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  const abortError = () => signal?.reason ?? cancellationError();
+  let rejectOnAbort: ((reason: unknown) => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    rejectOnAbort = reject;
+  });
+  const onAbort = () => {
+    // Reject before cancelling: cancellation settles the pending read as
+    // `done`, which would otherwise race the abort into a truncated success.
+    rejectOnAbort?.(abortError());
+    cancelReader(reader);
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+
   try {
+    // Cancellation can land between the completed fetch and body-reader setup.
+    // Check after subscribing, inside the cleanup boundary, so that gap neither
+    // starts an orphaned read nor retains the listener.
+    if (signal?.aborted) throw abortError();
     while (true) {
-      const { value, done } = await reader.read();
+      const read = reader.read();
+      const { value, done } = signal ? await Promise.race([read, aborted]) : await read;
       if (done) break;
       if (!value) continue;
       const remaining = maxBytes - total;
@@ -152,9 +173,14 @@ export async function readTruncatedResponseText(
         break;
       }
     }
-  } catch {
+    return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
+  } catch (error) {
     cancelReader(reader);
+    // Abort must surface so callers honor deadlines; other read failures stay "".
+    if (signal?.aborted) throw error;
     return "";
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+    releaseReader(reader);
   }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
 }

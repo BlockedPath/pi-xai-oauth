@@ -146,4 +146,35 @@ describe("shared bounded body readers", () => {
     expect(cancel).toHaveBeenCalledTimes(1);
     await expect(readTruncatedResponseText(new Response(null), 8)).resolves.toBe("");
   });
+
+  it("aborts a stalled truncated body read within the caller deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const cancel = vi.fn();
+      // Peer never closes and stays under maxBytes — only the deadline unblocks.
+      const stalled = new Response(new ReadableStream<Uint8Array>({ cancel }));
+      const deadline = composeTimeoutSignal(undefined, 1_000);
+      const reading = readTruncatedResponseText(stalled, 1024, deadline.signal);
+      const settled = expect(reading).rejects.toMatchObject({ name: "AbortError" });
+      await vi.advanceTimersByTimeAsync(1_000);
+      await settled;
+      expect(cancel).toHaveBeenCalledTimes(1);
+      deadline.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels a truncated body reader immediately when the caller aborts", async () => {
+    const cancel = vi.fn();
+    const controller = new AbortController();
+    const reading = readTruncatedResponseText(
+      new Response(new ReadableStream<Uint8Array>({ cancel })),
+      1024,
+      controller.signal,
+    );
+    controller.abort();
+    await expect(reading).rejects.toMatchObject({ name: "AbortError" });
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
 });

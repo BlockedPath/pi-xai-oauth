@@ -67,7 +67,8 @@ function acquireRedirectGuard(url: string): () => void {
         guarded ? { ...init, redirect: "error" } : init,
       );
       if (!guarded || response.ok) return response;
-      const error = await xaiHttpErrorFromResponse(response, url);
+      const requestSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+      const error = await xaiHttpErrorFromResponse(response, url, requestSignal);
       const marker = error.code === "encrypted-content-mismatch"
         ? "encrypted_content"
         : error.code === "proxy-version-gate"
@@ -261,7 +262,7 @@ export async function postXaiJson(
   });
 
   if (!response.ok) {
-    throw await xaiHttpErrorFromResponse(response, url);
+    throw await xaiHttpErrorFromResponse(response, url, signal);
   }
 
   if (maxResponseBytes !== undefined) {
