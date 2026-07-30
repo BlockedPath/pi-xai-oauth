@@ -79,7 +79,15 @@ async function realBoundaryRegistry(initialCredential: any) {
     await runtime.refresh({ allowNetwork: false });
     return {
       registry,
-      setRuntimeApiKey: (key: string) => runtime.setRuntimeApiKey("xai-auth", key),
+      // Pi 0.81.0 stopped honouring `allowModelNetwork` for the runtime's persistent
+      // network flag (`modelNetworkEnabled = process.env.PI_OFFLINE === undefined`) and
+      // in the same release gave `setRuntimeApiKey` a third `refreshOptions` argument.
+      // Its trailing `await this.refresh(refreshOptions)` therefore defaults to a
+      // network-enabled, signal-less, timeout-less catalog refresh across every builtin
+      // provider. Bound it exactly like the two explicit refreshes above; older runtimes
+      // ignore the extra argument and already honour `allowModelNetwork: false`.
+      setRuntimeApiKey: (key: string) =>
+        runtime.setRuntimeApiKey("xai-auth", key, { allowNetwork: false }),
     };
   }
 
@@ -99,6 +107,11 @@ async function realBoundaryRegistry(initialCredential: any) {
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-auth-");
   vi.stubEnv("HOME", temp.path);
+  // No assertion in this suite depends on a real catalog fetch. Fail fast instead of
+  // hanging if Pi ever reintroduces an implicitly network-enabled refresh.
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    throw new Error(`Unexpected network request in an isolated test: ${String((input as Request)?.url ?? input)}`);
+  });
 });
 afterEach(async () => {
   setXaiRuntimeModels(CURATED_FALLBACK_MODELS);
