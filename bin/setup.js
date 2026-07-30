@@ -181,7 +181,8 @@ function updateSettings(settingsPath = SETTINGS_PATH) {
 
   // Prefer Pi's built-in xAI chat when no provider is configured. Never overwrite
   // an existing choice — including package-owned xai-auth or any other provider.
-  if (typeof settings.defaultProvider !== "string" || !settings.defaultProvider.trim()) {
+  const hadProvider = typeof settings.defaultProvider === "string" && settings.defaultProvider.trim() !== "";
+  if (!hadProvider) {
     settings.defaultProvider = BUNDLED_XAI_PROVIDER;
     changed = true;
     console.log(color(`   + Set defaultProvider: ${BUNDLED_XAI_PROVIDER}`, "green"));
@@ -189,16 +190,34 @@ function updateSettings(settingsPath = SETTINGS_PATH) {
     console.log(color(`   (Keeping defaultProvider: ${PACKAGE_OAUTH_PROVIDER})`, "reset"));
   }
 
-  if (settings.defaultModel !== DEFAULT_XAI_MODEL) {
-    settings.defaultModel = DEFAULT_XAI_MODEL;
-    changed = true;
-    console.log(color(`   + Set defaultModel: ${DEFAULT_XAI_MODEL}`, "green"));
-  }
+  // The model/thinking defaults are only coherent alongside an xAI provider.
+  // Seeding them next to an unrelated provider (e.g. anthropic) would leave the
+  // user on an impossible provider/model pair, so scope the writes:
+  //   - provider newly seeded here  -> this package owns the whole selection
+  //   - existing xAI provider       -> only fill in blanks, never replace a choice
+  //   - existing non-xAI provider   -> leave the selection untouched
+  const usesXaiProvider =
+    settings.defaultProvider === BUNDLED_XAI_PROVIDER ||
+    settings.defaultProvider === PACKAGE_OAUTH_PROVIDER;
+  const ownsModelSelection = !hadProvider;
 
-  if (settings.defaultThinkingLevel !== DEFAULT_THINKING_LEVEL) {
-    settings.defaultThinkingLevel = DEFAULT_THINKING_LEVEL;
-    changed = true;
-    console.log(color(`   + Set defaultThinkingLevel: ${DEFAULT_THINKING_LEVEL}`, "green"));
+  if (ownsModelSelection || usesXaiProvider) {
+    const blank = (value) => typeof value !== "string" || value.trim() === "";
+
+    if ((ownsModelSelection || blank(settings.defaultModel)) && settings.defaultModel !== DEFAULT_XAI_MODEL) {
+      settings.defaultModel = DEFAULT_XAI_MODEL;
+      changed = true;
+      console.log(color(`   + Set defaultModel: ${DEFAULT_XAI_MODEL}`, "green"));
+    }
+
+    if (
+      (ownsModelSelection || blank(settings.defaultThinkingLevel)) &&
+      settings.defaultThinkingLevel !== DEFAULT_THINKING_LEVEL
+    ) {
+      settings.defaultThinkingLevel = DEFAULT_THINKING_LEVEL;
+      changed = true;
+      console.log(color(`   + Set defaultThinkingLevel: ${DEFAULT_THINKING_LEVEL}`, "green"));
+    }
   }
 
   if (changed) {

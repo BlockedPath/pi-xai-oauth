@@ -106,6 +106,8 @@ describe("setup settings", () => {
       defaultThinkingLevel: "high",
     });
 
+    // An unrelated provider owns its own model selection. Seeding a Grok model
+    // next to it would leave the user on an impossible provider/model pair.
     await writeFile(
       settingsPath,
       JSON.stringify({
@@ -119,6 +121,39 @@ describe("setup settings", () => {
     expect(JSON.parse(await readFile(settingsPath, "utf8"))).toMatchObject({
       packages: ["npm:pi-xai-oauth"],
       defaultProvider: "anthropic",
+      defaultModel: "claude-opus-4-6",
+      defaultThinkingLevel: "medium",
+    });
+  });
+  it("fills blank xAI defaults but keeps a deliberate xAI model choice", async () => {
+    await mkdir(join(settingsPath, ".."), { recursive: true });
+    await writeFile(
+      settingsPath,
+      JSON.stringify({
+        packages: ["npm:pi-xai-oauth"],
+        defaultProvider: "xai",
+        defaultModel: "grok-4-fast",
+        defaultThinkingLevel: "low",
+      }),
+    );
+    setup.updateSettings(settingsPath);
+    expect(JSON.parse(await readFile(settingsPath, "utf8"))).toMatchObject({
+      defaultProvider: "xai",
+      defaultModel: "grok-4-fast",
+      defaultThinkingLevel: "low",
+    });
+
+    await writeFile(
+      settingsPath,
+      JSON.stringify({
+        packages: ["npm:pi-xai-oauth"],
+        defaultProvider: "xai-auth",
+        defaultModel: "",
+      }),
+    );
+    setup.updateSettings(settingsPath);
+    expect(JSON.parse(await readFile(settingsPath, "utf8"))).toMatchObject({
+      defaultProvider: "xai-auth",
       defaultModel: "grok-4.5",
       defaultThinkingLevel: "high",
     });
