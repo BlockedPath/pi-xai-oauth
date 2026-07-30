@@ -1,5 +1,5 @@
 import type { OAuthLoginCallbacks } from "@earendil-works/pi-ai";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { XAI_OAUTH_DEVICE_URL } from "../../extensions/xai/constants";
 import {
   createXaiOAuth,
@@ -75,6 +75,23 @@ function runtimeInteraction(callbacks: OAuthLoginCallbacks) {
     },
   };
 }
+
+/**
+ * Keep Pi's real credential runtime hermetic for this suite.
+ *
+ * `ModelRuntime.create` sets `modelNetworkEnabled = process.env.PI_OFFLINE === undefined`,
+ * and `ModelRuntime.login()` finishes by awaiting `refresh({ allowNetwork: modelNetworkEnabled })`
+ * with no signal and no timeout. Left unset, a *successful* login therefore fans out real,
+ * unbounded catalog requests for every builtin provider (observed: `https://pi.dev/api/models/...`),
+ * which hangs the test whenever the network is slow or unreachable. `PI_OFFLINE` keeps that
+ * post-login refresh offline, and the fetch stub guarantees no request can escape the suite.
+ */
+beforeEach(() => {
+  vi.stubEnv("PI_OFFLINE", "1");
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    throw new Error(`Unexpected network request in an isolated test: ${String((input as Request)?.url ?? input)}`);
+  });
+});
 
 async function createPiAuthHarness(id: string, initial?: any) {
   const codingAgent = (await import("@earendil-works/pi-coding-agent")) as any;
