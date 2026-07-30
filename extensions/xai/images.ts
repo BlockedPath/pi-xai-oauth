@@ -1,6 +1,7 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resizeImage } from "@earendil-works/pi-coding-agent";
+import { MEDIA_MAX_DATA_URL_CHARS } from "./media/constants";
 import { toImageDataUrl } from "./media/data-url";
 import { readBoundedWorkspaceImageFileSync } from "./media/paths";
 import type { SupportedImageMimeType } from "./media/types";
@@ -10,12 +11,32 @@ export const MAX_XAI_INLINE_IMAGE_BASE64_BYTES = 3 * 1024 * 1024;
 export const MAX_XAI_IMAGE_DIMENSION = 2000;
 export const XAI_JPEG_QUALITY = 95;
 
+/**
+ * Input-side caps enforced during payload traversal before whitespace
+ * normalization, deep-clone amplification of huge strings, or base64 decode.
+ * Output compaction still applies to images that pass this gate.
+ */
+export const MAX_XAI_INLINE_IMAGE_INPUT_BASE64_CHARS = MEDIA_MAX_DATA_URL_CHARS;
+export const MAX_XAI_INLINE_IMAGE_INPUT_AGGREGATE_BASE64_CHARS = 24 * 1024 * 1024;
+export const MAX_XAI_INLINE_IMAGE_INPUT_COUNT = 32;
+export const MAX_XAI_INLINE_IMAGE_PAYLOAD_MAX_DEPTH = 32;
+export const MAX_XAI_INLINE_IMAGE_PAYLOAD_MAX_NODES = 8192;
+
+/** Prefix allowance for `data:image/...;base64,` before the encoded payload. */
+const INLINE_IMAGE_DATA_URL_PREFIX_MAX_CHARS = 64;
+
 interface InlineImageReference {
   imagePart: Record<string, any>;
   mimeType: string;
   base64: string;
   encodedSize: number;
   targetSize: number;
+}
+
+interface InlineImageCollectState {
+  references: InlineImageReference[];
+  nodes: number;
+  aggregateEncoded: number;
 }
 
 function stripShellQuotes(value: string): string {
@@ -88,35 +109,95 @@ export function normalizeXaiImageInput(
   return toImageDataUrl(verified);
 }
 
-function parseInlineImageDataUrl(value: string): { mimeType: string; base64: string } | undefined {
+function inlineImageInputSizeError(): Error {
+  return new Error("xAI inline image payload exceeds the safe input size limit");
+}
+
+function inlineImageInputCountError(): Error {
+  return new Error("xAI inline image payload contains too many inline images");
+}
+
+function inlineImageStructureError(): Error {
+  return new Error("xAI inline image payload exceeds the safe structure budget");
+}
+
+/**
+ * Parse a PNG/JPEG data URL after rejecting oversized encoded payloads.
+ * Bounds run on the raw string before whitespace stripping or decode.
+ */
+function parseInlineImageDataUrl(
+  value: string,
+): { mimeType: string; base64: string; encodedSize: number } | undefined {
   if (!/^data:image\//i.test(value)) return undefined;
+
+  // Reject before regex / whitespace work can amplify a multi-megabyte string.
+  if (value.length > MAX_XAI_INLINE_IMAGE_INPUT_BASE64_CHARS + INLINE_IMAGE_DATA_URL_PREFIX_MAX_CHARS) {
+    throw inlineImageInputSizeError();
+  }
+
   const match = /^data:(image\/(?:png|jpe?g));base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(value);
   if (!match) {
     throw new Error("xAI inline image payload contains an invalid or unsupported image data URL");
   }
+
+  // Bound the raw base64 region before allocating a whitespace-normalized copy.
+  if (match[2].length > MAX_XAI_INLINE_IMAGE_INPUT_BASE64_CHARS) {
+    throw inlineImageInputSizeError();
+  }
+
+  const base64 = match[2].replace(/\s+/g, "");
+  const encodedSize = base64.length;
+  if (encodedSize > MAX_XAI_INLINE_IMAGE_INPUT_BASE64_CHARS) {
+    throw inlineImageInputSizeError();
+  }
+
   return {
     mimeType: match[1].toLowerCase() === "image/jpg" ? "image/jpeg" : match[1].toLowerCase(),
-    base64: match[2].replace(/\s+/g, ""),
+    base64,
+    encodedSize,
   };
 }
 
-function clonePayloadAndCollectInlineImages(value: unknown, references: InlineImageReference[]): unknown {
-  if (Array.isArray(value)) return value.map((item) => clonePayloadAndCollectInlineImages(item, references));
+/**
+ * Deep-clone a payload while collecting inline images under hard input caps.
+ * Depth/node/image/aggregate bounds reject before decode.
+ */
+function clonePayloadAndCollectInlineImages(
+  value: unknown,
+  state: InlineImageCollectState,
+  depth = 0,
+): unknown {
+  if (depth > MAX_XAI_INLINE_IMAGE_PAYLOAD_MAX_DEPTH || ++state.nodes > MAX_XAI_INLINE_IMAGE_PAYLOAD_MAX_NODES) {
+    throw inlineImageStructureError();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => clonePayloadAndCollectInlineImages(item, state, depth + 1));
+  }
   if (!value || typeof value !== "object") return value;
 
   const cloned: Record<string, any> = {};
   for (const [key, child] of Object.entries(value as Record<string, any>)) {
-    cloned[key] = clonePayloadAndCollectInlineImages(child, references);
+    cloned[key] = clonePayloadAndCollectInlineImages(child, state, depth + 1);
   }
 
   if (cloned.type === "input_image" && typeof cloned.image_url === "string") {
+    // Count gate before parse so a 33rd image never pays normalization cost.
+    if (/^data:image\//i.test(cloned.image_url) && state.references.length >= MAX_XAI_INLINE_IMAGE_INPUT_COUNT) {
+      throw inlineImageInputCountError();
+    }
+
     const parsed = parseInlineImageDataUrl(cloned.image_url);
     if (parsed) {
-      references.push({
+      if (state.aggregateEncoded + parsed.encodedSize > MAX_XAI_INLINE_IMAGE_INPUT_AGGREGATE_BASE64_CHARS) {
+        throw inlineImageInputSizeError();
+      }
+      state.aggregateEncoded += parsed.encodedSize;
+      state.references.push({
         imagePart: cloned,
         mimeType: parsed.mimeType,
         base64: parsed.base64,
-        encodedSize: Buffer.byteLength(parsed.base64, "utf8"),
+        encodedSize: parsed.encodedSize,
         targetSize: 0,
       });
     }
@@ -150,6 +231,7 @@ function allocateInlineImageBudgets(references: InlineImageReference[], maxBase6
 /**
  * Compact inline PNG/JPEG inputs to a safe aggregate xAI transport budget.
  *
+ * Input-side size/count/structure caps reject hostile payloads before decode.
  * Small images keep their original allocation while oversized images share the
  * remaining budget. Processing is sequential to cap peak decoded-image memory.
  * A codec failure is surfaced locally so a known-risk oversized request is not sent.
@@ -162,12 +244,16 @@ export async function compactXaiInlineImages(
     throw new Error("xAI inline image transport budget must be a positive number");
   }
 
-  const references: InlineImageReference[] = [];
-  const clonedPayload = clonePayloadAndCollectInlineImages(payload, references);
-  if (references.length === 0) return clonedPayload;
+  const state: InlineImageCollectState = {
+    references: [],
+    nodes: 0,
+    aggregateEncoded: 0,
+  };
+  const clonedPayload = clonePayloadAndCollectInlineImages(payload, state);
+  if (state.references.length === 0) return clonedPayload;
 
-  allocateInlineImageBudgets(references, Math.floor(maxBase64Bytes));
-  for (const reference of references) {
+  allocateInlineImageBudgets(state.references, Math.floor(maxBase64Bytes));
+  for (const reference of state.references) {
     const bytes = Buffer.from(reference.base64, "base64");
     if (bytes.length === 0 || reference.targetSize < 1) {
       throw new Error("xAI inline image payload exceeds the safe transport budget and could not be compacted");
