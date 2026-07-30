@@ -79,11 +79,15 @@ function installBaseFetch(
   );
   return bearers;
 }
-async function login(provider: any, setUrl: (url: URL) => void) {
+async function login(
+  provider: any,
+  setUrl: (url: URL) => void,
+  onProgress: (message: string) => void = () => {},
+) {
   let manualCallback = "";
   return provider.oauth.login({
     onPrompt: async () => "n",
-    onProgress: () => {},
+    onProgress,
     onAuth(auth: any) {
       const url = new URL(auth.url);
       setUrl(url);
@@ -218,5 +222,55 @@ describe.sequential("catalog refresh ownership races", () => {
     expect(h.providers.get("xai-auth").models.map(({ id }: any) => id)).toEqual(
       ["login-priority"],
     );
+  });
+  it("keeps the applied remote catalog when the progress callback throws", async () => {
+    let authUrl: URL | undefined;
+    installBaseFetch(
+      [
+        async () =>
+          jsonResponse({
+            data: [
+              {
+                model: "entitled-only",
+                api_backend: "responses",
+                context_window: 100_000,
+              },
+            ],
+          }),
+      ],
+      () => authUrl,
+    );
+    const h = createExtensionHarness();
+    await extension(h.api);
+
+    // A host UI failure is cosmetic: it must not roll the validated remote
+    // entitlement snapshot back to the curated fallback. Only the catalog
+    // notice throws; earlier login-flow progress must still work.
+    const notices: string[] = [];
+    await login(
+      h.providers.get("xai-auth"),
+      (url) => {
+        authUrl = url;
+      },
+      (message) => {
+        notices.push(message);
+        if (/OAuth-visible|curated fallback/.test(message)) {
+          throw new Error("ui notification failed");
+        }
+      },
+    );
+
+    expect(notices.at(-1)).toMatch(/Refreshed 1 OAuth-visible xAI model\./);
+
+    expect(h.providers.get("xai-auth").models.map(({ id }: any) => id)).toEqual(
+      ["entitled-only"],
+    );
+    const cache = JSON.parse(
+      await readFile(
+        join(temp.path, ".pi/agent/cache/pi-xai-oauth/models-v2.json"),
+        "utf8",
+      ),
+    );
+    expect(cache.models.map(({ id }: any) => id)).toEqual(["entitled-only"]);
   });
 });

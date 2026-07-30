@@ -101,6 +101,9 @@ export default async function (pi: ExtensionAPI) {
       visionRouting.reset();
       const loginGeneration = ++loginCatalogGeneration;
       activeLoginRefreshes++;
+      // Progress text is chosen here but reported only after the catalog state is
+      // committed, so a failing notification cannot roll back a good catalog.
+      let notice: string | undefined;
       try {
         const { selection, isCurrent } = await refreshCatalog(credentials.access, {
           forceRefresh: true,
@@ -111,22 +114,28 @@ export default async function (pi: ExtensionAPI) {
         if (loginGeneration !== loginCatalogGeneration || !isCurrent) return;
         applyCatalog(selection, true);
         deferredRetryAfter = selection.needsAuthenticatedRefresh ? Date.now() + 60_000 : 0;
-        callbacks.onProgress?.(
+        notice =
           selection.source === "remote"
             ? `Refreshed ${selection.models.length} OAuth-visible xAI model${selection.models.length === 1 ? "" : "s"}.`
-            : "The authenticated xAI model catalog was unavailable; using the curated fallback.",
-        );
+            : "The authenticated xAI model catalog was unavailable; using the curated fallback.";
       } catch (error) {
         if (callbacks.signal?.aborted) throw error;
         if (loginGeneration === loginCatalogGeneration) {
           applyCatalog(curatedFallbackSelection(), true);
           deferredRetryAfter = Date.now() + 60_000;
-          callbacks.onProgress?.(
-            "The authenticated xAI model catalog was unavailable; using the curated fallback.",
-          );
+          notice = "The authenticated xAI model catalog was unavailable; using the curated fallback.";
         }
       } finally {
         activeLoginRefreshes--;
+      }
+      if (notice !== undefined) {
+        // Cosmetic, like the turn_end usage footer: a host UI failure must not fail
+        // the completed login or disturb the applied entitlement snapshot.
+        try {
+          callbacks.onProgress?.(notice);
+        } catch {
+          // Ignored on purpose; the catalog above is already committed.
+        }
       }
     },
   });
