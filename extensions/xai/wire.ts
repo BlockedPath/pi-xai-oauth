@@ -293,7 +293,8 @@ export class XaiHttpError extends Error {
 export async function xaiHttpErrorFromResponse(
   response: Response,
   url: string,
+  signal?: AbortSignal,
 ): Promise<XaiHttpError> {
-  const detail = await readTruncatedResponseText(response, MAX_ERROR_BODY_BYTES);
+  const detail = await readTruncatedResponseText(response, MAX_ERROR_BODY_BYTES, signal);
   return new XaiHttpError(response.status, routeKindForUrl(url), detail);
 }
