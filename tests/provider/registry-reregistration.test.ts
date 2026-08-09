@@ -243,13 +243,14 @@ describe("ModelRegistry re-registration precedence", () => {
           return credentials.access;
         },
       },
-      models: [baselineModelConfig],
+      models: [{ ...baselineModelConfig, id: "placeholder-model" }],
       async refreshModels(context: {
-        store: { read: () => Promise<any> };
+        store?: { read: () => Promise<any> };
+        stored?: any;
         allowNetwork?: boolean;
       }) {
         refreshCalls += 1;
-        const stored = await context.store.read();
+        const stored = context.stored ?? await context.store?.read();
         if (stored?.models?.some((model: { id: string }) => model.id === "stale-from-store")) {
           sawStaleStore = true;
         }
@@ -269,13 +270,14 @@ describe("ModelRegistry re-registration precedence", () => {
       },
     });
 
-    await runtime.refresh({ allowNetwork: true, force: true });
-
-    expect(refreshCalls).toBeGreaterThan(0);
-    expect(sawStaleStore).toBe(true);
-    expect(registry.find("xai-auth", "stale-from-store")).toBeUndefined();
-    expect(registry.find("xai-auth", "baseline-model")).toMatchObject({
-      id: "baseline-model",
+    await vi.waitFor(() => {
+      expect(refreshCalls).toBeGreaterThan(0);
+      expect(sawStaleStore).toBe(true);
+      expect(registry.find("xai-auth", "stale-from-store")).toBeUndefined();
+      expect(registry.find("xai-auth", "placeholder-model")).toBeUndefined();
+      expect(registry.find("xai-auth", "baseline-model")).toMatchObject({
+        id: "baseline-model",
+      });
     });
     expect(
       runtime

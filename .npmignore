@@ -20,3 +20,8 @@ auth.json
 pi-session-*.html
 cat.svg
 .agent-task.md
+
+# Local research and live-probe artifacts are never part of the extension package.
+docs/research/
+prototype/
+probe-*

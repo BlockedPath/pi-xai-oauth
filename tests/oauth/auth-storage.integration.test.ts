@@ -1,4 +1,6 @@
 import type { OAuthLoginCallbacks } from "@earendil-works/pi-ai";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { XAI_OAUTH_DEVICE_URL } from "../../extensions/xai/constants";
 import {
@@ -11,6 +13,7 @@ import {
   makeClock,
   tokenPayload,
 } from "../fixtures/device";
+import { createTempDir } from "../fixtures/temp";
 
 function oauthWithClock() {
   const clock = makeClock();
@@ -133,15 +136,23 @@ describe("Pi credential-runtime device integration", () => {
       expires: Date.now() + 60_000,
     });
     const controller = new AbortController();
-    await expect(
-      harness.login({
-        onPrompt: async () => "n",
-        onAuth: () => {},
-        onSelect: async () => XAI_DEVICE_LOGIN_METHOD,
-        onDeviceCode: () => controller.abort(),
-        signal: controller.signal,
-      } as any),
-    ).rejects.toThrow("Login cancelled");
+    let resolved = false;
+    const cancellation = await harness.login({
+      onPrompt: async () => "n",
+      onAuth: () => {},
+      onSelect: async () => XAI_DEVICE_LOGIN_METHOD,
+      onDeviceCode: () => controller.abort(),
+      signal: controller.signal,
+    } as any).then(
+      () => {
+        resolved = true;
+        return undefined;
+      },
+      (error: unknown) => error,
+    );
+    expect(resolved).toBe(false);
+    expect(cancellation).toBeInstanceOf(Error);
+    expect((cancellation as Error).message).toMatch(/Login cancelled|operation was aborted/i);
     await expect(harness.read()).resolves.toMatchObject({
       access: "existing-access",
       refresh: "existing-refresh",
@@ -161,5 +172,62 @@ describe("Pi credential-runtime device integration", () => {
       access: "device-access-token",
       refresh: "device-refresh-token",
     });
+  });
+
+  it("persists rotated credentials before preparing an authenticated request", async () => {
+    const codingAgent = (await import("@earendil-works/pi-coding-agent")) as any;
+    const temp = await createTempDir("pi-xai-refresh-store-");
+    const id = `xai-refresh-${crypto.randomUUID()}`;
+    const authPath = join(temp.path, "agent", "auth.json");
+    try {
+      await mkdir(join(authPath, ".."), { recursive: true });
+      await writeFile(authPath, JSON.stringify({
+        [id]: {
+          type: "oauth",
+          access: "expired-access",
+          refresh: "original-refresh",
+          expires: 1,
+          tokenEndpoint: "https://auth.x.ai/oauth2/token",
+        },
+      }));
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(tokenPayload({
+        access_token: "refreshed-access",
+        refresh_token: "rotated-refresh",
+      }))));
+
+      let requestAccess: string | undefined;
+      if (typeof codingAgent.ModelRuntime === "function") {
+        const runtime = await codingAgent.ModelRuntime.create({
+          authPath,
+          modelsPath: null,
+          allowModelNetwork: false,
+        });
+        runtime.registerProvider(id, providerConfig());
+        await runtime.refresh({ allowNetwork: false, providers: [id] });
+        const model = runtime.getModel(id, "grok-integration-test");
+        expect(model).toBeDefined();
+        requestAccess = (await runtime.prepareRequest(model, {})).options.apiKey;
+      } else {
+        const storage = codingAgent.AuthStorage.create(authPath);
+        const registry = codingAgent.ModelRegistry.create(storage);
+        registry.registerProvider(id, providerConfig());
+        const model = registry.find(id, "grok-integration-test");
+        expect(model).toBeDefined();
+        const auth = await registry.getApiKeyAndHeaders(model);
+        expect(auth).toMatchObject({ ok: true });
+        requestAccess = auth.apiKey;
+      }
+
+      const stored = JSON.parse(await readFile(authPath, "utf8"))[id];
+      expect(requestAccess).toBe("refreshed-access");
+      expect(stored).toMatchObject({
+        type: "oauth",
+        access: "refreshed-access",
+        refresh: "rotated-refresh",
+      });
+      expect(stored.expires).toBeGreaterThan(Date.now());
+    } finally {
+      await temp.cleanup();
+    }
   });
 });
