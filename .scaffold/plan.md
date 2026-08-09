@@ -22,7 +22,7 @@ Publish each validated release to both npmjs as `pi-xai-oauth` and GitHub Packag
 4. [x] Extend CI and GitHub Release publishing to validate and publish both registries idempotently.
 5. [x] Bump and document release 1.4.2, including authenticated GitHub Packages installation.
 6. [x] Run full local gates, exact packed boundaries, and independent review.
-7. [ ] Commit, push, and open the 1.4.2 dual-publishing pull request.
+7. [x] Commit, push, and open the 1.4.2 dual-publishing pull request.
 
 ## Non-goals
 

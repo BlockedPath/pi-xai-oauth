@@ -22,8 +22,8 @@
 
 ## In Progress
 
-- Commit, push, and open the 1.4.2 dual-publishing PR.
+- None.
 
 ## Next
 
-Merge the reviewed PR, create GitHub Release `v1.4.2`, verify both registry publish steps, then change the new GitHub Package visibility to public once from its package settings.
+Merge PR #174, create GitHub Release `v1.4.2`, verify both registry publish steps, then change the new GitHub Package visibility to public once from its package settings.
