@@ -75,6 +75,8 @@ node bin/setup.js --help
 
 ## Pi Compatibility and Release Changes
 
+Maintainers should follow the exact dual-registry checklist in [`RELEASING.md`](RELEASING.md) for every release.
+
 The compatibility contract lives in `compatibility/pi-versions.json`. Both Pi peer ranges must remain aligned, normal development dependencies must be exact at the policy's `latest` release, and CI derives its two exact matrix cells from that policy. Each release keeps npmjs `pi-xai-oauth` canonical and derives the GitHub Packages mirror `@blockedpath/pi-xai-oauth` from that exact tarball; `node scripts/verify-github-package.js` checks version, repository, peer, setup-name, and file-path parity.
 
 To evaluate a future Pi release without advertising it prematurely:
