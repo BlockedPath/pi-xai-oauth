@@ -35,9 +35,9 @@ pi --model grok-4.5:low "Quick status check"   # fast mode
 
 This package adds xAI's **account-specific OAuth model catalog** to pi, with **Grok 4.5** as the offline fallback/default, proper OAuth login, automatic token refresh, and a suite of custom xAI tools (`xai_generate_text`, `web_search`, `xai_x_search`, etc.). The normalized cache remains exact; registration may additionally expose narrowly verified compatibility routes such as Grok 4.3 and Composer only while their required authenticated entitlement source is present.
 
-> **Latest release:** `pi-xai-oauth` **1.4.1** adds exact Pi 0.84.1 compatibility, forwards Pi's refresh cancellation signal through xAI token exchange, and verifies rotated OAuth credentials are persisted before request use. Setup now defaults an unset provider to Pi's built-in `xai` provider without overwriting an existing choice, while package-owned Grok terminal adapters suppress Pi session metadata. Existing npm installs should run `pi update npm:pi-xai-oauth`; local checkout installs should keep only one copy with `pi remove npm:pi-xai-oauth && pi install .`.
+> **Latest release:** `pi-xai-oauth` **1.4.2** publishes the canonical `pi-xai-oauth` package on npmjs and a scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages from the same validated GitHub Release. Setup treats both registry names as one extension and removes duplicate aliases before they can register conflicting tools. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
 >
-> **Compatibility:** 1.4.1 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. The exact tested boundaries are 0.80.1 and 0.84.1.
+> **Compatibility:** 1.4.2 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. The exact tested boundaries are 0.80.1 and 0.84.1.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and fix history.
 
@@ -138,6 +138,23 @@ Chat stays on Pi's built-in `xai` provider by default. This package still regist
 pi install npm:pi-xai-oauth
 ```
 
+### GitHub Packages mirror
+
+Every release is also published as `@blockedpath/pi-xai-oauth` on GitHub Packages. GitHub creates the package privately on its first publication; a package administrator must open the new package's settings and change its visibility to public once. GitHub still requires authentication when installing public npm packages: create a classic personal access token with `read:packages`, then authenticate with the token as your password. The generated user-level npm credentials must never be committed.
+
+```bash
+npm login --scope=@blockedpath --auth-type=legacy --registry=https://npm.pkg.github.com
+pi install npm:@blockedpath/pi-xai-oauth
+```
+
+The scoped setup command is also available after authentication:
+
+```bash
+npx @blockedpath/pi-xai-oauth
+```
+
+Use either the npmjs package or the GitHub Packages mirror, never both. They contain the same extension and version; npmjs remains the simpler public installation path because it does not require GitHub registry authentication.
+
 Recommended settings for native SuperGrok chat plus this package's tools/usage:
 
 ```bash
@@ -153,7 +170,7 @@ Authenticate with `/login xai`. Use `/login xai-auth` only when you want this pa
 
 > **⚠️ Important: install only one copy**
 >
-> `pi-xai-oauth` registers fixed private tool names such as `xai_generate_text`, `xai_grok_web_search`, and `xai_x_search`. If you install more than one copy — for example `npm:pi-xai-oauth` plus a local checkout, or two different local checkouts — pi will fail to start with `Tool "xai_generate_text" conflicts with ...` errors.
+> `pi-xai-oauth` registers fixed private tool names such as `xai_generate_text`, `xai_grok_web_search`, and `xai_x_search`. If you install more than one copy — for example `npm:pi-xai-oauth` plus `npm:@blockedpath/pi-xai-oauth`, a local checkout, or two different local checkouts — pi will fail to start with `Tool "xai_generate_text" conflicts with ...` errors. The setup CLI prunes npmjs/GitHub/local aliases, but manual installs must still keep only one.
 >
 > Check with:
 > ```bash
@@ -774,7 +791,7 @@ pi update npm:pi-xai-oauth
 
 This pulls the latest version from npm and updates your installed extension.
 
-Version 1.4.1 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.1. It adds Pi 0.84.1 OAuth refresh and model-catalog lifecycle compatibility, verifies file-backed rotated-token persistence across both tested boundaries, defaults previously unset setup configuration to Pi's built-in `xai` provider, and preserves the tools, media, transport, and entitlement hardening introduced in 1.4.0. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. If you installed the published npm package, update with the command above. If you are testing a local checkout instead, reinstall the checkout:
+Version 1.4.2 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.1. It preserves Pi 0.84.1 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall the checkout:
 
 ```bash
 pi remove npm:pi-xai-oauth && pi install .
@@ -974,19 +991,22 @@ npm pack --dry-run --json
 git diff --check
 ```
 
-Normal releases publish through [`.github/workflows/publish.yml`](.github/workflows/publish.yml) with npm trusted publishing—no long-lived npm token is stored in GitHub. Configure the `pi-xai-oauth` package's trusted publisher on npmjs.com with GitHub owner `BlockedPath`, repository `pi-xai-oauth`, workflow filename `publish.yml`, no environment, and the `npm publish` action enabled. The workflow uses a GitHub-hosted runner, npm 11.6.2, and the required `id-token: write` permission.
+Normal releases publish through [`.github/workflows/publish.yml`](.github/workflows/publish.yml) to both registries. npmjs uses trusted publishing, so no long-lived npm token is stored in GitHub: configure `pi-xai-oauth` on npmjs.com with GitHub owner `BlockedPath`, repository `pi-xai-oauth`, workflow filename `publish.yml`, no environment, and `npm publish` enabled. GitHub Packages uses the repository-scoped `GITHUB_TOKEN` with `packages: write`; no additional GitHub secret is required.
 
-After the release PR is merged, create and publish a non-prerelease GitHub Release whose tag exactly matches `v` plus the version in `package.json` (for example, `v1.4.1`). The workflow refuses tags not contained in `main`, reruns the full release gates and exact packed boundaries, and then publishes the public package with OIDC-generated provenance.
+The workflow creates `@blockedpath/pi-xai-oauth` from the already validated canonical tarball by changing only its package name and registry. CI verifies that the mirror retains the same version, repository, peer dependencies, setup behavior, and contents. Both publish steps are idempotent so a failed second registry can be retried without attempting to overwrite the successful first publication. GitHub Packages creates the mirror privately on its first publication and exposes no npm-publish option for public visibility, so a package administrator must make it public once from the package settings UI; later versions retain the package's configured visibility.
+
+After the release PR is merged, create and publish a non-prerelease GitHub Release whose tag exactly matches `v` plus the version in `package.json` (for example, `v1.4.2`). The workflow refuses tags not contained in `main`, reruns the full release gates and exact packed boundaries, and then publishes npmjs with OIDC provenance plus the GitHub Packages mirror.
 
 ```bash
 git switch main
 git pull --ff-only origin main
-git tag v1.4.1
-git push origin v1.4.1
-gh release create v1.4.1 --verify-tag --generate-notes
+git tag v1.4.2
+git push origin v1.4.2
+gh release create v1.4.2 --verify-tag --generate-notes
 
-# Users update with:
+# Users update the distribution they installed with one of:
 # pi update npm:pi-xai-oauth
+# pi update npm:@blockedpath/pi-xai-oauth
 ```
 
 ---

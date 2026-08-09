@@ -7,7 +7,7 @@ import { createTempDir } from "../fixtures/temp";
 const require = createRequire(import.meta.url);
 const setup = require("../../bin/setup.js") as {
   getNpmPackageName(source: string): string | undefined;
-  pruneDuplicatePackageEntries(entries: any[], settingsPath: string): any;
+  pruneDuplicatePackageEntries(entries: any[], settingsPath: string, packageName?: string): any;
   updateSettings(path: string): boolean;
 };
 let temp: Awaited<ReturnType<typeof createTempDir>>;
@@ -64,6 +64,30 @@ describe("setup settings", () => {
       packages: ["npm:pi-xai-oauth"],
       removed: [localXai],
       addedNpmPackage: true,
+    });
+  });
+  it("treats npmjs and GitHub Packages distributions as one package", () => {
+    expect(
+      setup.pruneDuplicatePackageEntries(
+        ["npm:pi-xai-oauth", "npm:@blockedpath/pi-xai-oauth", localXai, "npm:other"],
+        settingsPath,
+        "@blockedpath/pi-xai-oauth",
+      ),
+    ).toEqual({
+      packages: ["npm:@blockedpath/pi-xai-oauth", "npm:other"],
+      removed: ["npm:pi-xai-oauth", localXai],
+      addedNpmPackage: false,
+    });
+
+    expect(
+      setup.pruneDuplicatePackageEntries(
+        ["npm:@blockedpath/pi-xai-oauth", "npm:other"],
+        settingsPath,
+      ),
+    ).toEqual({
+      packages: ["npm:@blockedpath/pi-xai-oauth", "npm:other"],
+      removed: [],
+      addedNpmPackage: false,
     });
   });
   it("writes pruned packages and preserves package-owned xai-auth defaults", async () => {

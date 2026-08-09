@@ -17,6 +17,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Run TypeScript: `npm run typecheck` (production, tests, fixtures, config)
 - Verify Pi policy/package metadata: `npm run compatibility:check`
 - Verify exact packed Pi boundaries: `npm run compatibility:boundaries`
+- Verify the scoped GitHub Packages mirror: `node scripts/verify-github-package.js`
 - Evaluate an unadvertised Pi candidate: `node scripts/run-compatibility-matrix.js X.Y.Z --candidate`
 - Git: Always work on feature branches and confirm the active branch before edits.
 
@@ -35,6 +36,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Keep the normalized token-free catalog cache atomic and apply the documented TTL/stale/fallback policy
 - Preserve known model metadata and compatibility behavior without inventing unentitled model families; known aliases and independently verified OAuth request slugs may be advertised only while their entitlement source is present at registration/runtime (cache stays exact)
 - Keep both Pi peers aligned to the checked-in bounded range in `compatibility/pi-versions.json`
+- Keep npmjs `pi-xai-oauth` canonical and publish GitHub Packages only as the exact scoped mirror `@blockedpath/pi-xai-oauth`; setup must treat both names as aliases and prevent duplicate registration
 - Install/report exact Pi matrix versions from a clean packed package; never reuse the repository lockfile for boundary jobs
 - Keep normal Pi dev dependencies exact at the policy's latest tested release and review candidate releases before widening support
 - Resolve `x-userid` transiently from the pinned authenticated CLI-proxy `/user` endpoint before any billing request
@@ -85,6 +87,8 @@ pi-xai-oauth/
 ├── scripts/
 │   ├── verify-extension-loader.mjs # Small real Pi loader smoke
 │   ├── verify-compatibility.js # Policy/range/registry/pack/unsupported-peer checks
+│   ├── prepare-github-package.js # Exact scoped mirror staging for GitHub Packages
+│   ├── verify-github-package.js # Mirror name/registry/version/setup parity gate
 │   └── run-compatibility-matrix.js # Clean packed exact-version test/typecheck runner
 ├── .github/workflows/
 │   └── ci.yml           # PR/main policy and exact Pi boundary matrix

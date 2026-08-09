@@ -21,7 +21,10 @@ pi-session-*.html
 cat.svg
 .agent-task.md
 
-# Local research and live-probe artifacts are never part of the extension package.
+# Local agent configuration and generated research artifacts are never published.
+.agents/
+skills-lock.json
+docs/diagrams/
 docs/research/
 prototype/
 probe-*

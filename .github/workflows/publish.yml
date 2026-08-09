@@ -1,4 +1,4 @@
-name: Publish npm package
+name: Publish npm and GitHub packages
 
 on:
   release:
@@ -8,9 +8,10 @@ on:
 permissions:
   contents: read
   id-token: write
+  packages: write
 
 concurrency:
-  group: npm-publish-${{ github.event.release.tag_name }}
+  group: package-publish-${{ github.event.release.tag_name }}
   cancel-in-progress: false
 
 env:
@@ -40,6 +41,9 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      - name: Remove deprecated setup-node npm setting
+        run: sed -i '/^always-auth=/d' "$NPM_CONFIG_USERCONFIG"
+
       - name: Pin npm with trusted-publishing support
         run: npm install --global npm@${NPM_VERSION}
 
@@ -68,5 +72,61 @@ jobs:
       - name: Verify exact packed Pi boundaries
         run: npm run compatibility:boundaries
 
+      - name: Pack the canonical release archive once
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          PACK_RESULT="$(npm pack --json --pack-destination "$RUNNER_TEMP/release")"
+          PACK_FILENAME="$(PACK_RESULT="$PACK_RESULT" node --input-type=commonjs --eval '
+            const path = require("path");
+            const parsed = JSON.parse(process.env.PACK_RESULT);
+            const entries = Array.isArray(parsed) ? parsed : Object.values(parsed);
+            if (entries.length !== 1 || path.basename(entries[0].filename) !== entries[0].filename) process.exit(1);
+            process.stdout.write(entries[0].filename);
+          ')"
+          echo "CANONICAL_TARBALL=$RUNNER_TEMP/release/$PACK_FILENAME" >> "$GITHUB_ENV"
+
       - name: Publish to npm with trusted publishing
-        run: npm publish --access public
+        run: |
+          PACKAGE_VERSION="$(node --print 'require("./package.json").version')"
+          if npm view "pi-xai-oauth@$PACKAGE_VERSION" version --registry https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "pi-xai-oauth@$PACKAGE_VERSION is already published; skipping npmjs publish"
+          else
+            npm publish "$CANONICAL_TARBALL" --access public --registry https://registry.npmjs.org
+          fi
+
+      - name: Prepare scoped GitHub Packages mirror from the canonical archive
+        run: node scripts/prepare-github-package.js "$CANONICAL_TARBALL" "$RUNNER_TEMP/github-package"
+
+      - name: Pack the scoped mirror archive
+        run: |
+          MIRROR_RESULT="$(npm pack "$RUNNER_TEMP/github-package/package" --json --pack-destination "$RUNNER_TEMP/release")"
+          MIRROR_FILENAME="$(MIRROR_RESULT="$MIRROR_RESULT" node --input-type=commonjs --eval '
+            const path = require("path");
+            const parsed = JSON.parse(process.env.MIRROR_RESULT);
+            const entries = Array.isArray(parsed) ? parsed : Object.values(parsed);
+            if (entries.length !== 1 || path.basename(entries[0].filename) !== entries[0].filename) process.exit(1);
+            process.stdout.write(entries[0].filename);
+          ')"
+          echo "GITHUB_TARBALL=$RUNNER_TEMP/release/$MIRROR_FILENAME" >> "$GITHUB_ENV"
+
+      - name: Set up the GitHub Packages registry
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://npm.pkg.github.com
+          scope: "@blockedpath"
+
+      - name: Remove deprecated GitHub registry setting
+        run: sed -i '/^always-auth=/d' "$NPM_CONFIG_USERCONFIG"
+
+      - name: Publish scoped mirror to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PACKAGE_VERSION="$(node --print 'require("./package.json").version')"
+          PACKAGE_NAME="@blockedpath/pi-xai-oauth"
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published; skipping GitHub Packages publish"
+          else
+            npm publish "$GITHUB_TARBALL" --registry https://npm.pkg.github.com
+          fi

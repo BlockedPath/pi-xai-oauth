@@ -43,6 +43,8 @@ jobs:
         run: npm run typecheck
       - name: Verify packed manifest and contents
         run: node scripts/verify-compatibility.js pack
+      - name: Verify scoped GitHub Packages mirror
+        run: node scripts/verify-github-package.js
       - name: Verify unsupported peer diagnostics
         run: node scripts/verify-compatibility.js unsupported
       - name: Inspect package dry run

@@ -75,7 +75,7 @@ node bin/setup.js --help
 
 ## Pi Compatibility and Release Changes
 
-The compatibility contract lives in `compatibility/pi-versions.json`. Both Pi peer ranges must remain aligned, normal development dependencies must be exact at the policy's `latest` release, and CI derives its two exact matrix cells from that policy.
+The compatibility contract lives in `compatibility/pi-versions.json`. Both Pi peer ranges must remain aligned, normal development dependencies must be exact at the policy's `latest` release, and CI derives its two exact matrix cells from that policy. Each release keeps npmjs `pi-xai-oauth` canonical and derives the GitHub Packages mirror `@blockedpath/pi-xai-oauth` from that exact tarball; `node scripts/verify-github-package.js` checks version, repository, peer, setup-name, and file-path parity.
 
 To evaluate a future Pi release without advertising it prematurely:
 
@@ -95,6 +95,7 @@ NODE_OPTIONS=--unhandled-rejections=strict npm test
 npm run test:coverage
 npm run typecheck
 npm run compatibility:check
+node scripts/verify-github-package.js
 npm run compatibility:boundaries
 npm pack --dry-run --json
 git diff --check
