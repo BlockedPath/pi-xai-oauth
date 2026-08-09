@@ -69,6 +69,32 @@ describe("OAuth refresh", () => {
     expect(headers[0].get("X-XAI-Token-Auth")).toBeNull();
   });
 
+  it("forwards Pi's concrete refresh abort signal to the token exchange", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn(async (_url: any, init: RequestInit) => {
+      expect(init.signal).toBe(controller.signal);
+      return jsonResponse({
+        access_token: "signal-bound-access",
+        refresh_token: "signal-bound-refresh",
+        expires_in: 3600,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const oauth = createXaiOAuth({ getExistingCredentials: () => null });
+    await oauth.refreshToken(
+      {
+        access: "old",
+        refresh: "old-refresh",
+        expires: 1,
+        tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+      },
+      controller.signal,
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("rejects missing refresh and untrusted token endpoints", async () => {
     await expect(
       refreshXaiCredentials({ access: "expired", refresh: "", expires: 1 }),

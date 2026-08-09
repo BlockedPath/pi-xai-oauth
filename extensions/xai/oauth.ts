@@ -571,12 +571,15 @@ export function createXaiOAuth({
       );
     },
 
-    async refreshToken(credentials: OAuthCredentials): Promise<OAuthCredentials> {
+    async refreshToken(
+      credentials: OAuthCredentials,
+      signal?: AbortSignal,
+    ): Promise<OAuthCredentials> {
       if (!credentials.refresh && credentials.expires && credentials.expires <= Date.now()) {
         throw new Error("xAI OAuth token is expired and cannot be refreshed. Please run /login xai-auth again.");
       }
       if (!credentials.refresh) return credentials;
-      return refreshXaiCredentials(credentials);
+      return refreshXaiCredentials(credentials, signal);
     },
 
     getApiKey(credentials: OAuthCredentials): string {

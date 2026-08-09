@@ -9,10 +9,15 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 ### Changed
 
 - Setup no longer forces `defaultProvider: xai-auth`. When no provider is configured it seeds Pi's built-in `xai` chat provider, preserves any existing provider choice (including package-owned `xai-auth`), and still installs opt-in tools plus `/xai-usage` for both providers.
-- Reviewed the Pi 0.82 line and adopted it as the latest exact tested boundary after clean packed candidate validation, while preserving the 0.80.1 minimum. Pi 0.82's `bash` factory reads the tool execution context's session manager, active model, and thinking level to expose `PI_*` session metadata; the Grok-native `run_terminal_command` adapter delegates that context unchanged and is now covered by a realistic session-context test.
-- Widened aligned Pi peers to `>=0.80.1 <0.83.0` and pinned development metadata and the lockfile exactly to 0.82.1, the latest release inside the allowed line at review time.
+- Reviewed Pi 0.82 through 0.84.1 and adopted 0.84.1 as the latest exact tested boundary after clean packed candidate validation, while preserving the 0.80.1 minimum. Compatibility coverage now includes Pi 0.83's proactive OAuth refresh and Pi 0.84's cross-process credential reload, abortable refresh, and generation-checked catalog publication contracts.
+- Widened aligned Pi peers to `>=0.80.1 <0.85.0` and pinned development metadata and the lockfile exactly to 0.84.1, the latest release inside the allowed line at review time. Pi 0.82's `bash` session metadata remains suppressed from Grok-native terminal children through the cross-range `spawnHook`.
 - Audited Pi's built-in `xai` reasoning levels against the package-owned `xai-auth` catalog and found no stale mappings; every difference is intentional and is now pinned by tests. No advertised reasoning level changed.
 - Suppressed Pi's `PI_SESSION_ID`, `PI_SESSION_FILE`, `PI_PROVIDER`, `PI_MODEL`, and `PI_REASONING_LEVEL` metadata from Grok-native terminal child processes, including stale parent values on older supported Pi versions, while preserving all unrelated environment variables and standard shell behavior.
+
+### Fixed
+
+- Forwarded Pi 0.84's concrete OAuth refresh abort signal through xAI discovery and token exchange so cancelled or timed-out refreshes release Pi's credential-store lock without a late network commit.
+- Kept real-runtime credential cancellation and model-catalog publication tests compatible with both the Pi 0.80.1 legacy surfaces and Pi 0.84's abort and read-only stored-catalog contracts.
 
 ### Documentation
 
