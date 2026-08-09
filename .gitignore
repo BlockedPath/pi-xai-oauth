@@ -18,3 +18,8 @@ CLAUDE.md
 .claude/
 skills-lock.json
 docs/diagrams/
+
+# Local research, prototypes, and probe artifacts.
+docs/research/
+prototype/
+probe-*
