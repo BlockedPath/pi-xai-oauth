@@ -35,9 +35,9 @@ pi --model grok-4.5:low "Quick status check"   # fast mode
 
 This package adds xAI's **account-specific OAuth model catalog** to pi, with **Grok 4.5** as the offline fallback/default, proper OAuth login, automatic token refresh, and a suite of custom xAI tools (`xai_generate_text`, `web_search`, `xai_x_search`, etc.). The normalized cache remains exact; registration may additionally expose narrowly verified compatibility routes such as Grok 4.3 and Composer only while their required authenticated entitlement source is present.
 
-> **Latest release:** `pi-xai-oauth` **1.4.0** adds opt-in vision routing, image-to-video generation, the `pi-clickable-menu:xai-tools` bridge, built-in SuperGrok network-tool/usage support, and Pi 0.81.1 compatibility, while hardening credential isolation, local media bounds, and Grok-native path containment. Existing npm installs should run `pi update npm:pi-xai-oauth`; local checkout installs should keep only one copy with `pi remove npm:pi-xai-oauth && pi install .`.
+> **Latest release:** `pi-xai-oauth` **1.4.1** adds exact Pi 0.84.1 compatibility, forwards Pi's refresh cancellation signal through xAI token exchange, and verifies rotated OAuth credentials are persisted before request use. Setup now defaults an unset provider to Pi's built-in `xai` provider without overwriting an existing choice, while package-owned Grok terminal adapters suppress Pi session metadata. Existing npm installs should run `pi update npm:pi-xai-oauth`; local checkout installs should keep only one copy with `pi remove npm:pi-xai-oauth && pi install .`.
 >
-> **Compatibility:** aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. The exact tested boundaries are 0.80.1 and 0.84.1.
+> **Compatibility:** 1.4.1 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. The exact tested boundaries are 0.80.1 and 0.84.1.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and fix history.
 
@@ -774,7 +774,7 @@ pi update npm:pi-xai-oauth
 
 This pulls the latest version from npm and updates your installed extension.
 
-The current build requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.1. Version 1.4.0 added opt-in vision routing, image-to-video generation, the menu bridge, built-in SuperGrok tool/usage support, and further transport and entitlement hardening on top of authenticated model discovery, device OAuth, encrypted reasoning replay, Grok-native tools, bounded image editing, and explicit subscription usage. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. If you installed the published npm package, update with the command above. If you are testing a local checkout instead, reinstall the checkout:
+Version 1.4.1 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.1. It adds Pi 0.84.1 OAuth refresh and model-catalog lifecycle compatibility, verifies file-backed rotated-token persistence across both tested boundaries, defaults previously unset setup configuration to Pi's built-in `xai` provider, and preserves the tools, media, transport, and entitlement hardening introduced in 1.4.0. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. If you installed the published npm package, update with the command above. If you are testing a local checkout instead, reinstall the checkout:
 
 ```bash
 pi remove npm:pi-xai-oauth && pi install .
@@ -972,7 +972,18 @@ npm run compatibility:check
 npm run compatibility:boundaries
 npm pack --dry-run --json
 git diff --check
-npm publish
+```
+
+Normal releases publish through [`.github/workflows/publish.yml`](.github/workflows/publish.yml) with npm trusted publishing—no long-lived npm token is stored in GitHub. Configure the `pi-xai-oauth` package's trusted publisher on npmjs.com with GitHub owner `BlockedPath`, repository `pi-xai-oauth`, workflow filename `publish.yml`, no environment, and the `npm publish` action enabled. The workflow uses a GitHub-hosted runner, npm 11.6.2, and the required `id-token: write` permission.
+
+After the release PR is merged, create and publish a non-prerelease GitHub Release whose tag exactly matches `v` plus the version in `package.json` (for example, `v1.4.1`). The workflow refuses tags not contained in `main`, reruns the full release gates and exact packed boundaries, and then publishes the public package with OIDC-generated provenance.
+
+```bash
+git switch main
+git pull --ff-only origin main
+git tag v1.4.1
+git push origin v1.4.1
+gh release create v1.4.1 --verify-tag --generate-notes
 
 # Users update with:
 # pi update npm:pi-xai-oauth

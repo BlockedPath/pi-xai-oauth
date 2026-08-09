@@ -191,7 +191,10 @@ describe("ModelRegistry re-registration precedence", () => {
       type: "oauth",
       access: "store-oauth-access",
       refresh: "refresh",
-      expires: Date.now() + 60_000,
+      // Keep credential refresh outside this catalog-publication test. Pi 0.83+
+      // refreshes OAuth credentials five minutes early, so a one-minute lifetime
+      // races the concurrent availability checks and obscures the store assertion.
+      expires: Date.now() + 60 * 60_000,
     };
     const credentialStore = {
       async read(providerId: string) {
@@ -216,7 +219,7 @@ describe("ModelRegistry re-registration precedence", () => {
       credentials: credentialStore,
       modelsPath,
       modelsStorePath,
-      allowModelNetwork: true,
+      allowModelNetwork: false,
     });
     const registry = new codingAgent.ModelRegistry(runtime);
 
@@ -225,6 +228,16 @@ describe("ModelRegistry re-registration precedence", () => {
     const localCatalogModifiedAt = Date.now();
     let refreshCalls = 0;
     let sawStaleStore = false;
+
+    // Pi 0.84 starts registration refresh asynchronously. Capture that exact
+    // promise so the test waits for its generation-checked publication instead
+    // of racing it with a second refresh or polling an unobserved background job.
+    const runRefresh = runtime.refresh.bind(runtime);
+    let registrationRefresh: Promise<any> | undefined;
+    runtime.refresh = (options: any = {}) => {
+      registrationRefresh = runRefresh(options);
+      return registrationRefresh;
+    };
 
     registry.registerProvider("xai-auth", {
       name: "xAI store precedence",
@@ -270,14 +283,15 @@ describe("ModelRegistry re-registration precedence", () => {
       },
     });
 
-    await vi.waitFor(() => {
-      expect(refreshCalls).toBeGreaterThan(0);
-      expect(sawStaleStore).toBe(true);
-      expect(registry.find("xai-auth", "stale-from-store")).toBeUndefined();
-      expect(registry.find("xai-auth", "placeholder-model")).toBeUndefined();
-      expect(registry.find("xai-auth", "baseline-model")).toMatchObject({
-        id: "baseline-model",
-      });
+    expect(registrationRefresh).toBeDefined();
+    const refresh = await registrationRefresh!;
+    expect(refresh.errors.get("xai-auth")).toBeUndefined();
+    expect(refreshCalls).toBeGreaterThan(0);
+    expect(sawStaleStore).toBe(true);
+    expect(registry.find("xai-auth", "stale-from-store")).toBeUndefined();
+    expect(registry.find("xai-auth", "placeholder-model")).toBeUndefined();
+    expect(registry.find("xai-auth", "baseline-model")).toMatchObject({
+      id: "baseline-model",
     });
     expect(
       runtime
