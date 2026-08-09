@@ -23,3 +23,6 @@ docs/diagrams/
 docs/research/
 prototype/
 probe-*
+
+# Pi session media output accidentally created under repo root (normal location is ~/.pi/agent/sessions/.../pi-xai-oauth/).
+/pi-xai-oauth/
