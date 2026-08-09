@@ -10,7 +10,17 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const PACKAGE_NAME = "pi-xai-oauth";
+const DISTRIBUTION_PACKAGE_NAMES = Object.freeze([
+  "pi-xai-oauth",
+  "@blockedpath/pi-xai-oauth",
+]);
+const packageManifest = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
+);
+if (!DISTRIBUTION_PACKAGE_NAMES.includes(packageManifest.name)) {
+  throw new Error(`Unsupported pi-xai-oauth distribution name: ${packageManifest.name}`);
+}
+const PACKAGE_NAME = packageManifest.name;
 const NPM_SPEC = `npm:${PACKAGE_NAME}`;
 /** Pi's built-in SuperGrok/X Premium provider used for normal chat. */
 const BUNDLED_XAI_PROVIDER = "xai";
@@ -96,28 +106,45 @@ function resolveLocalPackageJson(source, settingsPath = SETTINGS_PATH) {
   }
 }
 
+function packageAliasesFor(packageName) {
+  return DISTRIBUTION_PACKAGE_NAMES.includes(packageName)
+    ? new Set(DISTRIBUTION_PACKAGE_NAMES)
+    : new Set([packageName]);
+}
+
 function isLocalPackageNamed(source, packageName = PACKAGE_NAME, settingsPath = SETTINGS_PATH) {
   const packageJsonPath = resolveLocalPackageJson(source, settingsPath);
   if (!packageJsonPath) return false;
 
   try {
     const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-    return pkg.name === packageName;
+    return packageAliasesFor(packageName).has(pkg.name);
   } catch {
     return false;
   }
 }
 
 function pruneDuplicatePackageEntries(packages, settingsPath = SETTINGS_PATH, packageName = PACKAGE_NAME) {
-  let hasNpmPackage = false;
+  const aliases = packageAliasesFor(packageName);
+  const npmPackageNames = packages.map((entry) => getNpmPackageName(getPackageEntrySource(entry)));
+  const preferredName = npmPackageNames.includes(packageName)
+    ? packageName
+    : npmPackageNames.find((name) => aliases.has(name));
+  let retainedNpmPackage = false;
+  let addedNpmPackage = false;
   const removed = [];
   const next = [];
 
   for (const entry of packages) {
     const source = getPackageEntrySource(entry);
-    if (getNpmPackageName(source) === packageName) {
-      hasNpmPackage = true;
-      next.push(entry);
+    const npmPackageName = getNpmPackageName(source);
+    if (aliases.has(npmPackageName)) {
+      if (!retainedNpmPackage && npmPackageName === preferredName) {
+        retainedNpmPackage = true;
+        next.push(entry);
+      } else {
+        removed.push(source);
+      }
       continue;
     }
 
@@ -129,12 +156,12 @@ function pruneDuplicatePackageEntries(packages, settingsPath = SETTINGS_PATH, pa
     next.push(entry);
   }
 
-  if (!hasNpmPackage) {
-    next.push(NPM_SPEC);
-    hasNpmPackage = true;
+  if (!retainedNpmPackage) {
+    next.push(`npm:${packageName}`);
+    addedNpmPackage = true;
   }
 
-  return { packages: next, removed, addedNpmPackage: !packages.some((entry) => getNpmPackageName(getPackageEntrySource(entry)) === packageName) };
+  return { packages: next, removed, addedNpmPackage };
 }
 
 function updateSettings(settingsPath = SETTINGS_PATH) {
@@ -169,7 +196,7 @@ function updateSettings(settingsPath = SETTINGS_PATH) {
     settings.packages = packagePrune.packages;
     changed = true;
     for (const source of packagePrune.removed) {
-      console.log(color(`   - Removed duplicate local ${PACKAGE_NAME} package: ${source}`, "yellow"));
+      console.log(color(`   - Removed duplicate ${PACKAGE_NAME} package entry: ${source}`, "yellow"));
     }
   }
 
@@ -269,7 +296,7 @@ function printNextSteps(nonInteractive = false) {
   console.log("   • xai_analyze_image     — Image analysis");
   console.log("   • xai_critique          — Structured critique");
   console.log("   • xai_deep_research     — Deep research with web/X tools\n");
-  console.log(`   Update later: ${color("pi update npm:pi-xai-oauth", "yellow")}\n`);
+  console.log(`   Update later: ${color(`pi update ${NPM_SPEC}`, "yellow")}\n`);
 }
 
 function printScaffoldHeader() {
@@ -399,7 +426,7 @@ pi-xai-oauth — xAI OAuth provider for pi framework.
 
 ## Commands
 - Scaffold: node bin/setup.js --scaffold
-- Install: pi install npm:pi-xai-oauth
+- Install: pi install ${NPM_SPEC}
 
 ## Workflow
 - Always use feature branches
@@ -426,12 +453,12 @@ See .scaffold/plan.md for current roadmap.`;
 function printHelp() {
   console.log(`\n${color("pi-xai-oauth", "cyan")} — CLI for xAI tools/usage setup and agent scaffolding\n`);
   console.log("Usage:");
-  console.log("  npx pi-xai-oauth              Install package + seed native xAI chat defaults when unset");
-  console.log("  npx pi-xai-oauth --scaffold   Generate .scaffold/ harness in current project");
-  console.log("  npx pi-xai-oauth --yes        Non-interactive / automated mode");
-  console.log("  npx pi-xai-oauth --help       Show this help\n");
+  console.log(`  npx ${PACKAGE_NAME}              Install package + seed native xAI chat defaults when unset`);
+  console.log(`  npx ${PACKAGE_NAME} --scaffold   Generate .scaffold/ harness in current project`);
+  console.log(`  npx ${PACKAGE_NAME} --yes        Non-interactive / automated mode`);
+  console.log(`  npx ${PACKAGE_NAME} --help       Show this help\n`);
   console.log("Examples:");
-  console.log("  npx pi-xai-oauth --scaffold   # in any pi project to add agent harness\n");
+  console.log(`  npx ${PACKAGE_NAME} --scaffold   # in any pi project to add agent harness\n`);
 }
 
 function main() {
@@ -474,6 +501,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  DISTRIBUTION_PACKAGE_NAMES,
   PACKAGE_NAME,
   NPM_SPEC,
   getNpmPackageName,

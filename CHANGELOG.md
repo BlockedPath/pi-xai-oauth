@@ -6,6 +6,18 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.4.2 - 2026-08-09
+
+### Added
+
+- Added an `@blockedpath/pi-xai-oauth` GitHub Packages mirror alongside the canonical `pi-xai-oauth` npmjs package. GitHub Release publishing now validates once and publishes the same release contents to both registries with registry-specific authentication; after the first publication, a package administrator can make the mirror public in GitHub's package settings.
+- Added a deterministic mirror-packaging verifier that rewrites only the distribution name and registry, preserves the exact version, repository, peer range, and package contents, and runs in CI and release validation.
+
+### Changed
+
+- Made the setup CLI distribution-aware so npmjs, GitHub Packages, and local installs are treated as aliases of one extension; setup preserves the selected registry and removes duplicate aliases before they can register conflicting tools.
+- Made both registry publish steps idempotent so a retry can finish a partially successful release without attempting to overwrite an immutable package version.
+
 ## 1.4.1 - 2026-08-09
 
 ### Changed

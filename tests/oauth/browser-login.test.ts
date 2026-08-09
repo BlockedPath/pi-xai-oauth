@@ -232,7 +232,9 @@ describe("browser OAuth state and manual callbacks", () => {
             callbackDriver = trackDriver(
               controller,
               (async () => {
-                await new Promise((resolve) => setTimeout(resolve, 10));
+                await vi.waitFor(() => {
+                  expect(progress.some((message) => notice.test(message))).toBe(true);
+                });
                 const good = new URL(
                   fixture.authUrl!.searchParams.get("redirect_uri")!,
                 );

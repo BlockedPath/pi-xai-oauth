@@ -209,13 +209,26 @@ function verifyPackedPackage() {
       "extensions/xai/usage.ts",
       "scripts/verify-compatibility.js",
       "scripts/run-compatibility-matrix.js",
+      "scripts/prepare-github-package.js",
+      "scripts/verify-github-package.js",
       "scripts/verify-extension-loader.mjs",
       "vitest.config.ts",
       ...listFilesRecursively(path.join(repoRoot, "tests")),
     ];
     for (const file of required) assert.ok(packed.files.includes(file), `Packed package is missing ${file}`);
 
-    const forbidden = ["node_modules/", ".git/", ".scaffold/", ".pi-subagents/", "coverage/", ".env", "auth.json"];
+    const forbidden = [
+      "node_modules/",
+      ".git/",
+      ".scaffold/",
+      ".pi-subagents/",
+      ".agents/",
+      "coverage/",
+      "docs/diagrams/",
+      "skills-lock.json",
+      ".env",
+      "auth.json",
+    ];
     for (const file of packed.files) {
       assert.ok(!forbidden.some((prefix) => file === prefix || file.startsWith(prefix)), `Packed forbidden path: ${file}`);
     }
