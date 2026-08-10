@@ -18,7 +18,7 @@ npx pi-xai-oauth
 ## ✨ New: Grok 4.5
 
 | | |
-|---|---|
+| --- | --- |
 | **Model ID** | `grok-4.5` |
 | **Role** | xAI flagship for coding, agentic tasks, and knowledge work |
 | **Context** | 500K tokens |
@@ -125,6 +125,7 @@ npx pi-xai-oauth
 ```
 
 This runs the setup script which:
+
 1. Installs `npm:pi-xai-oauth` into pi
 2. Seeds `defaultProvider: "xai"` only when no provider is configured (never overwrites an existing choice, including package-owned `xai-auth`)
 3. Sets `grok-4.5` as your default model
@@ -173,11 +174,13 @@ Authenticate with `/login xai`. Use `/login xai-auth` only when you want this pa
 > `pi-xai-oauth` registers fixed private tool names such as `xai_generate_text`, `xai_grok_web_search`, and `xai_x_search`. If you install more than one copy — for example `npm:pi-xai-oauth` plus `npm:@blockedpath/pi-xai-oauth`, a local checkout, or two different local checkouts — pi will fail to start with `Tool "xai_generate_text" conflicts with ...` errors. The setup CLI prunes npmjs/GitHub/local aliases, but manual installs must still keep only one.
 >
 > Check with:
+>
 > ```bash
 > pi list
 > ```
 >
 > For local development, keep only this checkout:
+>
 > ```bash
 > pi remove npm:pi-xai-oauth
 > pi remove /path/to/other/pi-xai-oauth-copy
@@ -185,6 +188,7 @@ Authenticate with `/login xai`. Use `/login xai-auth` only when you want this pa
 > ```
 >
 > For the published npm package, remove local checkouts:
+>
 > ```bash
 > pi remove /path/to/local/pi-xai-oauth-copy
 > pi install npm:pi-xai-oauth
@@ -310,7 +314,7 @@ Enabling status performs one immediate lookup. Later refreshes are event-driven 
 Common catalog entries include:
 
 | Model ID | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | `grok-4.5` | **Default and curated offline fallback.** xAI flagship; reasoning low (**fast**) / medium / high (default), 500K context, text+image. |
 | `grok-4.3` | OAuth-compatible request model when `grok-4.5` is entitled; keeps authenticated input evidence and conservative catalog-derived limits. |
 | `grok-build` | When entitled: Grok Build coding model (same Grok-native tools as other xai-auth models). |
@@ -399,7 +403,7 @@ pi --model grok-4.5:low "What's the weather?"   # fast / latency-sensitive
 ```
 
 | Effort | Grok 4.5 behavior (per xAI docs) | Best for |
-|--------|-----------------------------------|----------|
+| -------- | ----------------------------------- | ---------- |
 | **`high`** (default) | More reasoning tokens, deeper thinking | Hard coding, complex math, multi-step logic |
 | **`medium`** | Balanced thinking vs latency | Analysis and longer-context work |
 | **`low`** (**fast mode**) | Some reasoning, still fast | Latency-sensitive agents and simple tool calling |
@@ -411,7 +415,7 @@ pi --model grok-4.5:low "What's the weather?"   # fast / latency-sensitive
 Setup seeds Pi's built-in `xai` provider when no provider is configured, so the same Grok model can be reached through two separate catalogs. They are deliberately **not** merged: built-in `xai` is Pi's generated API-key catalog, while `xai-auth` derives levels from your authenticated `/models-v2` entitlements plus bounded known metadata. Levels can therefore differ:
 
 | Model | Built-in `xai` | `xai-auth` | Why |
-|-------|----------------|------------|-----|
+| ------- | ---------------- | ------------ | ----- |
 | `grok-4.5` | `low` / `medium` / `high` | `minimal` / `low` / `medium` / `high` | **Intentional.** `xai-auth` maps Pi's `minimal` onto xAI's `low`, so `/think minimal` and `/think low` send the same `reasoning_effort: "low"` request. Selecting `minimal` never sends an effort xAI did not advertise. |
 | `grok-4.3` | `off` / `minimal` / `low` / `medium` / `high` | same | Identical on both paths. |
 | `grok-build-0.1` | available | **never advertised** | API-key-only model; it is excluded from `xai-auth` regardless of what a catalog response contains. |
@@ -434,7 +438,7 @@ No Grok 4.5-specific model card, label card, system card, paper, or official max
 For every active `xai-auth` model, this package advertises Grok-native client names—using the same name-override idea as Grok's `ToolConfig::with_name()`—and maps them onto pi capabilities:
 
 | Grok-native tool | pi capability used underneath |
-|------------------|-------------------------------|
+| ------------------ | ------------------------------- |
 | `read_file` | `read` |
 | `search_replace` | strict exact-string replacement; `write` when `old_string` is empty |
 | `list_dir` | `ls` |
@@ -461,7 +465,7 @@ This package registers credential-backed custom tools that make additional xAI A
 This opt-in boundary applies only to the extra tools below. Normal conversation continues through the selected provider: this package owns `xai-auth` chat/catalog/stream behavior and does not replace or intercept Pi's built-in `xai` transport.
 
 | Tool | Category | Additional usage / cost risk |
-|------|----------|------------------------------|
+| ------ | ---------- | ------------------------------ |
 | `xai_generate_text` | Generation | Separate model-token usage |
 | `xai_x_search` | Search | Model tokens plus native tool usage |
 | `xai_multi_agent` | Research | High/variable: 4 or 16 agents plus web/X tools |
@@ -504,6 +508,7 @@ Extension authors that drive `/xai-tools` through `pi.events` must follow the li
 > **Tip:** See the ⚠️ warning above about local vs published package conflicts.
 
 ### `xai_generate_text`
+
 Opt-in text generation with full reasoning and stateful conversations. Enable it through `/xai-tools` first.
 
 ```json
@@ -515,6 +520,7 @@ Opt-in text generation with full reasoning and stateful conversations. Enable it
 ```
 
 ### `xai_multi_agent`
+
 Opt-in deep multi-agent research using Grok's multi-agent model plus native web and X search tools. Enable it through `/xai-tools` first.
 
 ```json
@@ -526,6 +532,7 @@ Opt-in deep multi-agent research using Grok's multi-agent model plus native web 
 ```
 
 ### `web_search`
+
 Opt-in search using xAI's native `web_search` tool and the active xAI model. Enable it through `/xai-tools` first. The optional `allowed_domains` list is forwarded unchanged.
 
 ```json
@@ -536,6 +543,7 @@ Opt-in search using xAI's native `web_search` tool and the active xAI model. Ena
 ```
 
 ### `xai_x_search`
+
 Opt-in X (Twitter) search using xAI's native `x_search` tool and the active xAI model. Enable it through `/xai-tools` first.
 
 ```json
@@ -545,6 +553,7 @@ Opt-in X (Twitter) search using xAI's native `x_search` tool and the active xAI 
 ```
 
 ### `xai_code_execution`
+
 Opt-in Python-oriented analysis using xAI's native `code_interpreter` tool. Enable it through `/xai-tools` first.
 
 ```json
@@ -554,6 +563,7 @@ Opt-in Python-oriented analysis using xAI's native `code_interpreter` tool. Enab
 ```
 
 ### `xai_generate_image`
+
 Opt-in paid image generation with xAI's current image generation model. Enable it through `/xai-tools` first, and request it explicitly in your prompt.
 
 ```json
@@ -564,6 +574,7 @@ Opt-in paid image generation with xAI's current image generation model. Enable i
 ```
 
 ### `xai_analyze_image`
+
 Opt-in analysis of an image URL, data URL, or bounded local `.png` / `.jpg` path with Grok vision. Local files must be inside the active workspace. Enable it through `/xai-tools` first.
 
 ```json
@@ -616,6 +627,7 @@ Duration is `6` or `10` seconds (default `6`); resolution is `480p` or `720p` (d
 Completed MP4s are downloaded without OAuth headers through an HTTPS-only, no-redirect, resolve-once public-IPv4 DNS/IP-pinned transport; IPv6-only download hosts fail closed. Downloads accept only MP4 MIME, are streamed under a 256 MiB limit, require bounded `ftyp` evidence, and are atomically saved under `pi-xai-oauth/<session-hash>/videos/` with private `0700` directories and `0600` files. Signed URLs, request IDs, source data, prompts, credentials, and raw authenticated bodies are not returned or logged.
 
 ### `xai_critique`
+
 Opt-in structured critique for code, designs, writing, or ideas. Enable it through `/xai-tools` first.
 
 ```json
@@ -626,6 +638,7 @@ Opt-in structured critique for code, designs, writing, or ideas. Enable it throu
 ```
 
 ### `xai_deep_research`
+
 Opt-in research using the active xAI model plus native web and X search tools. Enable it through `/xai-tools` first.
 
 ```json
@@ -642,7 +655,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 ## Quick Reference
 
 | Action | Command |
-|--------|---------|
+| -------- | --------- |
 | Install | `pi install npm:pi-xai-oauth` |
 | One-command setup | `npx pi-xai-oauth` |
 | Try ephemeral | `pi -e npm:pi-xai-oauth` |
@@ -824,6 +837,7 @@ npm run scaffold
 ```
 
 Generates a full agent harness:
+
 - `AGENTS.md` — Dedicated operations manual for AI agents
 - `.scaffold/` with persistent state:
   - `plan.md` — Phased implementation roadmap
@@ -832,6 +846,7 @@ Generates a full agent harness:
   - `context.md` — Shared context for multi-agent workflows
 
 ### Benefits
+
 - Dramatically reduces exploratory turns and token waste
 - Enables reliable long-running agentic tasks
 - External state files allow agents to resume across sessions
@@ -920,25 +935,33 @@ Do not enable `xai_generate_image` for this smoke test. Image generation intenti
 
 ### Project Structure
 
-```
+```text
 pi-xai-oauth/
 ├── extensions/
 │   ├── xai-oauth.ts          # Thin provider/tools entrypoint
-│   └── xai/                  # Domain modules: OAuth, auth, models, payloads, tools
-│       ├── auth.ts           # Pi/Grok credential reuse + token resolution
+│   └── xai/                  # Focused xAI domain modules
+│       ├── abort.ts          # Shared AbortSignal and timeout helpers
+│       ├── auth.ts           # Pi/Grok CLI credential reuse + token resolution
+│       ├── bounded-body.ts   # Deadline- and size-bounded response reads
 │       ├── catalog.ts        # Authenticated /models-v2 normalization + atomic LKG cache
 │       ├── constants.ts      # URLs, OAuth constants, catalog bounds, defaults
+│       ├── device-auth.ts    # Pinned device initiation + bounded cancellable polling
+│       ├── image-edit.ts     # Bounded image-edit orchestration
+│       ├── image-to-video.ts # Image-to-video create/poll orchestration
+│       ├── images.ts         # Image-input normalization + inline transport budgets
+│       ├── media/            # Strict media parsing, compression, paths, and storage
 │       ├── models.ts         # Curated fallback/known metadata + compatibility helpers
 │       ├── oauth.ts          # Browser/device selection, PKCE login, refresh, callbacks
-│       ├── device-auth.ts    # Pinned device initiation + bounded cancellable polling
 │       ├── oidc.ts           # Pinned browser discovery/JWKS + ID-token validation
 │       ├── payload.ts        # xAI Responses payload normalization
 │       ├── responses.ts      # xAI request + streaming helpers
 │       ├── routing.ts        # Credential-aware Responses and Images endpoints
-│       ├── wire.ts           # Route-aware headers, scrubbing, identity, safe errors
-│       ├── image-edit.ts     # Bounded edit request/response orchestration
-│       ├── media/            # Reusable strict media parsing, compression, paths, and storage
-│       └── tools/            # Custom xAI tools + Grok-native tool adapters
+│       ├── text.ts           # Responses text and safe error/status extraction
+│       ├── tools/            # /xai-tools, custom tools, and Grok-native adapters
+│       ├── usage.ts          # Explicit bounded /xai-usage command + status
+│       ├── video-download.ts # DNS/IP-pinned MP4 download
+│       ├── vision-routing.ts # Opt-in routing for text-only entitlements
+│       └── wire.ts           # Route-aware headers, scrubbing, identity, safe errors
 ├── bin/
 │   └── setup.js              # One-command setup (npx pi-xai-oauth)
 ├── compatibility/
@@ -955,11 +978,19 @@ pi-xai-oauth/
 │   ├── tools/                 # Network lifecycle, commands, custom tools, and Grok-native adapters
 │   └── setup/                 # Installer/settings behavior
 ├── scripts/
+│   ├── prepare-github-package.js   # Canonical tarball → scoped mirror staging
 │   ├── run-compatibility-matrix.js # Clean packed exact-version test/typecheck runner
-│   ├── verify-compatibility.js # Range/lock/registry/pack/unsupported-peer checks
-│   └── verify-extension-loader.mjs # Small real Pi loader integration smoke
-├── vitest.config.ts           # Node isolation and measured V8 coverage floors
-├── .github/workflows/ci.yml  # PR/main policy and exact Pi boundary matrix
+│   ├── verify-compatibility.js     # Range/lock/registry/pack/unsupported-peer checks
+│   ├── verify-extension-loader.mjs # Small real Pi loader integration smoke
+│   └── verify-github-package.js    # Scoped mirror metadata/content parity
+├── .github/workflows/
+│   ├── ci.yml                # PR/main policy and exact Pi boundary matrix
+│   └── publish.yml           # Tag-gated npmjs + GitHub Packages publishing
+├── docs/
+│   ├── decisions/            # Package-scope and constrained-sampling ADRs
+│   ├── bridge-xai-tools.md   # xAI tools menu bridge protocol v1
+│   └── model-input-modalities.md
+├── vitest.config.ts          # Node isolation and measured V8 coverage floors
 ├── .scaffold/                # Persistent agent state (plan, progress, etc.)
 ├── AGENTS.md                 # AI agent operations manual
 ├── package.json
