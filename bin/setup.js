@@ -26,7 +26,7 @@ const NPM_SPEC = `npm:${PACKAGE_NAME}`;
 const BUNDLED_XAI_PROVIDER = "xai";
 /** Package-owned OAuth catalog/stream provider (optional). */
 const PACKAGE_OAUTH_PROVIDER = "xai-auth";
-const DEFAULT_XAI_MODEL = "grok-4.5";
+const DEFAULT_XAI_MODEL = "grok-4.6";
 const DEFAULT_THINKING_LEVEL = "high";
 const SETTINGS_PATH = path.join(os.homedir(), ".pi/agent/settings.json");
 

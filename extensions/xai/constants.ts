@@ -72,7 +72,7 @@ export function isXaiToolCompatibleProvider(
 ): provider is XaiToolCompatibleProviderId {
   return XAI_TOOL_COMPATIBLE_PROVIDER_IDS.some((providerId) => provider === providerId);
 }
-export const DEFAULT_XAI_MODEL = "grok-4.5";
+export const DEFAULT_XAI_MODEL = "grok-4.6";
 export const DEFAULT_XAI_IMAGE_MODEL = "grok-imagine-image-2.0";
 
 /** Private pi dispatch names mapped to the official Grok model-facing surface. */

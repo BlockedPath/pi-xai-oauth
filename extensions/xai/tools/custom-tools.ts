@@ -65,7 +65,7 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
             type: "string",
             enum: ["none", "low", "medium", "high"],
             description:
-              "Reasoning effort. Defaults to high for grok-4.5 and medium for other models when omitted.",
+              "Reasoning effort. Defaults to high for grok-4.5/grok-4.6 and medium for other models when omitted.",
           },
           response_format: { type: "string", description: "Set to 'json' for JSON output" },
           previous_response_id: { type: "string", description: "Continue conversation" },
@@ -109,7 +109,12 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
           input,
         };
 
-        const effort = params.reasoning_effort || (normalizedXaiModelId(model) === "grok-4.5" ? "high" : "medium");
+        const normalizedModel = normalizedXaiModelId(model);
+        const effort =
+          params.reasoning_effort ||
+          (normalizedModel === "grok-4.5" || normalizedModel === "grok-4.6" || normalizedModel.startsWith("grok-4.6")
+            ? "high"
+            : "medium");
         if (grokSupportsReasoningEffort(model) && effort !== "none") {
           body.reasoning = { effort };
         }

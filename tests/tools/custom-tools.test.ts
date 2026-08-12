@@ -144,6 +144,13 @@ describe("custom xAI tools", () => {
       reasoning: { effort: "high" },
     });
   });
+  it("uses high reasoning by default for Grok 4.6", async () => {
+    await run("xai_generate_text", { prompt: "hi", model: "grok-4.6" });
+    expect(requests.at(-1)?.body).toMatchObject({
+      model: "grok-4.6",
+      reasoning: { effort: "high" },
+    });
+  });
   it("omits reasoning for Composer and uses protected proxy metadata", async () => {
     await run("xai_generate_text", {
       prompt: "hi",

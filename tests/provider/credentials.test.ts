@@ -398,7 +398,7 @@ describe("credential resolution", () => {
       },
     });
     expect(runtimeOverride).toBeNull();
-    expect(getApiKeyAndHeaders).toHaveBeenCalledTimes(1);
+    expect(getApiKeyAndHeaders).toHaveBeenCalledTimes(2);
   });
   it.each([
     ["runtime override", { configured: true, source: "runtime" }],

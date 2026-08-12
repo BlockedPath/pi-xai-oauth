@@ -97,7 +97,7 @@ describe("setup settings", () => {
       JSON.stringify({
         packages: [localXai, "npm:pi-xai-oauth"],
         defaultProvider: "xai-auth",
-        defaultModel: "grok-4.5",
+        defaultModel: "grok-4.6",
         defaultThinkingLevel: "high",
         unrelated: true,
       }),
@@ -107,7 +107,7 @@ describe("setup settings", () => {
     expect(value).toMatchObject({
       packages: ["npm:pi-xai-oauth"],
       defaultProvider: "xai-auth",
-      defaultModel: "grok-4.5",
+      defaultModel: "grok-4.6",
       defaultThinkingLevel: "high",
       unrelated: true,
     });
@@ -126,7 +126,7 @@ describe("setup settings", () => {
     expect(JSON.parse(await readFile(settingsPath, "utf8"))).toMatchObject({
       packages: ["npm:other", "npm:pi-xai-oauth"],
       defaultProvider: "xai",
-      defaultModel: "grok-4.5",
+      defaultModel: "grok-4.6",
       defaultThinkingLevel: "high",
     });
 
@@ -178,7 +178,7 @@ describe("setup settings", () => {
     setup.updateSettings(settingsPath);
     expect(JSON.parse(await readFile(settingsPath, "utf8"))).toMatchObject({
       defaultProvider: "xai-auth",
-      defaultModel: "grok-4.5",
+      defaultModel: "grok-4.6",
       defaultThinkingLevel: "high",
     });
   });

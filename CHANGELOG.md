@@ -6,6 +6,21 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.5.0 - 2026-08-12
+
+### Added
+
+- Added known-model metadata and catalog support for Grok 4.6 (`grok-4.6`), including text+image input, 500K context, official standard-tier pricing, and authenticated reasoning levels `low` / `medium` / `high` / `xhigh`.
+- Mapped Pi's `minimal` thinking level onto xAI `low` for Grok 4.6 (same compatibility behavior as Grok 4.5).
+
+### Changed
+
+- Promoted `grok-4.6` to the package default model and curated offline fallback used by setup, request helpers, and permanent catalog-failure paths. Grok 4.5 remains fully supported when the authenticated catalog entitles it.
+
+### Documentation
+
+- Documented Grok 4.6 as the flagship default, kept Grok 4.5 as an entitled catalog model, and noted Grok 4.6's additional `xhigh` reasoning level.
+
 ## 1.4.2 - 2026-08-09
 
 ### Added

@@ -100,6 +100,22 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     }
   });
 
+  it("documents grok-4.6 known levels including authenticated xhigh", () => {
+    // Live `/models-v2` advertises low/medium/high/xhigh for Grok 4.6. xai-auth
+    // keeps Pi's `minimal` → xAI `low` mapping used for Grok 4.5.
+    expect(supportedLevels(known("grok-4.6"))).toEqual([
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ]);
+    expect(known("grok-4.6").thinkingLevelMap?.minimal).toBe("low");
+    expect(known("grok-4.6").thinkingLevelMap?.xhigh).toBe("xhigh");
+    expect(supportedLevels(known("grok-4.6"))).not.toContain("off");
+    expect(supportedLevels(known("grok-4.6"))).not.toContain("max");
+  });
+
   it("never advertises the API-key-only built-in grok-build-0.1 through xai-auth", () => {
     expect(XAI_MODELS["grok-build-0.1"]).toBeDefined();
     expect(KNOWN_XAI_MODEL_METADATA.map(({ id }) => id)).not.toContain(
@@ -185,5 +201,35 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
     // xAI's `max` canonicalizes to Pi's `xhigh`; `max` itself stays denied.
     expect(supportedLevels(extended)).toContain("xhigh");
     expect(supportedLevels(extended)).not.toContain("max");
+  });
+
+  it("maps authenticated grok-4.6 efforts including xhigh and minimal→low", () => {
+    const [grok46] = normalizeXaiCatalogPayload({
+      data: [
+        {
+          model: "grok-4.6",
+          name: "Grok 4.6",
+          api_backend: "responses",
+          context_window: 500_000,
+          supports_reasoning_effort: true,
+          reasoning_efforts: [
+            { value: "xhigh" },
+            { value: "high" },
+            { value: "medium" },
+            { value: "low" },
+          ],
+        },
+      ],
+    });
+    expect(grok46.id).toBe("grok-4.6");
+    expect(supportedLevels(grok46)).toEqual([
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ]);
+    expect(grok46.thinkingLevelMap?.minimal).toBe("low");
+    expect(grok46.thinkingLevelMap?.xhigh).toBe("xhigh");
   });
 });
