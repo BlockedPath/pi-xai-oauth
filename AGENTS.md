@@ -3,11 +3,13 @@
 > **For AI coding agents only.** Keep this file machine-readable and concise. Human-facing docs live in README.md.
 
 ## Project Overview
-pi-xai-oauth is a pi-package that registers the optional xAI OAuth provider (`xai-auth`) and the authenticated account's OAuth-visible Grok model catalog, with Grok 4.5 as the curated offline fallback. Opt-in network tools and `/xai-usage` also work with Pi's built-in `xai` SuperGrok/X Premium chat provider; setup seeds `defaultProvider: xai` only when unset and never overwrites an existing provider choice.
+
+pi-xai-oauth is a pi-package that registers the optional xAI OAuth provider (`xai-auth`) and the authenticated account's OAuth-visible Grok model catalog, with Grok 4.6 as the curated offline fallback. Opt-in network tools and `/xai-usage` also work with Pi's built-in `xai` SuperGrok/X Premium chat provider; setup seeds `defaultProvider: xai` only when unset and never overwrites an existing provider choice.
 
 Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `extensions/xai/catalog.ts` → provider registration in `extensions/xai-oauth.ts` → browser PKCE or bounded device authorization in `extensions/xai/oauth.ts` / `extensions/xai/device-auth.ts` → pinned browser OIDC/JWKS validation in `extensions/xai/oidc.ts` → streaming via xAI API helpers in `extensions/xai/responses.ts`; explicit revision-pinned subscription usage lives in `extensions/xai/usage.ts`.
 
 ## Key Commands (Exact, Copy-Paste Ready)
+
 - Install / setup: `node bin/setup.js` or `npm run setup`
 - Install as pi extension: `pi install npm:pi-xai-oauth`
 - Full policy/unit/loader gate: `npm test`
@@ -22,7 +24,9 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Git: Always work on feature branches and confirm the active branch before edits.
 
 ## Architecture & Boundaries (MUST / MUST NOT)
+
 **MUST:**
+
 - Register providers via `pi.registerProvider("xai-auth", { ... })`
 - Keep browser PKCE S256 with local callback server as the first/default login method
 - Offer device authorization through pi's native selector/device-code callbacks for remote/headless human login
@@ -43,6 +47,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Keep `/xai-usage` explicit, and keep its optional status off by default, session-scoped, bounded, and inactive outside xAI models
 
 **MUST NOT:**
+
 - Hardcode API keys (use OAuth only)
 - Accept raw authorization codes or callbacks with missing/mismatched state
 - Trust arbitrary `*.x.ai` discovery, device, token, verification, or JWKS endpoints
@@ -57,6 +62,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Skip error handling on OAuth refresh
 
 ## File Structure & Wayfinding
+
 ```
 pi-xai-oauth/
 ├── bin/
@@ -105,12 +111,14 @@ pi-xai-oauth/
 ```
 
 Start any task by reading:
+
 1. `extensions/xai-oauth.ts` (provider entrypoint)
 2. Relevant `extensions/xai/` domain module for the task
 3. `bin/setup.js`
 4. This AGENTS.md
 
 ## Style & Quality Rules
+
 - Use TypeScript strict mode
 - Prefer async/await for OAuth and API calls
 - Add JSDoc for all exported functions
@@ -129,25 +137,30 @@ Start any task by reading:
 - Use strict peer resolution for supported versions; `--force` is allowed only in isolated negative fixtures that assert npm peer warnings
 
 ## Safety Gates
+
 - Before any file edit: run `git status` and confirm on correct branch
 - Before committing: ensure `npm test`, `npm run typecheck`, and both exact compatibility boundaries pass
 - For multi-agent work: always use the subagent tool with explicit parallel or chain mode
 - External state lives in `.scaffold/` — update progress.md after every major step
 
 ## Multi-Agent Workflow (Preferred)
+
 When complex work is needed:
+
 1. Use `subagent` in PARALLEL mode for research + planning
 2. Delegate to specialized agents (researcher, planner, reviewer, worker)
 3. Save outputs to `.scaffold/` files
 4. Review with `reviewer` agent before implementation
 
 ## Persistent State (Use These Files)
+
 - `.scaffold/plan.md` — Current implementation plan with steps and owners
 - `.scaffold/constraints.md` — Hard rules and boundaries
 - `.scaffold/progress.md` — What has been done + next actions
 - `.scaffold/context.md` — Shared context for handoff between agents
 
 ## Next Steps When Starting Fresh
+
 1. Read this AGENTS.md + README.md
 2. Run `git checkout -b feature/your-task`
 3. Check `.scaffold/plan.md` for current work

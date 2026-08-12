@@ -64,6 +64,34 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
     },
   },
   {
+    id: "grok-4.6",
+    name: "Grok 4.6",
+    apiBackend: "responses",
+    reasoning: true,
+    input: ["text", "image"],
+    inputProvenance: XaiModelInputProvenance.Known,
+    // Official docs/API pricing (standard tier, <200k prompt): $2/$0.50/$6 per 1M.
+    cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+    contextWindow: 500_000,
+    // xAI has not published a Grok 4.6-specific max output limit yet;
+    // keep the existing Grok Responses ceiling until official metadata is available.
+    maxTokens: 131_072,
+    thinkingLevelMap: {
+      off: null,
+      // Pi `minimal` maps onto xAI `low` (same compatibility used for Grok 4.5).
+      minimal: "low",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      // Live `/models-v2` advertises `xhigh` for Grok 4.6.
+      xhigh: "xhigh",
+      // `max` is intentionally omitted rather than spelled out as null: Pi
+      // 0.80.1's ModelThinkingLevel has no `max` member, and Pi treats an
+      // absent key and an explicit null identically. Advertised levels are the
+      // same either way.
+    },
+  },
+  {
     id: "grok-4.3",
     name: "Grok 4.3",
     apiBackend: "responses",
@@ -396,6 +424,7 @@ export function grokSupportsReasoningEffort(modelId: string): boolean {
     normalized.startsWith("grok-3-mini") ||
     normalized.startsWith("grok-4.20-multi-agent") ||
     normalized.startsWith("grok-4.3") ||
-    normalized.startsWith("grok-4.5")
+    normalized.startsWith("grok-4.5") ||
+    normalized.startsWith("grok-4.6")
   );
 }

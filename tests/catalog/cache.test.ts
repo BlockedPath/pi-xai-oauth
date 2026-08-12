@@ -407,7 +407,7 @@ describe("catalog cache selection", () => {
       source: "curated-fallback",
       needsAuthenticatedRefresh: false,
     });
-    expect(result.models.map(({ id }) => id)).toEqual(["grok-4.5"]);
+    expect(result.models.map(({ id }) => id)).toEqual(["grok-4.6"]);
     expect(JSON.parse(await readFile(path, "utf8")).invalidated).toBe(true);
   });
 

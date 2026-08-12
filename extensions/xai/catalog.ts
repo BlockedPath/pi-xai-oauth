@@ -250,9 +250,14 @@ function thinkingLevelMap(levels: ThinkingLevel[], modelId: string): XaiCatalogM
     else if (level === "max") map.max = "max";
     else map[level] = level;
   }
-  // Preserve pi-xai-oauth's existing Grok 4.5 compatibility: pi's minimal
-  // level is sent as xAI low when low is in the authenticated catalog.
-  if (modelId === "grok-4.5" && map.low === "low") map.minimal = "low";
+  // Preserve pi-xai-oauth's Grok 4.x compatibility: pi's minimal level is sent
+  // as xAI low when low is in the authenticated catalog.
+  if (
+    (modelId === "grok-4.5" || modelId === "grok-4.6") &&
+    map.low === "low"
+  ) {
+    map.minimal = "low";
+  }
   return map;
 }
 

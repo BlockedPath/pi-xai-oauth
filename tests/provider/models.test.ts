@@ -34,7 +34,33 @@ describe("model compatibility metadata", () => {
     expect(resolveXaiCanonicalModelId("grok-4.20")).toBe("grok-4.20-0309-reasoning");
     expect(resolveXaiCanonicalModelId("grok-4.20-multi-agent")).toBe("grok-4.20-multi-agent-0309");
     expect(resolveXaiCanonicalModelId("grok-4.5")).toBe("grok-4.5");
+    expect(resolveXaiCanonicalModelId("grok-4.6")).toBe("grok-4.6");
     expect(resolveXaiCanonicalModelId("unknown-model")).toBe("unknown-model");
+  });
+
+  it("curates Grok 4.6 as the offline default with xhigh reasoning metadata", () => {
+    const known = knownXaiModelMetadata("grok-4.6");
+    expect(known).toMatchObject({
+      id: "grok-4.6",
+      name: "Grok 4.6",
+      apiBackend: "responses",
+      reasoning: true,
+      input: ["text", "image"],
+      cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+      contextWindow: 500_000,
+      maxTokens: 131_072,
+    });
+    expect(known?.thinkingLevelMap).toMatchObject({
+      off: null,
+      minimal: "low",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+    });
+    expect(CURATED_FALLBACK_MODELS.map(({ id }) => id)).toEqual(["grok-4.6"]);
+    expect(grokSupportsReasoningEffort("grok-4.6")).toBe(true);
+    expect(grokSupportsReasoningEffort("xai-auth/GROK-4.6")).toBe(true);
   });
 
   it("expands only aliases of entitled models and preserves authenticated input", () => {
