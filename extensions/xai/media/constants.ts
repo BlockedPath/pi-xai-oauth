@@ -27,7 +27,7 @@ export const IMAGE_EDIT_MAX_OUTPUT_PIXELS = 16_000_000;
 export const IMAGE_EDIT_MAX_OUTPUT_SIDE_PX = 4_096;
 
 /** Fixed source-backed image-edit request fields. */
-export const IMAGE_EDIT_MODEL = "grok-imagine-image-quality";
+export const IMAGE_EDIT_MODEL = "grok-imagine-image-2.0";
 export const IMAGE_EDIT_RESOLUTION = "1k";
 export const IMAGE_EDIT_RESPONSE_FORMAT = "b64_json";
 export const IMAGE_EDIT_OUTPUT_COUNT = 1;

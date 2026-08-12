@@ -70,7 +70,7 @@ describe("image-edit validation and wire payload", () => {
       height: 1,
       wasCompressed: false,
     }])).toEqual({
-      model: "grok-imagine-image-quality",
+      model: "grok-imagine-image-2.0",
       prompt: "edit",
       n: 1,
       resolution: "1k",
@@ -87,7 +87,7 @@ describe("image-edit validation and wire payload", () => {
     });
     const reference = { dataUrl, mimeType: "image/png" as const, byteLength: png.length, width: 1, height: 1, wasCompressed: false };
     expect(buildXaiImageEditPayload(input, [reference, reference])).toEqual({
-      model: "grok-imagine-image-quality",
+      model: "grok-imagine-image-2.0",
       prompt: "combine",
       n: 1,
       resolution: "1k",
@@ -185,7 +185,7 @@ describe("bounded xAI image-edit execution", () => {
         expect(headers.get(name)).toBeNull();
       }
       expect(requests[0].body).toMatchObject({
-        model: "grok-imagine-image-quality",
+        model: "grok-imagine-image-2.0",
         n: 1,
         response_format: "b64_json",
         image: { url: dataUrl },

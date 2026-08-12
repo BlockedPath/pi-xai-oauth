@@ -569,7 +569,7 @@ Opt-in paid image generation with xAI's current image generation model. Enable i
 ```json
 {
   "prompt": "A clean product diagram of an OAuth flow",
-  "model": "grok-imagine-image-quality"
+  "model": "grok-imagine-image-2.0"
 }
 ```
 
