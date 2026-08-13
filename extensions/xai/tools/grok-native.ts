@@ -805,17 +805,19 @@ async function executeSearchReplace(
   if (!normalized.path) throw new Error("search_replace requires file_path");
   if (normalized.oldText === undefined) throw new Error("search_replace requires old_string");
   if (normalized.newText === undefined) throw new Error("search_replace requires new_string");
-  if (normalized.oldText === normalized.newText) {
+  const oldText = normalized.oldText;
+  const newText = normalized.newText;
+  if (oldText === newText) {
     throw new Error("search_replace requires different old_string and new_string values");
   }
 
   const absolutePath = await containedWorkspacePath(ctx.cwd, normalized.path);
   const toolPath = await toWorkspaceToolPath(ctx.cwd, absolutePath);
 
-  if (normalized.oldText === "") {
+  if (oldText === "") {
     return createWriteToolDefinition(ctx.cwd).execute(
       toolCallId,
-      { path: toolPath, content: normalized.newText },
+      { path: toolPath, content: newText },
       signal,
       onUpdate,
       ctx,
@@ -834,8 +836,8 @@ async function executeSearchReplace(
         throwIfAborted(signal);
         const replacementContent = buildExactSearchReplaceContent(
           rawContent,
-          normalized.oldText,
-          normalized.newText,
+          oldText,
+          newText,
           normalized.replaceAll,
           normalized.path,
         );
