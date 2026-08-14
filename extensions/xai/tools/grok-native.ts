@@ -744,6 +744,56 @@ function adaptReplacementLineEndings(value: string, lineEnding: "\n" | "\r\n"): 
   return lineEnding === "\r\n" ? normalized.replace(/\n/g, "\r\n") : normalized;
 }
 
+/**
+ * Apply one exact `old_string` → `new_string` replacement against current file
+ * bytes. Callers must invoke this only after holding pi's per-file mutation
+ * queue so sibling same-file hunks see each other's writes.
+ */
+function buildExactSearchReplaceContent(
+  rawContent: string,
+  oldTextRaw: string,
+  newTextRaw: string,
+  replaceAll: boolean | undefined,
+  displayPath: string,
+): string {
+  const hasBom = rawContent.charCodeAt(0) === 0xfeff;
+  const body = hasBom ? rawContent.slice(1) : rawContent;
+  const { normalized: matchText, rawBoundaries } = normalizeCrlfForExactMatch(body);
+  const oldText = oldTextRaw.replace(/\r\n/g, "\n");
+  const positions: number[] = [];
+  let searchOffset = 0;
+  while (true) {
+    const matchOffset = matchText.indexOf(oldText, searchOffset);
+    if (matchOffset < 0) break;
+    positions.push(matchOffset);
+    searchOffset = matchOffset + oldText.length;
+  }
+  if (positions.length === 0) {
+    throw new Error(`search_replace could not find old_string in ${displayPath}`);
+  }
+  if (!replaceAll && positions.length !== 1) {
+    throw new Error(
+      `search_replace found ${positions.length} occurrences; make old_string unique or set replace_all=true`,
+    );
+  }
+
+  const selectedPositions = replaceAll ? positions : positions.slice(0, 1);
+  const chunks: string[] = [];
+  let rawCursor = 0;
+  for (const position of selectedPositions) {
+    const rawStart = rawBoundaries[position];
+    const rawEnd = rawBoundaries[position + oldText.length];
+    chunks.push(body.slice(rawCursor, rawStart));
+    chunks.push(adaptReplacementLineEndings(
+      newTextRaw,
+      replacementLineEnding(body, rawStart, rawEnd),
+    ));
+    rawCursor = rawEnd;
+  }
+  chunks.push(body.slice(rawCursor));
+  return `${hasBom ? "\ufeff" : ""}${chunks.join("")}`;
+}
+
 async function executeSearchReplace(
   toolCallId: string,
   params: unknown,
@@ -755,82 +805,51 @@ async function executeSearchReplace(
   if (!normalized.path) throw new Error("search_replace requires file_path");
   if (normalized.oldText === undefined) throw new Error("search_replace requires old_string");
   if (normalized.newText === undefined) throw new Error("search_replace requires new_string");
-  if (normalized.oldText === normalized.newText) {
+  const oldText = normalized.oldText;
+  const newText = normalized.newText;
+  if (oldText === newText) {
     throw new Error("search_replace requires different old_string and new_string values");
   }
 
   const absolutePath = await containedWorkspacePath(ctx.cwd, normalized.path);
   const toolPath = await toWorkspaceToolPath(ctx.cwd, absolutePath);
 
-  if (normalized.oldText === "") {
+  if (oldText === "") {
     return createWriteToolDefinition(ctx.cwd).execute(
       toolCallId,
-      { path: toolPath, content: normalized.newText },
+      { path: toolPath, content: newText },
       signal,
       onUpdate,
       ctx,
     );
   }
 
-  throwIfAborted(signal);
-  const rawContent = await readContainedTextFile(absolutePath, normalized.path, signal);
-  throwIfAborted(signal);
-  const hasBom = rawContent.charCodeAt(0) === 0xfeff;
-  const body = hasBom ? rawContent.slice(1) : rawContent;
-  const { normalized: matchText, rawBoundaries } = normalizeCrlfForExactMatch(body);
-  const oldText = normalized.oldText.replace(/\r\n/g, "\n");
-  const positions: number[] = [];
-  let searchOffset = 0;
-  while (true) {
-    const matchOffset = matchText.indexOf(oldText, searchOffset);
-    if (matchOffset < 0) break;
-    positions.push(matchOffset);
-    searchOffset = matchOffset + oldText.length;
-  }
-  if (positions.length === 0) {
-    throw new Error(`search_replace could not find old_string in ${normalized.path}`);
-  }
-  if (!normalized.replaceAll && positions.length !== 1) {
-    throw new Error(
-      `search_replace found ${positions.length} occurrences; make old_string unique or set replace_all=true`,
-    );
-  }
-
-  const selectedPositions = normalized.replaceAll ? positions : positions.slice(0, 1);
-  const chunks: string[] = [];
-  let rawCursor = 0;
-  for (const position of selectedPositions) {
-    const rawStart = rawBoundaries[position];
-    const rawEnd = rawBoundaries[position + oldText.length];
-    chunks.push(body.slice(rawCursor, rawStart));
-    chunks.push(adaptReplacementLineEndings(
-      normalized.newText,
-      replacementLineEnding(body, rawStart, rawEnd),
-    ));
-    rawCursor = rawEnd;
-  }
-  chunks.push(body.slice(rawCursor));
-  const replacementContent = `${hasBom ? "\ufeff" : ""}${chunks.join("")}`;
-
-  // Reuse pi's write definition so the stale-snapshot check and write share
-  // the same process-wide per-file mutation queue as pi's built-in writers.
+  // Re-read and re-apply under pi's per-file mutation queue. Computing the
+  // patch from a pre-queue snapshot rejects independent same-file sibling
+  // hunks after the first write, even when each old_string is still unique.
   const result = await createWriteToolDefinition(ctx.cwd, {
     operations: {
       mkdir: () => Promise.resolve(),
-      async writeFile(queuedPath, queuedContent) {
+      async writeFile(queuedPath, _queuedContent) {
         throwIfAborted(signal);
-        if (await readContainedTextFile(queuedPath, normalized.path, signal) !== rawContent) {
-          throw new Error(
-            `search_replace refused to overwrite a concurrently changed file: ${normalized.path}`,
-          );
-        }
+        const rawContent = await readContainedTextFile(queuedPath, normalized.path, signal);
         throwIfAborted(signal);
-        await writeFileUtf8(queuedPath, queuedContent, "utf8");
+        const replacementContent = buildExactSearchReplaceContent(
+          rawContent,
+          oldText,
+          newText,
+          normalized.replaceAll,
+          normalized.path,
+        );
+        throwIfAborted(signal);
+        await writeFileUtf8(queuedPath, replacementContent, "utf8");
       },
     },
   }).execute(
     toolCallId,
-    { path: toolPath, content: replacementContent },
+    // Content is computed under the queue lock; the write tool only needs a
+    // path to join the per-file mutation queue.
+    { path: toolPath, content: "" },
     signal,
     onUpdate,
     ctx,

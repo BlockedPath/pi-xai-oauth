@@ -316,7 +316,34 @@ describe("Grok-native tools", () => {
     ).toMatch(/linked-created\.txt/);
   });
 
-  it("checks concurrent changes inside pi's file mutation queue", async () => {
+  it("applies sibling same-file search_replace hunks in queue order", async () => {
+    await writeFile(join(temp.path, "sections.txt"), "AAA\nBBB\nCCC\n");
+    const results = await Promise.all([
+      run("search_replace", {
+        file_path: "sections.txt",
+        old_string: "AAA",
+        new_string: "aaa",
+      }),
+      run("search_replace", {
+        file_path: "sections.txt",
+        old_string: "BBB",
+        new_string: "bbb",
+      }),
+      run("search_replace", {
+        file_path: "sections.txt",
+        old_string: "CCC",
+        new_string: "ccc",
+      }),
+    ]);
+    expect(results.map((result) => result.content[0].text)).toEqual([
+      "Successfully replaced text in sections.txt",
+      "Successfully replaced text in sections.txt",
+      "Successfully replaced text in sections.txt",
+    ]);
+    expect(await readFile(join(temp.path, "sections.txt"), "utf8")).toBe("aaa\nbbb\nccc\n");
+  });
+
+  it("refuses search_replace when a queued external write removes old_string", async () => {
     await writeFile(join(temp.path, "concurrent.txt"), "old");
     let releaseWrite!: () => void;
     const releaseWritePromise = new Promise<void>((resolve) => {
@@ -349,7 +376,7 @@ describe("Grok-native tools", () => {
       old_string: "old",
       new_string: "replacement",
     });
-    const replacementAssertion = expect(replacement).rejects.toThrow(/concurrently changed file/);
+    const replacementAssertion = expect(replacement).rejects.toThrow(/could not find old_string/);
     await new Promise((resolve) => setTimeout(resolve, 25));
     releaseWrite();
 
