@@ -19,8 +19,8 @@ jobs:
     outputs:
       versions: ${{ steps.matrix.outputs.versions }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@e9530f759f4500cee1cd7cfc54d32d403b54f47d # v4.1.1
+      - uses: actions/setup-node@16eef0ca6f3cdc172d1211423843eb17324cc7ce # v4.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -42,7 +42,7 @@ jobs:
       - name: Type-check production and test TypeScript
         run: npm run typecheck
       - name: Verify packed manifest and contents
-        run: node scripts/verify-compatibility.js pack
+        run: node scripts/verify-compatibility-safe.js pack
       - name: Verify scoped GitHub Packages mirror
         run: node scripts/verify-github-package.js
       - name: Verify unsupported peer diagnostics
@@ -59,8 +59,8 @@ jobs:
         pi-version: ${{ fromJSON(needs.policy.outputs.versions) }}
     name: Pi ${{ matrix.pi-version }} compatibility
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@e9530f759f4500cee1cd7cfc54d32d403b54f47d # v4.1.1
+      - uses: actions/setup-node@16eef0ca6f3cdc172d1211423843eb17324cc7ce # v4.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Pin npm resolver
