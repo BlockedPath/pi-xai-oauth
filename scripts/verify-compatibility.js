@@ -11,7 +11,16 @@ const policyPath = path.join(repoRoot, "compatibility", "pi-versions.json");
 const packagePath = path.join(repoRoot, "package.json");
 const lockPath = path.join(repoRoot, "package-lock.json");
 const workflowPath = path.join(repoRoot, ".github", "workflows", "ci.yml");
-const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
+
+function parseJson(text, source) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid JSON from ${source}`);
+  }
+}
+
+const policy = parseJson(fs.readFileSync(policyPath, "utf8"), policyPath);
 
 function parseVersion(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
@@ -40,16 +49,20 @@ function satisfiesPeerRange(version, range = policy.peerRange) {
 }
 
 function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  return parseJson(fs.readFileSync(filePath, "utf8"), filePath);
 }
 
-function listFilesRecursively(directory, root = directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const absolute = path.join(directory, entry.name);
-    return entry.isDirectory()
-      ? listFilesRecursively(absolute, root)
-      : [path.relative(repoRoot, absolute).split(path.sep).join("/")];
-  });
+function listGitVisibleFiles(directory) {
+  const relativeDirectory = path.relative(repoRoot, directory).split(path.sep).join("/");
+  const output = execFileSync(
+    "git",
+    ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", relativeDirectory],
+    { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 },
+  );
+  return output
+    .split(String.fromCharCode(0))
+    .filter(Boolean)
+    .map((file) => file.replace(/\\/g, "/"));
 }
 
 function run(command, args, options = {}) {
@@ -149,7 +162,7 @@ function registryVersions(packageName) {
     ["view", `${packageName}@${policy.peerRange}`, "version", "--json"],
     { cwd: repoRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
   );
-  const parsed = JSON.parse(output);
+  const parsed = parseJson(output, `${packageName} registry response`);
   return (Array.isArray(parsed) ? parsed : [parsed]).filter((version) => typeof version === "string");
 }
 
@@ -213,7 +226,7 @@ function verifyPackedPackage() {
       "scripts/verify-github-package.js",
       "scripts/verify-extension-loader.mjs",
       "vitest.config.ts",
-      ...listFilesRecursively(path.join(repoRoot, "tests")),
+      ...listGitVisibleFiles(path.join(repoRoot, "tests")),
     ];
     for (const file of required) assert.ok(packed.files.includes(file), `Packed package is missing ${file}`);
 

@@ -1,21 +1,26 @@
-# Execution Progress — Pi 0.84.2 compatibility update
+# Execution Progress — PR #182 corrective pass
 
-**Branch:** `chore/pi-0.84.2`
+**Branch:** `webbrain/issue-163`
 
 ## Completed
 
-- [x] Detected Pi 0.84.2 through the registry compatibility sentinel while validating PR #182.
-- [x] Confirmed no existing open issue or pull request covers 0.84.2.
-- [x] Passed the clean packed `0.84.2 --candidate` matrix before changing advertised policy.
-- [x] Updated `policy.latest`, both exact Pi development dependencies, and the lockfile to 0.84.2.
-- [x] Passed `npm test`, strict tests, typecheck, coverage, `compatibility:check`, package dry run, mirror parity, and both exact Pi boundaries at 0.80.1/0.84.2.
-- [x] Completed independent review with no actionable findings.
-- [x] Opened prerequisite PR #183: <https://github.com/BlockedPath/pi-xai-oauth/pull/183>
+- [x] Reviewed PR #182 against issue #163 and repository pack-policy requirements.
+- [x] Reproduced invalid GitHub Action SHAs and the replacement verifier failure.
+- [x] Added a failing CLI regression for ignored `tests/.DS_Store`.
+- [x] Restored the authoritative compatibility verifier and made its test inventory gitignore-aware.
+- [x] Replaced action references with valid tag-matching SHAs and disabled checkout credential persistence.
+- [x] Removed the duplicate `verify-compatibility-safe.js` wrapper.
+- [x] Passed the focused ignored-Finder-artifact regression.
+- [x] Passed LSP checks, full tests, strict tests, typecheck, coverage, pack verification, mirror parity, and exact Pi boundaries.
+- [x] Completed an independent corrective-delta review with no findings.
+- [x] Pushed corrective commits to PR #182.
+- [x] Validated Pi 0.84.2 separately and merged prerequisite PR #183.
+- [x] Integrated refreshed `main` with the 0.84.2 compatibility policy.
 
 ## In Progress
 
-- None.
+- [ ] Rerun PR #182 gates against refreshed `main`, then merge in order.
 
 ## Next
 
-Merge PR #183, then update/retest PR #182 against the refreshed main branch.
+Push the integrated branch, confirm CI, replace the stale changes-requested review, and merge PR #182.

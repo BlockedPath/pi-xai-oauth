@@ -19,8 +19,12 @@ jobs:
     outputs:
       versions: ${{ steps.matrix.outputs.versions }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # actions/checkout v4.1.1
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          persist-credentials: false
+      # actions/setup-node v4.0.0
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -30,7 +34,9 @@ jobs:
         run: npm ci --strict-peer-deps
       - name: Export exact compatibility matrix
         id: matrix
-        run: echo "versions=$(node scripts/verify-compatibility.js matrix)" >> "$GITHUB_OUTPUT"
+        run: |
+          versions="$(node scripts/verify-compatibility.js matrix)"
+          echo "versions=$versions" >> "$GITHUB_OUTPUT"
       - name: Verify compatibility policy and range boundaries
         run: node scripts/verify-compatibility.js policy
       - name: Detect unreviewed releases inside the allowed range
@@ -59,8 +65,12 @@ jobs:
         pi-version: ${{ fromJSON(needs.policy.outputs.versions) }}
     name: Pi ${{ matrix.pi-version }} compatibility
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # actions/checkout v4.1.1
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          persist-credentials: false
+      # actions/setup-node v4.0.0
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Pin npm resolver
