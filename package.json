@@ -29,7 +29,7 @@
     "test:coverage": "vitest run --coverage",
     "test:loader": "node scripts/verify-extension-loader.mjs",
     "typecheck": "tsc --noEmit",
-    "compatibility:check": "node scripts/verify-compatibility-safe.js all && node scripts/verify-github-package.js",
+    "compatibility:check": "node scripts/verify-compatibility.js all && node scripts/verify-github-package.js",
     "compatibility:min": "node scripts/run-compatibility-matrix.js minimum",
     "compatibility:latest": "node scripts/run-compatibility-matrix.js latest",
     "compatibility:boundaries": "npm run compatibility:min && npm run compatibility:latest"
