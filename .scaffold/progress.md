@@ -11,16 +11,16 @@
 - [x] Replaced action references with valid tag-matching SHAs and disabled checkout credential persistence.
 - [x] Removed the duplicate `verify-compatibility-safe.js` wrapper.
 - [x] Passed the focused ignored-Finder-artifact regression.
-- [x] Passed LSP checks, `npm test`, strict unhandled-rejection tests, typecheck, coverage, pack verification, GitHub mirror verification, and both exact Pi boundaries.
-- [x] Validated Pi 0.84.2 successfully as a candidate after the registry sentinel detected a new release.
-
+- [x] Passed LSP checks, full tests, strict tests, typecheck, coverage, pack verification, mirror parity, and exact Pi boundaries.
 - [x] Completed an independent corrective-delta review with no findings.
-- [x] Pushed corrective commit `479333a` to PR #182.
+- [x] Pushed corrective commits to PR #182.
+- [x] Validated Pi 0.84.2 separately and merged prerequisite PR #183.
+- [x] Integrated refreshed `main` with the 0.84.2 compatibility policy.
 
 ## In Progress
 
-- [ ] Open a separate prerequisite compatibility PR for Pi 0.84.2 so `compatibility:check` can return green without expanding #182.
+- [ ] Rerun PR #182 gates against refreshed `main`, then merge in order.
 
 ## Next
 
-Prepare the isolated Pi 0.84.2 policy bump, then recheck PR #182 after the prerequisite lands.
+Push the integrated branch, confirm CI, replace the stale changes-requested review, and merge PR #182.
