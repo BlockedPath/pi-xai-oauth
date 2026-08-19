@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the released tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
@@ -35,7 +35,7 @@ jobs:
           git merge-base --is-ancestor HEAD origin/main
 
       - name: Set up Node and the npm registry
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
@@ -110,7 +110,7 @@ jobs:
           echo "GITHUB_TARBALL=$RUNNER_TEMP/release/$MIRROR_FILENAME" >> "$GITHUB_ENV"
 
       - name: Set up the GitHub Packages registry
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://npm.pkg.github.com
