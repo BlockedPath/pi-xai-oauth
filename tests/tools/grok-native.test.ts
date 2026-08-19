@@ -148,6 +148,29 @@ describe("Grok-native tools", () => {
     await expect(run("grep", { pattern: "VALUE", type: "unknown" })).rejects.toThrow(
       /Unsupported grep file type/,
     );
+    await expect(run("grep", { pattern: "(value)\\1", path: "src" })).rejects.toThrow(
+      /Unsafe regex/,
+    );
+    await expect(run("grep", { pattern: "(a|b)+", path: "src" })).rejects.toThrow(
+      /Unsafe regex/,
+    );
+    await expect(
+      run("grep", { pattern: "a".repeat(501), path: "src" }),
+    ).rejects.toThrow(/maximum length of 500/);
+    await expect(
+      run("grep", { pattern: "VALUE", path: "src", output_mode: "json" }),
+    ).rejects.toThrow(/Unsupported grep output_mode/);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      tool("grep").execute(
+        "call",
+        { pattern: "VALUE", path: "src" },
+        controller.signal,
+        () => {},
+        toolExecutionContext(temp.path),
+      ),
+    ).rejects.toThrow(/aborted/);
   });
 
   it("supports multiline grep and hidden output modes", async () => {
@@ -166,6 +189,26 @@ describe("Grok-native tools", () => {
       output_mode: "count",
     });
     expect(count.content[0].text).toMatch(/a\.ts:2/);
+
+    await mkdir(join(temp.path, "src/nested"), { recursive: true });
+    await writeFile(join(temp.path, "src/nested/deep.ts"), "nested value\n");
+    await writeFile(join(temp.path, "src/nested/skip.js"), "nested value\n");
+    const recursive = await run("grep", {
+      pattern: "nested value",
+      path: "src",
+      glob: "**/*.ts",
+      output_mode: "files_with_matches",
+    });
+    expect(recursive.content[0].text).toMatch(/nested\/deep\.ts/);
+    expect(recursive.content[0].text).not.toMatch(/skip\.js/);
+
+    const characterClass = await run("grep", {
+      pattern: "[Vv]alue",
+      glob: "a.?s",
+      path: "src",
+    });
+    expect(characterClass.content[0].text).toMatch(/a\.ts:3: const second = 'value'/);
+    expect(characterClass.content[0].text).not.toMatch(/nested\/deep/);
   });
 
   it("maps read_file, search_replace, list_dir, and terminal calls onto pi tools", async () => {
@@ -383,6 +426,76 @@ describe("Grok-native tools", () => {
     await blockingWrite;
     await replacementAssertion;
     expect(await readFile(join(temp.path, "concurrent.txt"), "utf8")).toBe("external change");
+  });
+
+  it("aborts a queued search_replace without writing after the lock is released", async () => {
+    await writeFile(join(temp.path, "abort-replace.txt"), "old");
+    let releaseWrite!: () => void;
+    const releaseWritePromise = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    let markWriteEntered!: () => void;
+    const writeEntered = new Promise<void>((resolve) => {
+      markWriteEntered = resolve;
+    });
+    const blockingWrite = createWriteToolDefinition(temp.path, {
+      operations: {
+        mkdir: () => Promise.resolve(),
+        async writeFile(absolutePath, content) {
+          markWriteEntered();
+          await releaseWritePromise;
+          await writeFile(absolutePath, content, "utf8");
+        },
+      },
+    }).execute(
+      "blocking-write",
+      { path: "abort-replace.txt", content: "external change" },
+      undefined,
+      () => {},
+      { cwd: temp.path } as any,
+    );
+    await writeEntered;
+
+    const controller = new AbortController();
+    const replacement = tool("search_replace").execute(
+      "call",
+      {
+        file_path: "abort-replace.txt",
+        old_string: "old",
+        new_string: "replacement",
+      },
+      controller.signal,
+      () => {},
+      toolExecutionContext(temp.path),
+    );
+    const replacementAssertion = expect(replacement).rejects.toThrow(/aborted/);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    controller.abort();
+    releaseWrite();
+
+    await blockingWrite;
+    await replacementAssertion;
+    expect(await readFile(join(temp.path, "abort-replace.txt"), "utf8")).toBe(
+      "external change",
+    );
+  });
+
+  it("rejects identical search_replace strings and PDF read_file before touching the file", async () => {
+    const original = await readFile(join(temp.path, "src/a.ts"), "utf8");
+    await expect(
+      run("search_replace", {
+        file_path: "src/a.ts",
+        old_string: "VALUE",
+        new_string: "VALUE",
+      }),
+    ).rejects.toThrow(/different old_string and new_string/);
+    expect(await readFile(join(temp.path, "src/a.ts"), "utf8")).toBe(original);
+
+    await writeFile(join(temp.path, "doc.pdf"), "%PDF-1.4\nSECRET\n");
+    await expect(run("read_file", { target_file: "doc.pdf" })).rejects.toThrow(
+      /PDF pages\/format are unavailable/,
+    );
+    expect(await readFile(join(temp.path, "doc.pdf"), "utf8")).toContain("SECRET");
   });
 
   it("rejects background terminal calls instead of silently foregrounding them", async () => {
@@ -751,6 +864,49 @@ describe("Grok-native tools", () => {
     expect(result.content[0].text).toBe("No results for: unfindable topic");
     expect(result.details).toEqual({ response_id: "resp-empty" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps web_search local when credentials are missing and redacts transport errors", async () => {
+    vi.stubEnv("HOME", temp.path);
+    const model = { ...TEST_MODEL, id: "grok-4.5" };
+    expect(
+      setXaiNetworkToolActive(
+        h.api,
+        model,
+        XAI_GROK_NATIVE_WEB_SEARCH_DISPATCH_NAME,
+        true,
+      ),
+    ).toEqual({ ok: true, active: true });
+
+    const missing = await h.tools
+      .get(XAI_GROK_NATIVE_WEB_SEARCH_DISPATCH_NAME)
+      .execute(
+        "call",
+        { query: "must stay local" },
+        new AbortController().signal,
+        () => {},
+        { cwd: temp.path, model },
+      );
+    expect(missing.content[0].text).toMatch(/No xAI OAuth credentials/);
+    expect(requests).toHaveLength(0);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({ error: { message: "TOKEN_SECRET" } }, 502),
+      ),
+    );
+    const failed = await h.tools
+      .get(XAI_GROK_NATIVE_WEB_SEARCH_DISPATCH_NAME)
+      .execute(
+        "call",
+        { query: "must not leak" },
+        new AbortController().signal,
+        () => {},
+        { cwd: temp.path, ...authContext(model) },
+      );
+    expect(failed.content[0].text).toMatch(/xAI API Error 502/);
+    expect(failed.content[0].text).not.toContain("TOKEN_SECRET");
   });
 
   it("activates native local tools only for xai-auth without mutating unrelated public tools", () => {
