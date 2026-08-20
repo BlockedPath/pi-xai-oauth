@@ -757,4 +757,34 @@ describe("opt-in vision routing", () => {
     expect(result.errorMessage).toBe(XAI_VISION_ROUTING_INVALIDATED_ERROR);
     expect(requests).toHaveLength(1);
   });
+
+  it("scopes isEnabledFor and signalFor to the granted source until reset", () => {
+    const controller = createXaiVisionRoutingController();
+    controller.replaceCatalog([source, target]);
+    expect(controller.isEnabledFor(source.id)).toBe(false);
+    expect(controller.signalFor(source.id)).toBeUndefined();
+    expect(controller.enable(sourceModel).state).toBe("enabled");
+    expect(controller.isEnabledFor(source.id)).toBe(true);
+    expect(controller.isEnabledFor("TEXT-SOURCE")).toBe(true);
+    expect(controller.isEnabledFor(target.id)).toBe(false);
+    expect(controller.signalFor(source.id)?.aborted).toBe(false);
+    expect(controller.signalFor(target.id)).toBeUndefined();
+
+    const previous = controller.signalFor(source.id)!;
+    controller.disable();
+    expect(previous.aborted).toBe(true);
+    expect(controller.isEnabledFor(source.id)).toBe(false);
+    expect(controller.signalFor(source.id)).toBeUndefined();
+    expect(controller.status().state).toBe("disabled");
+  });
+
+  it("does not plan routing for a granted text-only turn without images", () => {
+    const controller = createXaiVisionRoutingController();
+    controller.replaceCatalog([source, target]);
+    controller.enable(sourceModel);
+    expect(controller.plan(source.id, { input: [{ role: "user", content: "text only" }] })).toBeUndefined();
+    expect(controller.plan(target.id, {
+      input: [{ type: "input_image", image_url: "https://example.test/x.png" }],
+    })).toBeUndefined();
+  });
 });
