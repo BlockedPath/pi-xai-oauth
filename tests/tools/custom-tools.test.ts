@@ -384,4 +384,111 @@ describe("custom xAI tools", () => {
       "x_search",
     ]);
   });
+  it("sends JSON format and previous_response_id for generate_text", async () => {
+    await run("xai_generate_text", {
+      prompt: "hi",
+      response_format: "json",
+      previous_response_id: "resp_prior",
+    });
+    expect(requests.at(-1)?.body).toMatchObject({
+      text: { format: { type: "json_object" } },
+      previous_response_id: "resp_prior",
+    });
+  });
+  it("rejects unsupported generate_image size and n before network", async () => {
+    setXaiNetworkToolActive(h.api, TEST_MODEL, "xai_generate_image", true);
+    const size = await h.tools.get("xai_generate_image").execute(
+      "call",
+      { prompt: "diagram", size: "1024x1024" },
+      undefined,
+      () => {},
+      authContext(TEST_MODEL),
+    );
+    expect(size.content[0].text).toMatch(/does not support the 'size' parameter/);
+    const invalidN = await h.tools.get("xai_generate_image").execute(
+      "call",
+      { prompt: "diagram", n: 5 },
+      undefined,
+      () => {},
+      authContext(TEST_MODEL),
+    );
+    expect(invalidN.content[0].text).toMatch(/integer from 1 to 4/);
+    expect(requests).toHaveLength(0);
+  });
+  it("returns generated image URLs and a bounded empty-result fallback", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: any, init: RequestInit = {}) => {
+        requests.push({ url: String(url), init, body: requestBody(init) });
+        return jsonResponse({
+          data: [{ url: "https://img.example.test/a.png" }, { url: "https://img.example.test/b.png" }],
+        });
+      }),
+    );
+    setXaiNetworkToolActive(h.api, TEST_MODEL, "xai_generate_image", true);
+    const withUrls = await h.tools.get("xai_generate_image").execute(
+      "call",
+      { prompt: "diagram", n: 2 },
+      undefined,
+      () => {},
+      authContext(TEST_MODEL),
+    );
+    expect(withUrls.content[0].text).toMatch(/Generated 2 image\(s\)/);
+    expect(withUrls.details).toMatchObject({
+      count: 2,
+      urls: [
+        "https://img.example.test/a.png",
+        "https://img.example.test/b.png",
+      ],
+    });
+    expect(requests.at(-1)?.body).toMatchObject({ n: 2 });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: any, init: RequestInit = {}) => {
+        requests.push({ url: String(url), init, body: requestBody(init) });
+        return jsonResponse({ data: [{}] });
+      }),
+    );
+    setXaiNetworkToolActive(h.api, TEST_MODEL, "xai_generate_image", true);
+    const empty = await h.tools.get("xai_generate_image").execute(
+      "call",
+      { prompt: "diagram" },
+      undefined,
+      () => {},
+      authContext(TEST_MODEL),
+    );
+    expect(empty.content[0].text).toBe("Image generation completed but no URLs returned.");
+  });
+  it.each([
+    ["xai_generate_text", { prompt: "secret-prompt" }, /xAI API Error 503/],
+    ["xai_multi_agent", { query: "secret-query" }, /xAI API Error 503/],
+    ["xai_x_search", { query: "secret-query" }, /xAI API Error 503/],
+    ["xai_code_execution", { code: "print(1)" }, /xAI API Error 503/],
+    ["xai_critique", { content: "secret-content" }, /xAI API Error 503/],
+    ["xai_deep_research", { topic: "secret-topic" }, /xAI API Error 503/],
+    ["xai_generate_image", { prompt: "secret-prompt" }, /xAI Image API Error 503/],
+  ] as const)(
+    "redacts %s transport bodies while preserving status",
+    async (name, params, statusPattern) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          jsonResponse({ error: "UPSTREAM_SECRET_TOKEN", prompt: "secret-prompt" }, 503),
+        ),
+      );
+      setXaiNetworkToolActive(h.api, TEST_MODEL, name, true);
+      const result = await h.tools.get(name).execute(
+        "call",
+        params,
+        undefined,
+        () => {},
+        authContext(TEST_MODEL),
+      );
+      expect(result.content[0].text).toMatch(statusPattern);
+      expect(result.details).toMatchObject({ error: true, status: 503 });
+      expect(JSON.stringify(result)).not.toContain("UPSTREAM_SECRET_TOKEN");
+      expect(JSON.stringify(result)).not.toContain("oauth-token");
+    },
+  );
 });

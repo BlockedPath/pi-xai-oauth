@@ -1,26 +1,20 @@
-# Execution Progress — PR #182 corrective pass
+# Execution Progress — daily coverage pass 2026-08-20
 
-**Branch:** `webbrain/issue-163`
+**Branch:** `cursor/missing-test-coverage-d5a8`
 
 ## Completed
 
-- [x] Reviewed PR #182 against issue #163 and repository pack-policy requirements.
-- [x] Reproduced invalid GitHub Action SHAs and the replacement verifier failure.
-- [x] Added a failing CLI regression for ignored `tests/.DS_Store`.
-- [x] Restored the authoritative compatibility verifier and made its test inventory gitignore-aware.
-- [x] Replaced action references with valid tag-matching SHAs and disabled checkout credential persistence.
-- [x] Removed the duplicate `verify-compatibility-safe.js` wrapper.
-- [x] Passed the focused ignored-Finder-artifact regression.
-- [x] Passed LSP checks, full tests, strict tests, typecheck, coverage, pack verification, mirror parity, and exact Pi boundaries.
-- [x] Completed an independent corrective-delta review with no findings.
-- [x] Pushed corrective commits to PR #182.
-- [x] Validated Pi 0.84.2 separately and merged prerequisite PR #183.
-- [x] Integrated refreshed `main` with the 0.84.2 compatibility policy.
+- [x] Inspected recent merges and leftover gaps from the 2026-08-19 coverage pass (PR #186 still open on a different branch).
+- [x] Added catalog atomic-write failure tests: uncommitted previous-account cache is dropped, and leftover readable cache refuses remote success.
+- [x] Added browser callback CORS, 404, preflight-does-not-consume-state, and default-port fallback tests.
+- [x] Added custom-tool transport redaction, generate_image size/n validation, JSON format, and image URL/empty-result mapping.
+- [x] Added vision-routing `isEnabledFor`/`signalFor` grant scoping and video-download SSRF/timeout/MIME/byte-limit paths.
+- [x] Passed focused unit tests, `npm run typecheck`, `npm test` (642), and `npm run test:coverage` (89.79 / 83.42 / 92.61 / 93.12).
 
 ## In Progress
 
-- [ ] Rerun PR #182 gates against refreshed `main`, then merge in order.
+- [ ] Exact packed Pi boundary matrix.
 
 ## Next
 
-Push the integrated branch, confirm CI, replace the stale changes-requested review, and merge PR #182.
+Commit, push, open PR, and post Slack summary. Remaining lower-priority gaps: `custom-tools.ts` edit/video generic catch branches, `vision-routing.ts` image-part normalization, `oauth.ts` leftover login-cancel lines.
