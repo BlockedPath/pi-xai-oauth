@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import packageMetadata from "../../package.json";
 import {
@@ -6,7 +7,11 @@ import {
 } from "../../extensions/xai/oauth";
 import { discovery, OIDC_PUBLIC_JWK, signIdToken } from "../fixtures/oauth";
 import { jsonResponse } from "../fixtures/http";
-import { XAI_USER_AGENT } from "../../extensions/xai/constants";
+import {
+  XAI_OAUTH_REDIRECT_HOST,
+  XAI_OAUTH_REDIRECT_PORT,
+  XAI_USER_AGENT,
+} from "../../extensions/xai/constants";
 import { resolveXaiOAuthClientSurface } from "../../extensions/xai/wire";
 
 const nativeFetch = globalThis.fetch;
@@ -302,5 +307,127 @@ describe("browser OAuth state and manual callbacks", () => {
       );
     expect(tokenError?.message).toMatch(/status 400/);
     expect(tokenError?.message).not.toContain("TOKEN_SECRET");
+  });
+
+  it("pins callback CORS, 404s other paths, and ignores preflight without consuming state", async () => {
+    const fixture = browserFixture();
+    const oauth = createXaiOAuth({ getExistingCredentials: () => null });
+    const controller = new AbortController();
+    let settled = false;
+    let callbackDriver = Promise.resolve();
+
+    const login = oauth
+      .login(
+        callbacks({
+          signal: controller.signal,
+          onAuth(auth: any) {
+            fixture.authUrl = new URL(auth.url);
+            callbackDriver = trackDriver(
+              controller,
+              (async () => {
+                const redirect = new URL(
+                  fixture.authUrl!.searchParams.get("redirect_uri")!,
+                );
+                const state = fixture.authUrl!.searchParams.get("state")!;
+
+                const preflight = await nativeFetch(redirect, {
+                  method: "OPTIONS",
+                  headers: { Origin: "https://accounts.x.ai" },
+                });
+                expect(preflight.status).toBe(204);
+                expect(preflight.headers.get("access-control-allow-origin")).toBe(
+                  "https://accounts.x.ai",
+                );
+                expect(
+                  preflight.headers.get("access-control-allow-private-network"),
+                ).toBe("true");
+                expect(preflight.headers.get("vary")).toBe("Origin");
+
+                const untrustedPreflight = await nativeFetch(redirect, {
+                  method: "OPTIONS",
+                  headers: { Origin: "https://evil.example" },
+                });
+                expect(untrustedPreflight.status).toBe(204);
+                expect(
+                  untrustedPreflight.headers.get("access-control-allow-origin"),
+                ).toBeNull();
+
+                const missing = new URL(redirect);
+                missing.pathname = "/favicon.ico";
+                const notFound = await nativeFetch(missing, {
+                  headers: { Origin: "https://accounts.x.ai" },
+                });
+                expect(notFound.status).toBe(404);
+                expect(await notFound.text()).toBe("Not found");
+                expect(notFound.headers.get("access-control-allow-origin")).toBeNull();
+                expect(settled).toBe(false);
+
+                const good = new URL(redirect);
+                good.searchParams.set("code", "cors-good");
+                good.searchParams.set("state", state);
+                const allowed = await nativeFetch(good, {
+                  headers: { Origin: "https://auth.x.ai" },
+                });
+                expect(allowed.status).toBe(200);
+                expect(allowed.headers.get("access-control-allow-origin")).toBe(
+                  "https://auth.x.ai",
+                );
+              })(),
+            );
+          },
+        }),
+      )
+      .then((credentials) => {
+        settled = true;
+        return credentials;
+      });
+
+    const credentials = await login;
+    await callbackDriver;
+    expect(credentials.access).toBe("access-cors-good");
+    expect(fixture.exchanges.map(({ code }) => code)).toEqual(["cors-good"]);
+  });
+
+  it("falls back to an ephemeral callback port when the default port is occupied", async () => {
+    const occupying = createServer();
+    await new Promise<void>((resolve, reject) => {
+      occupying.once("error", reject);
+      occupying.listen(XAI_OAUTH_REDIRECT_PORT, XAI_OAUTH_REDIRECT_HOST, () => {
+        occupying.removeListener("error", reject);
+        resolve();
+      });
+    }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "EADDRINUSE") throw error;
+    });
+
+    try {
+      const fixture = browserFixture();
+      const oauth = createXaiOAuth({ getExistingCredentials: () => null });
+      let manual = "";
+      const credentials = await oauth.login(
+        callbacks({
+          onAuth(auth: any) {
+            fixture.authUrl = new URL(auth.url);
+            const redirect = new URL(
+              fixture.authUrl.searchParams.get("redirect_uri")!,
+            );
+            expect(redirect.hostname).toBe(XAI_OAUTH_REDIRECT_HOST);
+            expect(Number(redirect.port)).not.toBe(XAI_OAUTH_REDIRECT_PORT);
+            redirect.searchParams.set("code", "ephemeral");
+            redirect.searchParams.set(
+              "state",
+              fixture.authUrl.searchParams.get("state")!,
+            );
+            manual = redirect.toString();
+          },
+          onManualCodeInput: async () => manual,
+        }),
+      );
+
+      expect(credentials.access).toBe("access-ephemeral");
+      expect(fixture.exchanges.map(({ code }) => code)).toEqual(["ephemeral"]);
+    } finally {
+      await new Promise<void>((resolve) => occupying.close(() => resolve()));
+    }
   });
 });
