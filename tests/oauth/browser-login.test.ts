@@ -309,6 +309,31 @@ describe("browser OAuth state and manual callbacks", () => {
     expect(tokenError?.message).not.toContain("TOKEN_SECRET");
   });
 
+  it.each([
+    ["refresh token", { refresh_token: "" }, /did not include a refresh token/],
+    ["ID token", { id_token: "" }, /did not include an ID token/],
+  ] as const)(
+    "rejects an authorization-code response that omits a %s",
+    async (_label, tokenBody, message) => {
+      const fixture = browserFixture(200, tokenBody);
+      const error = await createXaiOAuth({ getExistingCredentials: () => null })
+        .login(
+          callbacks({
+            onAuth(auth: any) {
+              fixture.authUrl = new URL(auth.url);
+            },
+            onManualCodeInput: async () =>
+              `code=incomplete&state=${fixture.authUrl?.searchParams.get("state")}`,
+          }),
+        )
+        .then(
+          () => undefined,
+          (value: Error) => value,
+        );
+      expect(error?.message).toMatch(message);
+    },
+  );
+
   it("pins callback CORS, 404s other paths, and ignores preflight without consuming state", async () => {
     const fixture = browserFixture();
     const oauth = createXaiOAuth({ getExistingCredentials: () => null });

@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,11 @@ import {
   resolvePiManagedXaiCredential,
   resolvePiManagedXaiOAuthCredential,
 } from "../../extensions/xai/auth";
+import {
+  XAI_GROK_CLI_LEGACY_AUTH_SCOPE_KEY,
+  XAI_OAUTH_TOKEN_URL,
+} from "../../extensions/xai/constants";
+import { jsonResponse } from "../fixtures/http";
 import {
   CURATED_FALLBACK_MODELS,
   setXaiRuntimeModels,
@@ -145,6 +150,129 @@ describe("credential resolution", () => {
       refresh: "grok-refresh",
       tokenEndpoint: "https://auth.x.ai/oauth2/token",
     });
+  });
+  it("parses Grok CLI expiry strings and falls back for unusable dates", async () => {
+    const path = join(temp.path, ".grok/auth.json");
+    await mkdir(join(path, ".."), { recursive: true });
+    const futureMs = Date.now() + 3600_000;
+    await writeFile(
+      path,
+      JSON.stringify({
+        "https://auth.x.ai::b1a00492-073a-47ea-816f-4c329264a828": {
+          key: "iso-access",
+          refresh_token: "iso-refresh",
+          expires_at: new Date(futureMs).toISOString(),
+        },
+      }),
+    );
+    const iso = getGrokAuthCredentials();
+    expect(iso).toMatchObject({ access: "iso-access", refresh: "iso-refresh" });
+    expect(iso?.expires).toBeGreaterThan(Date.now());
+
+    await writeFile(
+      path,
+      JSON.stringify({
+        "https://auth.x.ai::b1a00492-073a-47ea-816f-4c329264a828": {
+          key: "numeric-access",
+          refresh_token: "numeric-refresh",
+          expires_at: String(futureMs),
+        },
+      }),
+    );
+    expect(getGrokAuthCredentials()).toMatchObject({
+      access: "numeric-access",
+      refresh: "numeric-refresh",
+    });
+
+    await writeFile(
+      path,
+      JSON.stringify({
+        "https://auth.x.ai::b1a00492-073a-47ea-816f-4c329264a828": {
+          key: "fallback-access",
+          refresh_token: "fallback-refresh",
+          expires_at: "not-a-date",
+        },
+      }),
+    );
+    const fallback = getGrokAuthCredentials();
+    expect(fallback?.access).toBe("fallback-access");
+    expect(fallback?.expires).toBeGreaterThan(Date.now() + 5 * 60 * 60 * 1000);
+  });
+  it("reuses legacy and top-level Grok CLI credential shapes without modifying the file", async () => {
+    const path = join(temp.path, ".grok/auth.json");
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(
+      path,
+      JSON.stringify({
+        [XAI_GROK_CLI_LEGACY_AUTH_SCOPE_KEY]: { key: "legacy-access" },
+      }),
+    );
+    expect(getGrokAuthCredentials()).toMatchObject({
+      access: "legacy-access",
+      refresh: "",
+    });
+
+    await writeFile(
+      path,
+      JSON.stringify({
+        access_token: "top-level-access",
+        refresh_token: "top-level-refresh",
+        expires_at: Date.now() + 3600_000,
+        token_type: "Bearer",
+      }),
+    );
+    expect(getGrokAuthCredentials()).toMatchObject({
+      access: "top-level-access",
+      refresh: "top-level-refresh",
+      tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+    });
+    expect(await readFile(path, "utf8")).toContain("top-level-access");
+  });
+  it("ignores a malformed Grok CLI auth file instead of throwing", async () => {
+    const path = join(temp.path, ".grok/auth.json");
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(path, "{not-json");
+    expect(getGrokAuthCredentials()).toBeNull();
+    expect(getStartupXaiCatalogAuth()).toMatchObject({
+      credential: null,
+      needsRegistryRefresh: false,
+    });
+  });
+  it("refreshes expired Grok CLI credentials when resolving package tools", async () => {
+    const path = join(temp.path, ".grok/auth.json");
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(
+      path,
+      JSON.stringify({
+        "https://auth.x.ai::b1a00492-073a-47ea-816f-4c329264a828": {
+          key: "stale-grok-access",
+          refresh_token: "grok-refresh",
+          expires_at: Date.now() - 10_000,
+        },
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(XAI_OAUTH_TOKEN_URL);
+        expect(init).toMatchObject({ method: "POST", redirect: "error" });
+        return jsonResponse({
+          access_token: "rotated-grok-access",
+          refresh_token: "rotated-grok-refresh",
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    await expect(resolveXaiCredential({ model: TEST_MODEL })).resolves.toEqual({
+      kind: "oauth-session",
+      token: "rotated-grok-access",
+    });
+    expect(getStartupXaiCatalogAuth()).toMatchObject({
+      credential: null,
+      needsRegistryRefresh: false,
+    });
+    expect(await readFile(path, "utf8")).toContain("stale-grok-access");
   });
   it("prefers fresh Grok auth while retaining deferred expired Pi refresh intent", async () => {
     const pi = join(temp.path, ".pi/agent/auth.json");

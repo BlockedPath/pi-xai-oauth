@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import packageMetadata from "../../package.json";
 import {
   createXaiOAuth,
+  ensureFreshXaiCredentials,
   refreshXaiCredentials,
 } from "../../extensions/xai/oauth";
 import { XAI_OAUTH_TOKEN_URL } from "../../extensions/xai/constants";
@@ -127,5 +128,157 @@ describe("OAuth refresh", () => {
     }).catch((value) => value as Error);
     expect(error.message).toMatch(/status 400/);
     expect(error.message).not.toContain("TOKEN_SECRET");
+  });
+
+  it("returns unexpired credentials without a token request", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("must not refresh a fresh token");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const oauth = createXaiOAuth({ getExistingCredentials: () => null });
+    const fresh = {
+      access: "fresh-access",
+      refresh: "fresh-refresh",
+      expires: Date.now() + 60_000,
+      tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+    };
+    const noExpiry = { access: "no-expiry-access", refresh: "refresh", expires: 0 };
+
+    await expect(ensureFreshXaiCredentials(fresh)).resolves.toBe(fresh);
+    await expect(oauth.refreshToken({ ...fresh, refresh: "" })).resolves.toEqual({
+      ...fresh,
+      refresh: "",
+    });
+    await expect(ensureFreshXaiCredentials(noExpiry)).resolves.toBe(noExpiry);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refreshes expired stored credentials and refuses expired tokens without refresh", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          access_token: "rotated-access",
+          refresh_token: "rotated-refresh",
+          expires_in: 3600,
+        }),
+      ),
+    );
+    const oauth = createXaiOAuth({ getExistingCredentials: () => null });
+    const expired = {
+      access: "stale-access",
+      refresh: "stale-refresh",
+      expires: 1,
+      tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+    };
+
+    await expect(ensureFreshXaiCredentials(expired)).resolves.toMatchObject({
+      access: "rotated-access",
+      refresh: "rotated-refresh",
+    });
+    await expect(
+      oauth.refreshToken({ access: "stale-access", refresh: "", expires: 1 }),
+    ).rejects.toThrow(/expired and cannot be refreshed/);
+  });
+
+  it.each([
+    ["non-JSON", () => new Response("not-json", { status: 200 }), /invalid JSON/],
+    ["array JSON", () => jsonResponse(["token"]), /invalid JSON/],
+    [
+      "missing access token",
+      () => jsonResponse({ refresh_token: "refresh" }),
+      /did not include an access token/,
+    ],
+    [
+      "empty access token",
+      () => jsonResponse({ access_token: "", refresh_token: "refresh" }),
+      /did not include an access token/,
+    ],
+  ] as const)("rejects a %s token payload", async (_label, response, message) => {
+    vi.stubGlobal("fetch", vi.fn(async () => response()));
+    await expect(
+      refreshXaiCredentials({
+        access: "old",
+        refresh: "refresh",
+        expires: 1,
+        tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+      }),
+    ).rejects.toThrow(message);
+  });
+
+  it("reuses existing Grok CLI credentials during login without opening a browser", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        access_token: "login-rotated",
+        refresh_token: "login-rotated-refresh",
+        expires_in: 3600,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const existing = {
+      access: "stale-grok",
+      refresh: "grok-refresh",
+      expires: 1,
+      tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+    };
+    const oauth = createXaiOAuth({ getExistingCredentials: () => existing });
+    const credentials = await oauth.login({
+      onPrompt: async () => "yes",
+      onProgress: () => {},
+      onAuth: () => {
+        throw new Error("browser login must not start");
+      },
+      onSelect: async () => {
+        throw new Error("login method selector must not start");
+      },
+      onDeviceCode: () => {
+        throw new Error("device login must not start");
+      },
+    } as any);
+
+    expect(credentials).toMatchObject({
+      access: "login-rotated",
+      refresh: "login-rotated-refresh",
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("falls through to a fresh login when existing credentials cannot be refreshed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse(
+          { error: "invalid_grant", error_description: "TOKEN_SECRET" },
+          400,
+        ),
+      ),
+    );
+    const progress: string[] = [];
+    const oauth = createXaiOAuth({
+      getExistingCredentials: () => ({
+        access: "stale-grok",
+        refresh: "grok-refresh",
+        expires: 1,
+        tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+      }),
+    });
+
+    await expect(
+      oauth.login({
+        onPrompt: async () => "Y",
+        onProgress: (message: string) => progress.push(message),
+        onSelect: async () => undefined,
+        onAuth: () => {
+          throw new Error("browser login must wait for method selection");
+        },
+        onDeviceCode: () => {
+          throw new Error("device login must wait for method selection");
+        },
+      } as any),
+    ).rejects.toThrow("Login cancelled");
+
+    expect(progress[0]).toMatch(/could not be refreshed/);
+    expect(progress[0]).toMatch(/status 400/);
+    expect(progress.join("\n")).not.toContain("TOKEN_SECRET");
   });
 });
