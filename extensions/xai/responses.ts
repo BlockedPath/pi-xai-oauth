@@ -1,4 +1,10 @@
-import type { Api, Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import type {
+  Api,
+  AssistantMessage,
+  Context,
+  Model,
+  SimpleStreamOptions,
+} from "@earendil-works/pi-ai";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/compat";
 import { randomUUID } from "crypto";
 import { readBoundedResponseText } from "./bounded-body";
@@ -34,12 +40,21 @@ import {
 import {
   safeXaiTransportErrorMessage,
   scrubXaiReservedHeaders,
+  XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
   xaiHttpErrorFromResponse,
   xaiJsonPostHeaders,
   xaiProxyRequestHeaders,
 } from "./wire";
 
-type AssistantStreamEvent = Record<string, any>;
+interface AssistantStreamEvent {
+  type: string;
+  partial?: any;
+  toolCall?: any;
+  message?: any;
+  error?: any;
+  reason?: string;
+  [key: string]: unknown;
+}
 
 const streamSimpleOpenAIResponses = openAIResponsesApi().streamSimple;
 const SAFE_TEXT_ONLY_ERROR_PATTERN =
@@ -113,7 +128,66 @@ function normalizeXaiErrorText(value: string): string {
     : value;
 }
 
-function restoreXaiMessageIdentity(value: unknown, model: Model<Api>): unknown {
+const XAI_RESPONSES_DELEGATE_API = "openai-responses";
+
+function isReplayCompatibleXaiMessage(
+  value: unknown,
+  model: Model<Api>,
+  selectedModelId: string,
+): value is AssistantMessage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const message = value as Record<string, unknown>;
+  return message.role === "assistant" &&
+    message.provider === model.provider &&
+    message.model === selectedModelId &&
+    (message.api === model.api || message.api === XAI_RESPONSES_DELEGATE_API);
+}
+
+function prepareXaiDelegateContext(
+  context: Context,
+  model: Model<Api>,
+  selectedModelId: string,
+): Context {
+  let changed = false;
+  const messages = context.messages.map((message) => {
+    if (
+      !isReplayCompatibleXaiMessage(message, model, selectedModelId) ||
+      message.api === XAI_RESPONSES_DELEGATE_API
+    ) return message;
+    changed = true;
+    return { ...message, api: XAI_RESPONSES_DELEGATE_API };
+  });
+  return changed ? { ...context, messages } : context;
+}
+
+function shouldOmitRejectedEncryptedReasoning(
+  context: Context,
+  model: Model<Api>,
+  selectedModelId: string,
+): boolean {
+  for (let index = context.messages.length - 1; index >= 0; index--) {
+    const message = context.messages[index];
+    if (!message || typeof message !== "object" || message.role !== "assistant") continue;
+    return isReplayCompatibleXaiMessage(message, model, selectedModelId) &&
+      message.stopReason === "error" &&
+      message.errorMessage === XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
+  }
+  return false;
+}
+
+function omitRejectedEncryptedReasoning(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!Array.isArray(payload.input)) return payload;
+  const input = payload.input.filter((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return true;
+    const item = value as Record<string, unknown>;
+    return item.type !== "reasoning" || !("encrypted_content" in item);
+  });
+  return input.length === payload.input.length ? payload : { ...payload, input };
+}
+
+function restoreXaiMessageIdentity<T>(value: T, model: Model<Api>): T {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const message = value as Record<string, unknown>;
   if (message.role !== "assistant") return value;
@@ -122,7 +196,7 @@ function restoreXaiMessageIdentity(value: unknown, model: Model<Api>): unknown {
     api: model.api,
     provider: model.provider,
     model: model.id,
-  };
+  } as T;
 }
 
 function normalizeXaiStreamEvent(
@@ -148,7 +222,7 @@ function normalizeXaiStreamEvent(
   if (internalized.type !== "error" || !internalized.error || typeof internalized.error !== "object") {
     return internalized;
   }
-  const error = internalized.error as Record<string, any>;
+  const error = internalized.error as Record<string, unknown>;
   if (typeof error.errorMessage !== "string") return internalized;
   return {
     ...internalized,
@@ -165,6 +239,10 @@ function normalizeXaiStreamEvent(
             error.errorMessage,
             typeof error.status === "number" ? error.status : undefined,
             "responses-proxy",
+            // Pi 0.84 preserves `response.failed` here; the supported 0.80
+            // boundary does not. In both cases the additional classifier still
+            // requires xAI's invalid_request code plus encrypted-content marker.
+            error.rawStopReason === "failed" || error.rawStopReason === undefined,
           ),
     },
   };
@@ -248,7 +326,7 @@ function streamErrorMessage(model: Model<Api>, error: unknown) {
 export async function postXaiJson(
   authToken: string,
   url: string,
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   signal?: AbortSignal,
   contractHeaders: Record<string, string> = {},
   maxResponseBytes?: number,
@@ -314,7 +392,7 @@ export function assertXaiRuntimeModelAcceptsPayload(modelId: string, payload: un
 /** Create one xAI Responses result using explicit credential-aware routing. */
 export async function createXaiResponse(
   credential: XaiCredential,
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   signal?: AbortSignal,
   beforeSend?: () => void,
   maxResponseBytes?: number,
@@ -342,7 +420,7 @@ export async function createXaiResponse(
   if (usesPackageCatalog) {
     assertXaiRuntimeModelAcceptsPayload(selectedModelId, policyPayload);
   }
-  const payload = (await compactXaiInlineImages(policyPayload)) as Record<string, any>;
+  const payload = (await compactXaiInlineImages(policyPayload)) as Record<string, unknown>;
   if (usesPackageCatalog) {
     assertXaiRuntimeModelAcceptsPayload(selectedModelId, payload);
   }
@@ -440,6 +518,12 @@ export function streamSimpleXaiResponses(
       : {}),
     api: "openai-responses" as const,
   };
+  const delegateContext = prepareXaiDelegateContext(context, model, selectedModelId);
+  const omitRejectedReasoning = shouldOmitRejectedEncryptedReasoning(
+    context,
+    model,
+    selectedModelId,
+  );
   // The OAuth bearer comes only from options.apiKey. Required proxy metadata
   // is merged last so callers cannot spoof authentication or attribution.
   const headers = { ...scrubXaiReservedHeaders(options?.headers), ...requestHeaders };
@@ -469,7 +553,7 @@ export function streamSimpleXaiResponses(
     try {
       const inner = streamSimpleOpenAIResponses(
         openAIResponsesModel as Model<"openai-responses">,
-        context,
+        delegateContext,
         {
           ...options,
           signal: transportSignal,
@@ -504,7 +588,10 @@ export function streamSimpleXaiResponses(
             const visionSafePayload = visionEnabled
               ? omitConsumedXaiResponsesVisionImages(canonicalPayload)
               : canonicalPayload;
-            const policyPayload = applyXaiOAuthResponsesPolicy(visionSafePayload);
+            const replaySafePayload = omitRejectedReasoning
+              ? omitRejectedEncryptedReasoning(visionSafePayload)
+              : visionSafePayload;
+            const policyPayload = applyXaiOAuthResponsesPolicy(replaySafePayload);
             grokNativeToolRoutes = xaiPayloadGrokNativeToolRoutes(policyPayload);
             let exposedPayload = exposeGrokNativeToolNames(policyPayload);
             pinXaiPayloadModel(selectedModelId, exposedPayload);
@@ -518,7 +605,7 @@ export function streamSimpleXaiResponses(
               }
               const response = await createXaiResponse(
                 { kind: "oauth-session", token: options.apiKey },
-                buildXaiVisionDescriptionPayload(compactedVisionPayload, plan.targetModelId) as Record<string, any>,
+                buildXaiVisionDescriptionPayload(compactedVisionPayload, plan.targetModelId) as Record<string, unknown>,
                 AbortSignal.any([plan.signal, ...(options.signal ? [options.signal] : [])]),
                 () => {
                   if (!visionRouting?.validate(plan)) throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);

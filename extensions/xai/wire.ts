@@ -41,7 +41,8 @@ const VERSION_GATE_STATUSES = new Set([400, 401, 403, 426]);
 const VERSION_GATE_PATTERN =
   /\b(?:client[-_ ]?version|minimum[-_ ]?version|outdated[-_ ]?client|unsupported[-_ ]?client|update[-_ ]?required|version[-_ ]?gate)\b/i;
 const ENCRYPTED_CONTENT_MISMATCH_PATTERN = /encrypted_content/;
-const ENCRYPTED_CONTENT_MISMATCH_MESSAGE =
+const INVALID_REQUEST_PATTERN = /\binvalid_request\b/i;
+export const XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE =
   "xAI could not replay encrypted reasoning for this model. Start a clean session or turn using the same xAI model.";
 
 export type XaiClientMode = "interactive" | "headless";
@@ -237,10 +238,14 @@ function isEncryptedContentMismatch(
   status: number | undefined,
   detail: string,
   routeKind: XaiHttpRouteKind,
+  streamedFailure = false,
 ): boolean {
-  return routeKind === "responses-proxy" &&
-    status === 400 &&
-    ENCRYPTED_CONTENT_MISMATCH_PATTERN.test(detail);
+  if (
+    routeKind !== "responses-proxy" ||
+    !ENCRYPTED_CONTENT_MISMATCH_PATTERN.test(detail)
+  ) return false;
+  if (status !== undefined) return status === 400;
+  return streamedFailure && INVALID_REQUEST_PATTERN.test(detail);
 }
 
 function routeLabel(routeKind: XaiHttpRouteKind): string {
@@ -257,10 +262,11 @@ export function safeXaiTransportErrorMessage(
   detail: string,
   status?: number,
   routeKind: XaiHttpRouteKind = "unknown",
+  streamedFailure = false,
 ): string {
   const resolvedStatus = status ?? statusFromTransportText(detail);
-  if (isEncryptedContentMismatch(resolvedStatus, detail, routeKind)) {
-    return ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
+  if (isEncryptedContentMismatch(resolvedStatus, detail, routeKind, streamedFailure)) {
+    return XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
   }
   if (routeKind === "responses-proxy" && isProxyVersionGate(resolvedStatus, detail)) {
     const statusText = resolvedStatus ? ` (HTTP ${resolvedStatus})` : "";

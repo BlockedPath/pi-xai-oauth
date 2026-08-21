@@ -1,20 +1,31 @@
-# Execution Progress — daily coverage pass 2026-08-20
+# Execution Progress — Issue #188
 
-**Branch:** `cursor/missing-test-coverage-d5a8`
+**Branch:** `feature/issue-188-triage`
 
 ## Completed
 
-- [x] Inspected recent merges and leftover gaps from the 2026-08-19 coverage pass (PR #186 still open on a different branch).
-- [x] Added catalog atomic-write failure tests: uncommitted previous-account cache is dropped, and leftover readable cache refuses remote success.
-- [x] Added browser callback CORS, 404, preflight-does-not-consume-state, and default-port fallback tests.
-- [x] Added custom-tool transport redaction, generate_image size/n validation, JSON format, and image URL/empty-result mapping.
-- [x] Added vision-routing `isEnabledFor`/`signalFor` grant scoping and video-download SSRF/timeout/MIME/byte-limit paths.
-- [x] Passed focused unit tests, `npm run typecheck`, `npm test` (642), and `npm run test:coverage` (89.79 / 83.42 / 92.61 / 93.12).
+- [x] Confirmed the clean feature branch before edits.
+- [x] Read AGENTS.md, README.md, setup/entrypoint code, scaffold state, and the full issue (no comments were present).
+- [x] Read the Responses, payload, and wire implementations plus reasoning replay, routing, streaming, and payload tests.
+- [x] Inspected Pi/pi-ai 0.84.2's real OpenAI Responses conversion and `response.failed` stream seam.
+- [x] Established the working diagnosis: streamed failures lose HTTP status and are generically redacted; canonical `xai-responses` history is not replayed through the temporary `openai-responses` delegate identity, while persisted delegate-tagged history is.
+- [x] Added deterministic real stream-seam regressions and proved both pre-fix failures.
+- [x] Implemented bounded `response.failed` mismatch classification with fixed redacted guidance and no immediate retry.
+- [x] Aligned canonical and persisted delegate-tagged history at the conversion seam while retaining exact provider/model replay checks.
+- [x] Made the next same-model turn omit rejected encrypted reasoning only, preserving visible conversation/tool history and leaving unrelated failures unchanged.
+- [x] Passed 62 focused Responses tests across recovery, routing, replay, streaming, and payload suites.
+- [x] Passed local LSP diagnostics and `npm run typecheck`.
+- [x] Passed `npm test`: compatibility policy, 627 unit tests, and the real Pi loader smoke.
+- [x] Passed `npm run compatibility:check`, including packed-manifest and registry/mirror policy checks.
+- [x] Found and fixed a Pi 0.80.1 compatibility gap where the delegate does not retain `rawStopReason: failed`; the classifier remains bounded by `invalid_request` plus `encrypted_content`.
+- [x] Passed exact packed boundaries for Pi/pi-ai 0.80.1 and 0.84.2, including each packed package's tests, loader smoke, and typecheck.
+- [x] Ran a live Herdr smoke against the worktree-only extension with authenticated `xai-auth`: Grok 4.6 completed a tool turn and same-model continuation, Grok 4.5 completed the switched-model turn, and Grok 4.6 completed the switch-back turn without a Responses failure.
+- [x] Reviewed and committed the final delta, pushed the feature branch, and opened PR #190.
 
 ## In Progress
 
-- [ ] Exact packed Pi boundary matrix.
+- [ ] Rebase PR #190 onto refreshed `main` and monitor CI/review.
 
 ## Next
 
-Commit, push, open PR, and post Slack summary. Remaining lower-priority gaps: `custom-tools.ts` edit/video generic catch branches, `vision-routing.ts` image-part normalization, `oauth.ts` leftover login-cancel lines.
+Resolve the scaffold-only rebase conflict, repush the rebased branch, and confirm PR #190 is mergeable.

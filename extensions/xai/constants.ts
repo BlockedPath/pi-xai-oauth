@@ -8,7 +8,7 @@ export const XAI_OAUTH_TOKEN_URL = `${XAI_OAUTH_ISSUER}/oauth2/token`;
 export const XAI_OAUTH_JWKS_URL = `${XAI_OAUTH_ISSUER}/.well-known/jwks.json`;
 export const XAI_OAUTH_ID_TOKEN_ALGORITHM = "ES256";
 export const XAI_OAUTH_PKCE_METHOD = "S256";
-export const XAI_OAUTH_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828";
+export const XAI_OAUTH_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828"; // gitleaks:allow — public OAuth client identifier
 export const XAI_OAUTH_SCOPE =
   "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write";
 export const XAI_OAUTH_REDIRECT_HOST = "127.0.0.1";
