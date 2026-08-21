@@ -1,6 +1,6 @@
 # Execution Progress — Issue #188
 
-**Branch:** `feature/issue-188-triage`
+**Branch:** `release/v1.5.1`
 
 ## Completed
 
@@ -22,12 +22,14 @@
 - [x] Ran a live Herdr smoke against the worktree-only extension with authenticated `xai-auth`: Grok 4.6 completed a tool turn and same-model continuation, Grok 4.5 completed the switched-model turn, and Grok 4.6 completed the switch-back turn without a Responses failure.
 - [x] Reviewed and committed the final delta, pushed the feature branch, and opened PR #190.
 
+- [x] Merged PR #190 to `main` as `8eaf274`.
+- [x] Prepared the v1.5.1 package/lock metadata, release changelog, and README release references.
+- [x] Passed `npm test` (664 tests), `npm run typecheck`, `npm run compatibility:check`, both exact Pi 0.80.1/0.84.2 packed boundaries, `npm pack --dry-run --json`, and `git diff --check` for v1.5.1.
+
 ## In Progress
 
-- [x] Rebased PR #190 onto refreshed `main`, resolved the scaffold-only conflict, and repushed with force-with-lease.
-- [x] Confirmed PR #190 is approved and mergeable with policy, exact Pi 0.80.1/0.84.2, Socket, and CodeRabbit checks passing.
-- [x] Addressed CodeRabbit's sole actionable review by expanding exported-function JSDoc without changing test helpers or runtime behavior.
+- [ ] Publish v1.5.1 through the release PR and GitHub Release workflow.
 
 ## Next
 
-PR #190 is ready for maintainer merge.
+Run all documented release gates, merge the release PR, publish GitHub Release `v1.5.1`, and monitor both registry publish steps.
