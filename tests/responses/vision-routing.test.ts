@@ -11,7 +11,11 @@ import {
 } from "../../extensions/xai/models";
 import { createXaiResponse, streamSimpleXaiResponses } from "../../extensions/xai/responses";
 import {
+  buildXaiVisionDescriptionPayload,
   createXaiVisionRoutingController,
+  replaceXaiPayloadImagesWithDescription,
+  XAI_VISION_DESCRIPTION_ERROR,
+  XAI_VISION_PAYLOAD_ERROR,
   XAI_VISION_ROUTING_INVALIDATED_ERROR,
 } from "../../extensions/xai/vision-routing";
 import { jsonResponse, requestBody } from "../fixtures/http";
@@ -786,5 +790,92 @@ describe("opt-in vision routing", () => {
     expect(controller.plan(target.id, {
       input: [{ type: "input_image", image_url: "https://example.test/x.png" }],
     })).toBeUndefined();
+  });
+
+  it("refuses grants when the source is missing or already vision-capable", () => {
+    const controller = createXaiVisionRoutingController();
+    controller.replaceCatalog([source, target]);
+    expect(controller.enable({ ...sourceModel, id: "unknown-source" })).toMatchObject({
+      state: "unavailable",
+      reason: expect.stringMatching(/not an exact member/),
+    });
+    expect(controller.enable({ ...TEST_MODEL, id: target.id, input: ["text", "image"] } as any)).toMatchObject({
+      state: "unavailable",
+      reason: expect.stringMatching(/already accepts images/),
+    });
+  });
+
+  it("normalizes recognized image shapes into one image-only description request", () => {
+    const payload = buildXaiVisionDescriptionPayload({
+      input: [
+        { type: "input_image", image_url: { url: "https://example.test/object.png" }, detail: "high" },
+        { type: "input_image", file_id: "file_fallback" },
+        { type: "image", image_url: "https://example.test/string.png" },
+        { type: "image", image_url: { url: "https://example.test/nested.png" } },
+        { type: "image", data: "AAA", mimeType: "image/png" },
+        { type: "image", source: { type: "base64", data: "BBB", media_type: "image/jpeg" } },
+        { type: "computer_screenshot", image_url: "https://example.test/shot.png" },
+        { type: "computer_screenshot", file_id: "file_shot" },
+      ],
+    }, target.id);
+
+    expect(payload).toMatchObject({
+      model: target.id,
+      store: false,
+    });
+    const images = (payload.input as any)[0].content.slice(1);
+    expect(images).toEqual([
+      { type: "input_image", image_url: "https://example.test/object.png", detail: "high" },
+      { type: "input_image", file_id: "file_fallback" },
+      { type: "input_image", image_url: "https://example.test/string.png", detail: "auto" },
+      { type: "input_image", image_url: "https://example.test/nested.png", detail: "auto" },
+      { type: "input_image", image_url: "data:image/png;base64,AAA", detail: "auto" },
+      { type: "input_image", image_url: "data:image/jpeg;base64,BBB", detail: "auto" },
+      { type: "input_image", image_url: "https://example.test/shot.png", detail: "auto" },
+      { type: "input_image", file_id: "file_shot" },
+    ]);
+  });
+
+  it("replaces computer screenshots with a bounded labeled description and call association", () => {
+    const replaced = replaceXaiPayloadImagesWithDescription({
+      model: source.id,
+      input: [
+        {
+          type: "computer_call_output",
+          call_id: "computer_secret",
+          output: {
+            type: "computer_screenshot",
+            image_url: "https://example.test/private-screen.png",
+          },
+        },
+        { role: "user", content: [{ type: "input_text", text: "what is on screen?" }] },
+      ],
+    }, "A terminal showing a stack trace.");
+
+    expect(JSON.stringify(replaced)).not.toMatch(/private-screen/);
+    expect(replaced.input).toEqual(expect.arrayContaining([
+      {
+        type: "computer_call_output",
+        call_id: "computer_secret",
+        output: "[computer screenshot described in the following user message]",
+      },
+    ]));
+    expect(JSON.stringify(replaced)).toMatch(
+      /\[xAI-generated visual description\] \(from computer output computer_secret\)/,
+    );
+    expect(JSON.stringify(replaced)).toMatch(/terminal showing a stack trace/);
+  });
+
+  it("rejects empty, oversized, or fully-stripped vision descriptions without leaking image URLs", () => {
+    const imaged = {
+      type: "input_image",
+      image_url: "https://example.test/SECRET-private.png",
+    };
+    expect(() => replaceXaiPayloadImagesWithDescription({ input: [imaged] }, "   "))
+      .toThrow(XAI_VISION_DESCRIPTION_ERROR);
+    expect(() => replaceXaiPayloadImagesWithDescription({ input: [imaged] }, "x".repeat(32_769)))
+      .toThrow(XAI_VISION_DESCRIPTION_ERROR);
+    expect(() => replaceXaiPayloadImagesWithDescription(imaged as any, "ok"))
+      .toThrow(XAI_VISION_PAYLOAD_ERROR);
   });
 });

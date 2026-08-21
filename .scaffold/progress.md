@@ -1,35 +1,38 @@
-# Execution Progress — Issue #188
+# Execution Progress — coverage pass (rebased 2026-08-22)
 
-**Branch:** `release/v1.5.1`
+**Branch:** `chore/rebase-189` (rebase of `cursor/missing-test-coverage-7872` onto `main`)
 
-## Completed
+## Previously landed on `main`
 
-- [x] Confirmed the clean feature branch before edits.
-- [x] Read AGENTS.md, README.md, setup/entrypoint code, scaffold state, and the full issue (no comments were present).
-- [x] Read the Responses, payload, and wire implementations plus reasoning replay, routing, streaming, and payload tests.
-- [x] Inspected Pi/pi-ai 0.84.2's real OpenAI Responses conversion and `response.failed` stream seam.
-- [x] Established the working diagnosis: streamed failures lose HTTP status and are generically redacted; canonical `xai-responses` history is not replayed through the temporary `openai-responses` delegate identity, while persisted delegate-tagged history is.
-- [x] Added deterministic real stream-seam regressions and proved both pre-fix failures.
-- [x] Implemented bounded `response.failed` mismatch classification with fixed redacted guidance and no immediate retry.
-- [x] Aligned canonical and persisted delegate-tagged history at the conversion seam while retaining exact provider/model replay checks.
-- [x] Made the next same-model turn omit rejected encrypted reasoning only, preserving visible conversation/tool history and leaving unrelated failures unchanged.
-- [x] Passed 62 focused Responses tests across recovery, routing, replay, streaming, and payload suites.
-- [x] Passed local LSP diagnostics and `npm run typecheck`.
-- [x] Passed `npm test`: compatibility policy, 627 unit tests, and the real Pi loader smoke.
-- [x] Passed `npm run compatibility:check`, including packed-manifest and registry/mirror policy checks.
-- [x] Found and fixed a Pi 0.80.1 compatibility gap where the delegate does not retain `rawStopReason: failed`; the classifier remains bounded by `invalid_request` plus `encrypted_content`.
-- [x] Passed exact packed boundaries for Pi/pi-ai 0.80.1 and 0.84.2, including each packed package's tests, loader smoke, and typecheck.
-- [x] Ran a live Herdr smoke against the worktree-only extension with authenticated `xai-auth`: Grok 4.6 completed a tool turn and same-model continuation, Grok 4.5 completed the switched-model turn, and Grok 4.6 completed the switch-back turn without a Responses failure.
-- [x] Reviewed and committed the final delta, pushed the feature branch, and opened PR #190.
+- [x] PR #190 (issue #188 streamed reasoning-mismatch recovery) merged as `8eaf274`.
+- [x] v1.5.1 released via PR #192.
+- [x] PR #195 merged: combined `vitest` + `@vitest/coverage-v8` 4.1.11 bump and Dependabot
+      `groups` for the vitest packages and both Pi peers, superseding the split PRs #193/#194.
 
-- [x] Merged PR #190 to `main` as `8eaf274`.
-- [x] Prepared the v1.5.1 package/lock metadata, release changelog, and README release references.
-- [x] Passed `npm test` (664 tests), `npm run typecheck`, `npm run compatibility:check`, both exact Pi 0.80.1/0.84.2 packed boundaries, `npm pack --dry-run --json`, and `git diff --check` for v1.5.1.
+## Completed (this branch)
 
-## In Progress
+- [x] Inspected recent merges (#186/#187 coverage PRs already on main) and leftover gaps from the 2026-08-20 pass.
+- [x] Added vision-routing image-shape normalization, computer-call association, and description-bound tests.
+- [x] Added catalog post-rename `commitAllowed` restore plus 408/425/429/400 fetch classification.
+- [x] Added image-edit validation/wire/session/network/JSON redaction tests.
+- [x] Added custom media-tool generic catch redaction and missing-credential refusals.
+- [x] Added OAuth already-aborted callback wait and cancel-during-catalog-handoff tests.
+- [x] Rebased onto `main` after #190/#192/#195; only `.scaffold/progress.md` conflicted, all seven test
+      files applied clean.
+- [x] Re-verified on rebased `main`: `npm test` 55 files / 692 tests passed plus the real Pi loader
+      smoke, and `npm run typecheck` passed.
+- [x] Re-measured coverage against the current baseline: 90.93 / 84.89 / 93.30 / 94.14 on `main`
+      rises to 92.17 / 86.87 / 93.30 / 95.41 with this branch.
 
-- [ ] Publish v1.5.1 through the release PR and GitHub Release workflow.
+## Notes
+
+- The pre-rebase run reported 687 tests and 92.17 / 86.82 / 93.23 / 95.51; the deltas are #190's tests
+  landing on `main` since the branch was cut, not a behavior change here.
+- Packed `compatibility:boundaries` failed twice in the original cloud image on isolated `npm install`
+  (`Cannot read properties of null (reading 'edgesOut')`) before tests ran — environment/npm installer,
+  not a test flake. The hosted Pi 0.80.1 and 0.84.2 boundary jobs passed in CI.
 
 ## Next
 
-Run all documented release gates, merge the release PR, publish GitHub Release `v1.5.1`, and monitor both registry publish steps.
+Land the rebased coverage branch, then resume the regular coverage cadence against the remaining
+`extensions/xai-oauth.ts` and `media/output-storage.ts` gaps.
