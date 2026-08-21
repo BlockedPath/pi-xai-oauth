@@ -15,25 +15,34 @@ export const XAI_OAUTH_REDIRECT_HOST = "127.0.0.1";
 export const XAI_OAUTH_REDIRECT_PORT = 56121;
 export const XAI_OAUTH_REDIRECT_PATH = "/callback";
 export const XAI_OAUTH_REFRESH_SKEW_MS = 2 * 60 * 1000;
-export const XAI_OAUTH_DEVICE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
+export const XAI_OAUTH_DEVICE_GRANT_TYPE =
+  "urn:ietf:params:oauth:grant-type:device_code";
 export const XAI_OAUTH_DEVICE_DEFAULT_INTERVAL_SECONDS = 5;
 export const XAI_OAUTH_DEVICE_MIN_INTERVAL_SECONDS = 1;
 export const XAI_OAUTH_DEVICE_SLOW_DOWN_SECONDS = 5;
 export const XAI_OAUTH_DEVICE_MAX_DURATION_MS = 15 * 60 * 1000;
 export const XAI_OAUTH_DEVICE_REQUEST_TIMEOUT_MS = 15 * 1000;
 export const XAI_OAUTH_DEVICE_MAX_RESPONSE_BYTES = 64 * 1024;
-export const XAI_OAUTH_DEVICE_VERIFICATION_ORIGINS = [XAI_OAUTH_ISSUER, "https://accounts.x.ai"] as const;
+export const XAI_OAUTH_DEVICE_VERIFICATION_ORIGINS = [
+  XAI_OAUTH_ISSUER,
+  "https://accounts.x.ai",
+] as const;
 
 export const XAI_API_BASE_URL = "https://api.x.ai/v1";
 export const XAI_CLI_BASE_URL = "https://cli-chat-proxy.grok.com/v1";
 export const XAI_RESPONSES_URL = "https://api.x.ai/v1/responses";
-export const XAI_CLI_RESPONSES_URL = "https://cli-chat-proxy.grok.com/v1/responses";
-export const XAI_CLI_MODELS_URL = "https://cli-chat-proxy.grok.com/v1/models-v2";
+export const XAI_CLI_RESPONSES_URL =
+  "https://cli-chat-proxy.grok.com/v1/responses";
+export const XAI_CLI_MODELS_URL =
+  "https://cli-chat-proxy.grok.com/v1/models-v2";
 export const XAI_CLI_USER_URL = "https://cli-chat-proxy.grok.com/v1/user";
-export const XAI_CLI_BILLING_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits";
-export const XAI_IMAGES_GENERATIONS_URL = "https://api.x.ai/v1/images/generations";
+export const XAI_CLI_BILLING_URL =
+  "https://cli-chat-proxy.grok.com/v1/billing?format=credits";
+export const XAI_IMAGES_GENERATIONS_URL =
+  "https://api.x.ai/v1/images/generations";
 export const XAI_IMAGES_EDITS_URL = "https://api.x.ai/v1/images/edits";
-export const XAI_VIDEOS_GENERATIONS_URL = "https://api.x.ai/v1/videos/generations";
+export const XAI_VIDEOS_GENERATIONS_URL =
+  "https://api.x.ai/v1/videos/generations";
 export const XAI_VIDEOS_STATUS_PREFIX = "https://api.x.ai/v1/videos/";
 
 export const XAI_MODEL_CATALOG_CACHE_SCHEMA = 2;
@@ -56,7 +65,8 @@ export const XAI_PACKAGE_VERSION = packageMetadata.version;
 export const XAI_PROXY_CLIENT_VERSION = XAI_PACKAGE_VERSION;
 export const XAI_CLIENT_VERSION = XAI_PROXY_CLIENT_VERSION;
 export const XAI_USER_AGENT = `${XAI_CLIENT_IDENTIFIER}/${XAI_PACKAGE_VERSION}`;
-export const XAI_GROK_BUILD_REVIEWED_REVISION = "b189869b7755d2b482969acf6c92da3ecfeffd36";
+export const XAI_GROK_BUILD_REVIEWED_REVISION =
+  "b189869b7755d2b482969acf6c92da3ecfeffd36";
 export const XAI_PROVIDER_ID = "xai-auth";
 export const XAI_BUNDLED_PROVIDER_ID = "xai";
 export const XAI_TOOL_COMPATIBLE_PROVIDER_IDS = [
@@ -64,13 +74,16 @@ export const XAI_TOOL_COMPATIBLE_PROVIDER_IDS = [
   XAI_BUNDLED_PROVIDER_ID,
 ] as const;
 
-export type XaiToolCompatibleProviderId = (typeof XAI_TOOL_COMPATIBLE_PROVIDER_IDS)[number];
+export type XaiToolCompatibleProviderId =
+  (typeof XAI_TOOL_COMPATIBLE_PROVIDER_IDS)[number];
 
 /** Return whether a provider can use this package's opt-in network tools. */
 export function isXaiToolCompatibleProvider(
   provider: unknown,
 ): provider is XaiToolCompatibleProviderId {
-  return XAI_TOOL_COMPATIBLE_PROVIDER_IDS.some((providerId) => provider === providerId);
+  return XAI_TOOL_COMPATIBLE_PROVIDER_IDS.some(
+    (providerId) => provider === providerId,
+  );
 }
 export const DEFAULT_XAI_MODEL = "grok-4.6";
 export const DEFAULT_XAI_IMAGE_MODEL = "grok-imagine-image-2.0";
@@ -101,7 +114,10 @@ export const XAI_GROK_NATIVE_WEB_SEARCH_NAME = "web_search";
 export const XAI_GROK_NATIVE_WEB_SEARCH_DISPATCH_NAME = "xai_grok_web_search";
 
 /** All public Grok-native model-facing tool names, including opt-in web search. */
-export const XAI_GROK_NATIVE_TOOL_NAMES = Object.values(XAI_GROK_NATIVE_TOOL_NAME_MAP);
+export const XAI_GROK_NATIVE_TOOL_NAMES = Object.values(
+  XAI_GROK_NATIVE_TOOL_NAME_MAP,
+);
 
 export const XAI_GROK_CLI_AUTH_SCOPE_KEY = `${XAI_OAUTH_ISSUER}::${XAI_OAUTH_CLIENT_ID}`;
-export const XAI_GROK_CLI_LEGACY_AUTH_SCOPE_KEY = "https://accounts.x.ai/sign-in";
+export const XAI_GROK_CLI_LEGACY_AUTH_SCOPE_KEY =
+  "https://accounts.x.ai/sign-in";

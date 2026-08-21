@@ -87,12 +87,16 @@ export function resolveXaiClientMode(
     }
   }
 
-  if (outputMode === "json" || outputMode === "rpc" || printRequested) return "headless";
+  if (outputMode === "json" || outputMode === "rpc" || printRequested)
+    return "headless";
   return stdinIsTTY && stdoutIsTTY ? "interactive" : "headless";
 }
 
 /** Map pi's client mode onto xAI's OAuth client-surface vocabulary. */
-export function resolveXaiOAuthClientSurface(): Exclude<XaiOAuthClientSurface, "ui"> {
+export function resolveXaiOAuthClientSurface(): Exclude<
+  XaiOAuthClientSurface,
+  "ui"
+> {
   return resolveXaiClientMode() === "interactive" ? "cli" : "headless";
 }
 
@@ -103,7 +107,10 @@ export function scrubXaiReservedHeaders(
   return Object.fromEntries(
     Object.entries(headers ?? {}).filter(([name]) => {
       const normalized = name.trim().toLowerCase();
-      return !RESERVED_HEADER_NAMES.has(normalized) && !normalized.startsWith("x-grok-");
+      return (
+        !RESERVED_HEADER_NAMES.has(normalized) &&
+        !normalized.startsWith("x-grok-")
+      );
     }),
   );
 }
@@ -116,7 +123,8 @@ export function xaiProxyRequestHeaders(
   options: XaiProxyHeaderOptions = {},
 ): Record<string, string> {
   if (credentialKind !== "oauth-session") return {};
-  const normalizedModelId = (modelId || "").toLowerCase().split("/").pop() || "";
+  const normalizedModelId =
+    (modelId || "").toLowerCase().split("/").pop() || "";
 
   return {
     Accept: options.streaming ? "text/event-stream" : "application/json",
@@ -199,12 +207,16 @@ export function xaiJsonPostHeaders(
 }
 
 /** Build the exact protected header contract for direct public media JSON requests. */
-export function xaiDirectMediaJsonHeaders(authToken: string): Record<string, string> {
+export function xaiDirectMediaJsonHeaders(
+  authToken: string,
+): Record<string, string> {
   return xaiJsonPostHeaders(authToken);
 }
 
 /** Build protected JSON GET headers for direct public media status requests. */
-export function xaiDirectMediaJsonGetHeaders(authToken: string): Record<string, string> {
+export function xaiDirectMediaJsonGetHeaders(
+  authToken: string,
+): Record<string, string> {
   return {
     Accept: "application/json",
     Authorization: `Bearer ${authToken}`,
@@ -218,19 +230,27 @@ function routeKindForUrl(url: string): XaiHttpRouteKind {
   if (url === XAI_IMAGES_GENERATIONS_URL) return "image-generation";
   if (url === XAI_IMAGES_EDITS_URL) return "image-edit";
   if (url === XAI_VIDEOS_GENERATIONS_URL) return "video-generation-create";
-  if (url.startsWith(XAI_VIDEOS_STATUS_PREFIX)) return "video-generation-status";
+  if (url.startsWith(XAI_VIDEOS_STATUS_PREFIX))
+    return "video-generation-status";
   return "unknown";
 }
 
 function statusFromTransportText(value: string): number | undefined {
-  const match = value.match(/(?:API error|HTTP|status(?: code)?)\D{0,12}([1-5]\d{2})/i);
+  const match = value.match(
+    /(?:API error|HTTP|status(?: code)?)\D{0,12}([1-5]\d{2})/i,
+  );
   return match ? Number(match[1]) : undefined;
 }
 
-function isProxyVersionGate(status: number | undefined, detail: string): boolean {
+function isProxyVersionGate(
+  status: number | undefined,
+  detail: string,
+): boolean {
   return (
     status === 426 ||
-    (!!status && VERSION_GATE_STATUSES.has(status) && VERSION_GATE_PATTERN.test(detail))
+    (!!status &&
+      VERSION_GATE_STATUSES.has(status) &&
+      VERSION_GATE_PATTERN.test(detail))
   );
 }
 
@@ -243,13 +263,15 @@ function isEncryptedContentMismatch(
   if (
     routeKind !== "responses-proxy" ||
     !ENCRYPTED_CONTENT_MISMATCH_PATTERN.test(detail)
-  ) return false;
+  )
+    return false;
   if (status !== undefined) return status === 400;
   return streamedFailure && INVALID_REQUEST_PATTERN.test(detail);
 }
 
 function routeLabel(routeKind: XaiHttpRouteKind): string {
-  if (routeKind === "responses-proxy" || routeKind === "responses-direct") return "Responses";
+  if (routeKind === "responses-proxy" || routeKind === "responses-direct")
+    return "Responses";
   if (routeKind === "image-generation") return "image generation";
   if (routeKind === "image-edit") return "image editing";
   if (routeKind === "video-generation-create") return "video generation";
@@ -278,10 +300,20 @@ export function safeXaiTransportErrorMessage(
   streamedFailure = false,
 ): string {
   const resolvedStatus = status ?? statusFromTransportText(detail);
-  if (isEncryptedContentMismatch(resolvedStatus, detail, routeKind, streamedFailure)) {
+  if (
+    isEncryptedContentMismatch(
+      resolvedStatus,
+      detail,
+      routeKind,
+      streamedFailure,
+    )
+  ) {
     return XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
   }
-  if (routeKind === "responses-proxy" && isProxyVersionGate(resolvedStatus, detail)) {
+  if (
+    routeKind === "responses-proxy" &&
+    isProxyVersionGate(resolvedStatus, detail)
+  ) {
     const statusText = resolvedStatus ? ` (HTTP ${resolvedStatus})` : "";
     return `xAI proxy rejected ${XAI_CLIENT_IDENTIFIER}'s reviewed client/version contract${statusText}. Update ${XAI_CLIENT_IDENTIFIER}; if already current, open a compatibility issue with the HTTP status only. Last reviewed Grok Build revision: ${XAI_GROK_BUILD_REVIEWED_REVISION}.`;
   }
@@ -314,6 +346,10 @@ export async function xaiHttpErrorFromResponse(
   url: string,
   signal?: AbortSignal,
 ): Promise<XaiHttpError> {
-  const detail = await readTruncatedResponseText(response, MAX_ERROR_BODY_BYTES, signal);
+  const detail = await readTruncatedResponseText(
+    response,
+    MAX_ERROR_BODY_BYTES,
+    signal,
+  );
   return new XaiHttpError(response.status, routeKindForUrl(url), detail);
 }
