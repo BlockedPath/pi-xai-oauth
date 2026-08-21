@@ -282,10 +282,11 @@ function routeLabel(routeKind: XaiHttpRouteKind): string {
 /**
  * Return stable transport text without reflecting raw upstream response bodies.
  *
- * An explicit numeric status wins over status text parsed from `detail`. A
- * status-less streamed failure is classified as an encrypted-reasoning
- * mismatch only when `streamedFailure` is true and the bounded delegate detail
- * contains both the `invalid_request` code and `encrypted_content` marker.
+ * An explicit numeric status takes precedence over one parsed from `detail`.
+ * When either status is available, a Responses-proxy detail containing the
+ * `encrypted_content` marker is classified as a mismatch only for status 400;
+ * `invalid_request` is not required on that path. Only the truly status-less
+ * path additionally requires `streamedFailure` and the `invalid_request` code.
  *
  * @param detail Bounded transport or delegate error text used only for classification.
  * @param status Numeric HTTP status when the transport preserved one.
