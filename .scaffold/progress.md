@@ -24,8 +24,9 @@
 
 ## In Progress
 
-- [ ] Rebase PR #190 onto refreshed `main` and monitor CI/review.
+- [x] Rebased PR #190 onto refreshed `main`, resolved the scaffold-only conflict, and repushed with force-with-lease.
+- [x] Confirmed PR #190 is approved and mergeable with policy, exact Pi 0.80.1/0.84.2, Socket, and CodeRabbit checks passing.
 
 ## Next
 
-Resolve the scaffold-only rebase conflict, repush the rebased branch, and confirm PR #190 is mergeable.
+PR #190 is ready for maintainer merge.
