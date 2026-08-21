@@ -6,6 +6,10 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Fixed
+
+- Classified encrypted-reasoning mismatches delivered through HTTP-200 `response.failed` streams, kept their details redacted and non-retryable, and made the next same-model turn recover by omitting only the rejected encrypted reasoning while preserving visible messages and tool results. Canonical and persisted delegate-tagged xAI history now follow the same replay and cross-model protections.
+
 ## 1.5.0 - 2026-08-12
 
 ### Added

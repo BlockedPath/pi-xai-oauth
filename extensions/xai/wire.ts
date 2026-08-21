@@ -41,7 +41,8 @@ const VERSION_GATE_STATUSES = new Set([400, 401, 403, 426]);
 const VERSION_GATE_PATTERN =
   /\b(?:client[-_ ]?version|minimum[-_ ]?version|outdated[-_ ]?client|unsupported[-_ ]?client|update[-_ ]?required|version[-_ ]?gate)\b/i;
 const ENCRYPTED_CONTENT_MISMATCH_PATTERN = /encrypted_content/;
-const ENCRYPTED_CONTENT_MISMATCH_MESSAGE =
+const INVALID_REQUEST_PATTERN = /\binvalid_request\b/i;
+export const XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE =
   "xAI could not replay encrypted reasoning for this model. Start a clean session or turn using the same xAI model.";
 
 export type XaiClientMode = "interactive" | "headless";
@@ -86,12 +87,16 @@ export function resolveXaiClientMode(
     }
   }
 
-  if (outputMode === "json" || outputMode === "rpc" || printRequested) return "headless";
+  if (outputMode === "json" || outputMode === "rpc" || printRequested)
+    return "headless";
   return stdinIsTTY && stdoutIsTTY ? "interactive" : "headless";
 }
 
 /** Map pi's client mode onto xAI's OAuth client-surface vocabulary. */
-export function resolveXaiOAuthClientSurface(): Exclude<XaiOAuthClientSurface, "ui"> {
+export function resolveXaiOAuthClientSurface(): Exclude<
+  XaiOAuthClientSurface,
+  "ui"
+> {
   return resolveXaiClientMode() === "interactive" ? "cli" : "headless";
 }
 
@@ -102,7 +107,10 @@ export function scrubXaiReservedHeaders(
   return Object.fromEntries(
     Object.entries(headers ?? {}).filter(([name]) => {
       const normalized = name.trim().toLowerCase();
-      return !RESERVED_HEADER_NAMES.has(normalized) && !normalized.startsWith("x-grok-");
+      return (
+        !RESERVED_HEADER_NAMES.has(normalized) &&
+        !normalized.startsWith("x-grok-")
+      );
     }),
   );
 }
@@ -115,7 +123,8 @@ export function xaiProxyRequestHeaders(
   options: XaiProxyHeaderOptions = {},
 ): Record<string, string> {
   if (credentialKind !== "oauth-session") return {};
-  const normalizedModelId = (modelId || "").toLowerCase().split("/").pop() || "";
+  const normalizedModelId =
+    (modelId || "").toLowerCase().split("/").pop() || "";
 
   return {
     Accept: options.streaming ? "text/event-stream" : "application/json",
@@ -198,12 +207,16 @@ export function xaiJsonPostHeaders(
 }
 
 /** Build the exact protected header contract for direct public media JSON requests. */
-export function xaiDirectMediaJsonHeaders(authToken: string): Record<string, string> {
+export function xaiDirectMediaJsonHeaders(
+  authToken: string,
+): Record<string, string> {
   return xaiJsonPostHeaders(authToken);
 }
 
 /** Build protected JSON GET headers for direct public media status requests. */
-export function xaiDirectMediaJsonGetHeaders(authToken: string): Record<string, string> {
+export function xaiDirectMediaJsonGetHeaders(
+  authToken: string,
+): Record<string, string> {
   return {
     Accept: "application/json",
     Authorization: `Bearer ${authToken}`,
@@ -217,19 +230,27 @@ function routeKindForUrl(url: string): XaiHttpRouteKind {
   if (url === XAI_IMAGES_GENERATIONS_URL) return "image-generation";
   if (url === XAI_IMAGES_EDITS_URL) return "image-edit";
   if (url === XAI_VIDEOS_GENERATIONS_URL) return "video-generation-create";
-  if (url.startsWith(XAI_VIDEOS_STATUS_PREFIX)) return "video-generation-status";
+  if (url.startsWith(XAI_VIDEOS_STATUS_PREFIX))
+    return "video-generation-status";
   return "unknown";
 }
 
 function statusFromTransportText(value: string): number | undefined {
-  const match = value.match(/(?:API error|HTTP|status(?: code)?)\D{0,12}([1-5]\d{2})/i);
+  const match = value.match(
+    /(?:API error|HTTP|status(?: code)?)\D{0,12}([1-5]\d{2})/i,
+  );
   return match ? Number(match[1]) : undefined;
 }
 
-function isProxyVersionGate(status: number | undefined, detail: string): boolean {
+function isProxyVersionGate(
+  status: number | undefined,
+  detail: string,
+): boolean {
   return (
     status === 426 ||
-    (!!status && VERSION_GATE_STATUSES.has(status) && VERSION_GATE_PATTERN.test(detail))
+    (!!status &&
+      VERSION_GATE_STATUSES.has(status) &&
+      VERSION_GATE_PATTERN.test(detail))
   );
 }
 
@@ -237,14 +258,20 @@ function isEncryptedContentMismatch(
   status: number | undefined,
   detail: string,
   routeKind: XaiHttpRouteKind,
+  streamedFailure = false,
 ): boolean {
-  return routeKind === "responses-proxy" &&
-    status === 400 &&
-    ENCRYPTED_CONTENT_MISMATCH_PATTERN.test(detail);
+  if (
+    routeKind !== "responses-proxy" ||
+    !ENCRYPTED_CONTENT_MISMATCH_PATTERN.test(detail)
+  )
+    return false;
+  if (status !== undefined) return status === 400;
+  return streamedFailure && INVALID_REQUEST_PATTERN.test(detail);
 }
 
 function routeLabel(routeKind: XaiHttpRouteKind): string {
-  if (routeKind === "responses-proxy" || routeKind === "responses-direct") return "Responses";
+  if (routeKind === "responses-proxy" || routeKind === "responses-direct")
+    return "Responses";
   if (routeKind === "image-generation") return "image generation";
   if (routeKind === "image-edit") return "image editing";
   if (routeKind === "video-generation-create") return "video generation";
@@ -252,17 +279,42 @@ function routeLabel(routeKind: XaiHttpRouteKind): string {
   return "request";
 }
 
-/** Return stable transport text without reflecting raw upstream response bodies. */
+/**
+ * Return stable transport text without reflecting raw upstream response bodies.
+ *
+ * An explicit numeric status takes precedence over one parsed from `detail`.
+ * When either status is available, a Responses-proxy detail containing the
+ * `encrypted_content` marker is classified as a mismatch only for status 400;
+ * `invalid_request` is not required on that path. Only the truly status-less
+ * path additionally requires `streamedFailure` and the `invalid_request` code.
+ *
+ * @param detail Bounded transport or delegate error text used only for classification.
+ * @param status Numeric HTTP status when the transport preserved one.
+ * @param routeKind Internally selected pinned route classification.
+ * @param streamedFailure Whether the status-less detail came from a terminal streamed failure.
+ * @returns A fixed, non-reflective error message with safe route and status classification.
+ */
 export function safeXaiTransportErrorMessage(
   detail: string,
   status?: number,
   routeKind: XaiHttpRouteKind = "unknown",
+  streamedFailure = false,
 ): string {
   const resolvedStatus = status ?? statusFromTransportText(detail);
-  if (isEncryptedContentMismatch(resolvedStatus, detail, routeKind)) {
-    return ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
+  if (
+    isEncryptedContentMismatch(
+      resolvedStatus,
+      detail,
+      routeKind,
+      streamedFailure,
+    )
+  ) {
+    return XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
   }
-  if (routeKind === "responses-proxy" && isProxyVersionGate(resolvedStatus, detail)) {
+  if (
+    routeKind === "responses-proxy" &&
+    isProxyVersionGate(resolvedStatus, detail)
+  ) {
     const statusText = resolvedStatus ? ` (HTTP ${resolvedStatus})` : "";
     return `xAI proxy rejected ${XAI_CLIENT_IDENTIFIER}'s reviewed client/version contract${statusText}. Update ${XAI_CLIENT_IDENTIFIER}; if already current, open a compatibility issue with the HTTP status only. Last reviewed Grok Build revision: ${XAI_GROK_BUILD_REVIEWED_REVISION}.`;
   }
@@ -295,6 +347,10 @@ export async function xaiHttpErrorFromResponse(
   url: string,
   signal?: AbortSignal,
 ): Promise<XaiHttpError> {
-  const detail = await readTruncatedResponseText(response, MAX_ERROR_BODY_BYTES, signal);
+  const detail = await readTruncatedResponseText(
+    response,
+    MAX_ERROR_BODY_BYTES,
+    signal,
+  );
   return new XaiHttpError(response.status, routeKindForUrl(url), detail);
 }

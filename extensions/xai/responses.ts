@@ -1,4 +1,10 @@
-import type { Api, Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import type {
+  Api,
+  AssistantMessage,
+  Context,
+  Model,
+  SimpleStreamOptions,
+} from "@earendil-works/pi-ai";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/compat";
 import { randomUUID } from "crypto";
 import { readBoundedResponseText } from "./bounded-body";
@@ -34,12 +40,21 @@ import {
 import {
   safeXaiTransportErrorMessage,
   scrubXaiReservedHeaders,
+  XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
   xaiHttpErrorFromResponse,
   xaiJsonPostHeaders,
   xaiProxyRequestHeaders,
 } from "./wire";
 
-type AssistantStreamEvent = Record<string, any>;
+interface AssistantStreamEvent {
+  type: string;
+  partial?: any;
+  toolCall?: any;
+  message?: any;
+  error?: any;
+  reason?: string;
+  [key: string]: unknown;
+}
 
 const streamSimpleOpenAIResponses = openAIResponsesApi().streamSimple;
 const SAFE_TEXT_ONLY_ERROR_PATTERN =
@@ -67,13 +82,19 @@ function acquireRedirectGuard(url: string): () => void {
         guarded ? { ...init, redirect: "error" } : init,
       );
       if (!guarded || response.ok) return response;
-      const requestSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
-      const error = await xaiHttpErrorFromResponse(response, url, requestSignal);
-      const marker = error.code === "encrypted-content-mismatch"
-        ? "encrypted_content"
-        : error.code === "proxy-version-gate"
-          ? "update_required"
-          : "request failed";
+      const requestSignal =
+        init?.signal ?? (input instanceof Request ? input.signal : undefined);
+      const error = await xaiHttpErrorFromResponse(
+        response,
+        url,
+        requestSignal,
+      );
+      const marker =
+        error.code === "encrypted-content-mismatch"
+          ? "encrypted_content"
+          : error.code === "proxy-version-gate"
+            ? "update_required"
+            : "request failed";
       return new Response(JSON.stringify({ error: { message: marker } }), {
         status: response.status,
         statusText: response.statusText,
@@ -113,7 +134,75 @@ function normalizeXaiErrorText(value: string): string {
     : value;
 }
 
-function restoreXaiMessageIdentity(value: unknown, model: Model<Api>): unknown {
+const XAI_RESPONSES_DELEGATE_API = "openai-responses";
+
+function isReplayCompatibleXaiMessage(
+  value: unknown,
+  model: Model<Api>,
+  selectedModelId: string,
+): value is AssistantMessage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const message = value as Record<string, unknown>;
+  return (
+    message.role === "assistant" &&
+    message.provider === model.provider &&
+    message.model === selectedModelId &&
+    (message.api === model.api || message.api === XAI_RESPONSES_DELEGATE_API)
+  );
+}
+
+function prepareXaiDelegateContext(
+  context: Context,
+  model: Model<Api>,
+  selectedModelId: string,
+): Context {
+  let changed = false;
+  const messages = context.messages.map((message) => {
+    if (
+      !isReplayCompatibleXaiMessage(message, model, selectedModelId) ||
+      message.api === XAI_RESPONSES_DELEGATE_API
+    )
+      return message;
+    changed = true;
+    return { ...message, api: XAI_RESPONSES_DELEGATE_API };
+  });
+  return changed ? { ...context, messages } : context;
+}
+
+function shouldOmitRejectedEncryptedReasoning(
+  context: Context,
+  model: Model<Api>,
+  selectedModelId: string,
+): boolean {
+  for (let index = context.messages.length - 1; index >= 0; index--) {
+    const message = context.messages[index];
+    if (!message || typeof message !== "object" || message.role !== "assistant")
+      continue;
+    return (
+      isReplayCompatibleXaiMessage(message, model, selectedModelId) &&
+      message.stopReason === "error" &&
+      message.errorMessage === XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE
+    );
+  }
+  return false;
+}
+
+function omitRejectedEncryptedReasoning(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!Array.isArray(payload.input)) return payload;
+  const input = payload.input.filter((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return true;
+    const item = value as Record<string, unknown>;
+    return item.type !== "reasoning" || !("encrypted_content" in item);
+  });
+  return input.length === payload.input.length
+    ? payload
+    : { ...payload, input };
+}
+
+function restoreXaiMessageIdentity<T>(value: T, model: Model<Api>): T {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const message = value as Record<string, unknown>;
   if (message.role !== "assistant") return value;
@@ -122,7 +211,7 @@ function restoreXaiMessageIdentity(value: unknown, model: Model<Api>): unknown {
     api: model.api,
     provider: model.provider,
     model: model.id,
-  };
+  } as T;
 }
 
 function normalizeXaiStreamEvent(
@@ -134,21 +223,30 @@ function normalizeXaiStreamEvent(
     restoreXaiMessageIdentity(event.partial, model),
     grokNativeToolRoutes,
   );
-  const toolCall = internalizeGrokNativeToolCalls(event.toolCall, grokNativeToolRoutes);
+  const toolCall = internalizeGrokNativeToolCalls(
+    event.toolCall,
+    grokNativeToolRoutes,
+  );
   const message = internalizeGrokNativeToolCalls(
     restoreXaiMessageIdentity(event.message, model),
     grokNativeToolRoutes,
   );
   const restoredError = restoreXaiMessageIdentity(event.error, model);
   const internalized =
-    partial !== event.partial || toolCall !== event.toolCall ||
-      message !== event.message || restoredError !== event.error
+    partial !== event.partial ||
+    toolCall !== event.toolCall ||
+    message !== event.message ||
+    restoredError !== event.error
       ? { ...event, partial, toolCall, message, error: restoredError }
       : event;
-  if (internalized.type !== "error" || !internalized.error || typeof internalized.error !== "object") {
+  if (
+    internalized.type !== "error" ||
+    !internalized.error ||
+    typeof internalized.error !== "object"
+  ) {
     return internalized;
   }
-  const error = internalized.error as Record<string, any>;
+  const error = internalized.error as Record<string, unknown>;
   if (typeof error.errorMessage !== "string") return internalized;
   return {
     ...internalized,
@@ -160,19 +258,25 @@ function normalizeXaiStreamEvent(
         error.errorMessage === XAI_PAYLOAD_CANONICALIZATION_ERROR ||
         error.errorMessage === XAI_VISION_DESCRIPTION_ERROR ||
         error.errorMessage === XAI_VISION_ROUTING_INVALIDATED_ERROR
-        ? error.errorMessage
-        : safeXaiTransportErrorMessage(
-            error.errorMessage,
-            typeof error.status === "number" ? error.status : undefined,
-            "responses-proxy",
-          ),
+          ? error.errorMessage
+          : safeXaiTransportErrorMessage(
+              error.errorMessage,
+              typeof error.status === "number" ? error.status : undefined,
+              "responses-proxy",
+              // Pi 0.84 preserves `response.failed` here; the supported 0.80
+              // boundary does not. In both cases the additional classifier still
+              // requires xAI's invalid_request code plus encrypted-content marker.
+              error.rawStopReason === "failed" ||
+                error.rawStopReason === undefined,
+            ),
     },
   };
 }
 
 function createForwardingAssistantStream() {
   const queue: AssistantStreamEvent[] = [];
-  const waiting: Array<(result: IteratorResult<AssistantStreamEvent>) => void> = [];
+  const waiting: Array<(result: IteratorResult<AssistantStreamEvent>) => void> =
+    [];
   let done = false;
   let resolveResult: (result: any) => void = () => {};
   const resultPromise = new Promise<any>((resolve) => {
@@ -214,7 +318,9 @@ function createForwardingAssistantStream() {
         } else if (done) {
           return;
         } else {
-          const result = await new Promise<IteratorResult<AssistantStreamEvent>>((resolve) => waiting.push(resolve));
+          const result = await new Promise<
+            IteratorResult<AssistantStreamEvent>
+          >((resolve) => waiting.push(resolve));
           if (result.done) return;
           yield result.value;
         }
@@ -239,16 +345,30 @@ function streamErrorMessage(model: Model<Api>, error: unknown) {
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
     stopReason: "error",
-    errorMessage: normalizeXaiErrorText(error instanceof Error ? error.message : String(error)),
+    errorMessage: normalizeXaiErrorText(
+      error instanceof Error ? error.message : String(error),
+    ),
     timestamp: Date.now(),
   };
 }
 
-/** POST a JSON body to an xAI endpoint with bearer authentication. */
+/**
+ * POST a JSON body to a pinned xAI endpoint with protected bearer headers.
+ *
+ * @param authToken OAuth session token or API key selected by the caller's route policy.
+ * @param url Internally selected xAI endpoint; redirects are always rejected.
+ * @param body Canonical JSON-compatible request body.
+ * @param signal Optional cancellation signal forwarded to fetch and bounded body reads.
+ * @param contractHeaders Approved internally owned proxy metadata.
+ * @param maxResponseBytes Optional response bound used by strict auxiliary Responses calls.
+ * @returns The parsed successful JSON response.
+ * @throws {XaiHttpError} For non-success HTTP responses, with only safe route/status detail.
+ * @throws {Error} When a bounded auxiliary response is oversized or malformed.
+ */
 export async function postXaiJson(
   authToken: string,
   url: string,
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   signal?: AbortSignal,
   contractHeaders: Record<string, string> = {},
   maxResponseBytes?: number,
@@ -295,10 +415,15 @@ function pinXaiPayloadModel(modelId: string, payload: unknown): void {
 }
 
 /** Assert the current authenticated entitlement permits the final Responses payload. */
-export function assertXaiRuntimeModelAcceptsPayload(modelId: string, payload: unknown): void {
+export function assertXaiRuntimeModelAcceptsPayload(
+  modelId: string,
+  payload: unknown,
+): void {
   const runtimeModel = getXaiRuntimeModel(modelId);
   if (!runtimeModel) {
-    throw new Error(`xAI OAuth model ${modelId} is not present in the authenticated model catalog`);
+    throw new Error(
+      `xAI OAuth model ${modelId} is not present in the authenticated model catalog`,
+    );
   }
   if (
     isAuthenticatedXaiInputProvenance(runtimeModel.inputProvenance) &&
@@ -311,48 +436,76 @@ export function assertXaiRuntimeModelAcceptsPayload(modelId: string, payload: un
   }
 }
 
-/** Create one xAI Responses result using explicit credential-aware routing. */
+/**
+ * Create one xAI Responses result using explicit credential-aware routing.
+ *
+ * OAuth requests receive the final `store: false` and encrypted-reasoning
+ * include policy after canonicalization, model pinning, entitlement checks,
+ * and inline-image compaction; API-key requests retain their separate route.
+ *
+ * @param credential Explicit OAuth-session or API-key credential and catalog scope.
+ * @param body Caller Responses body, canonicalized before policy checks or transport.
+ * @param signal Optional cancellation signal for transport and bounded response reads.
+ * @param beforeSend Optional final guard invoked after local validation and before network I/O.
+ * @param maxResponseBytes Optional strict response-size bound for auxiliary calls.
+ * @returns The parsed successful Responses JSON result.
+ * @throws {Error} When canonicalization, entitlement, payload policy, or transport validation fails.
+ */
 export async function createXaiResponse(
   credential: XaiCredential,
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   signal?: AbortSignal,
   beforeSend?: () => void,
   maxResponseBytes?: number,
 ): Promise<any> {
   const canonicalBody = canonicalizeXaiResponsesPayload(body);
-  const requestedModel = typeof canonicalBody.model === "string" ? canonicalBody.model : undefined;
+  const requestedModel =
+    typeof canonicalBody.model === "string" ? canonicalBody.model : undefined;
   const model = xaiModelForRequest(requestedModel, credential.kind);
-  const usesPackageCatalog = credential.kind === "oauth-session"
-    && credential.catalogScope !== "host";
-  const runtimeModel = usesPackageCatalog ? getXaiRuntimeModel(model.id) : undefined;
+  const usesPackageCatalog =
+    credential.kind === "oauth-session" && credential.catalogScope !== "host";
+  const runtimeModel = usesPackageCatalog
+    ? getXaiRuntimeModel(model.id)
+    : undefined;
   if (usesPackageCatalog && !runtimeModel) {
-    throw new Error(`xAI OAuth model ${model.id} is not present in the authenticated model catalog`);
+    throw new Error(
+      `xAI OAuth model ${model.id} is not present in the authenticated model catalog`,
+    );
   }
   const selectedModelId = runtimeModel?.id ?? model.id;
-  const requestModel = selectedModelId === model.id ? model : { ...model, id: selectedModelId };
+  const requestModel =
+    selectedModelId === model.id ? model : { ...model, id: selectedModelId };
   const route = resolveXaiRoute(credential.kind, "responses");
   if (usesPackageCatalog) {
     assertXaiRuntimeModelAcceptsPayload(selectedModelId, canonicalBody);
   }
   const rewritten = rewriteXaiResponsesPayload(canonicalBody, requestModel);
-  const policyPayload = credential.kind === "oauth-session"
-    ? applyXaiOAuthResponsesPolicy(rewritten as Record<string, unknown>)
-    : rewritten;
+  const policyPayload =
+    credential.kind === "oauth-session"
+      ? applyXaiOAuthResponsesPolicy(rewritten as Record<string, unknown>)
+      : rewritten;
   pinXaiPayloadModel(selectedModelId, policyPayload);
   if (usesPackageCatalog) {
     assertXaiRuntimeModelAcceptsPayload(selectedModelId, policyPayload);
   }
-  const payload = (await compactXaiInlineImages(policyPayload)) as Record<string, any>;
+  const payload = (await compactXaiInlineImages(policyPayload)) as Record<
+    string,
+    unknown
+  >;
   if (usesPackageCatalog) {
     assertXaiRuntimeModelAcceptsPayload(selectedModelId, payload);
   }
   beforeSend?.();
   const requestSessionId = randomUUID();
-  const requestHeaders = xaiProxyRequestHeaders(selectedModelId, credential.kind, {
-    conversationId: requestSessionId,
-    requestId: randomUUID(),
-    sessionId: requestSessionId,
-  });
+  const requestHeaders = xaiProxyRequestHeaders(
+    selectedModelId,
+    credential.kind,
+    {
+      conversationId: requestSessionId,
+      requestId: randomUUID(),
+      sessionId: requestSessionId,
+    },
+  );
   return postXaiJson(
     credential.token,
     route.url,
@@ -372,11 +525,15 @@ export async function createXaiResponse(
  * Returned events are forwarded through an assistant stream exposing async
  * iteration and `result()`. Delegate load or stream failures are converted
  * into terminal error events with xAI provider metadata instead of escaping
- * as unstructured promise failures.
+ * as unstructured promise failures. Canonical and persisted delegate-tagged
+ * same-model history are aligned only for internal conversion; after a fixed
+ * encrypted-reasoning mismatch, the next same-model request omits rejected
+ * encrypted reasoning while retaining visible and tool-result history.
  *
  * @param model xAI provider model selected by pi.
  * @param context Conversation messages and tool context to stream.
  * @param options Simple stream options, including OAuth token, session ID, cancellation, and payload hooks.
+ * @param visionRouting Optional session-scoped controller for explicit text-only model routing.
  * @returns A forwarding assistant stream compatible with pi's async iterator and `result()` contract.
  */
 export function streamSimpleXaiResponses(
@@ -390,7 +547,9 @@ export function streamSimpleXaiResponses(
     const stream = createForwardingAssistantStream();
     const message = streamErrorMessage(
       model,
-      new Error(`xAI OAuth model ${model.id} is not present in the authenticated model catalog`),
+      new Error(
+        `xAI OAuth model ${model.id} is not present in the authenticated model catalog`,
+      ),
     );
     stream.push({ type: "error", reason: "error", error: message });
     stream.end(message);
@@ -423,34 +582,55 @@ export function streamSimpleXaiResponses(
   // model.input lacks "image". Capture the exact enabled grant so a reset and
   // re-enable cannot authorize an already-started request under a new grant.
   const visionGrantSignal = visionRouting?.signalFor(selectedModelId);
-  const visionEnabled = visionGrantSignal !== undefined && !visionGrantSignal.aborted;
+  const visionEnabled =
+    visionGrantSignal !== undefined && !visionGrantSignal.aborted;
   const modelInputs = [...model.input];
   const streamModel = {
     ...model,
     id: selectedModelId,
     baseUrl: route.baseUrl,
-    headers: scrubXaiReservedHeaders((model as any).headers) as Record<string, string>,
+    headers: scrubXaiReservedHeaders((model as any).headers) as Record<
+      string,
+      string
+    >,
   };
   // Keep the xAI stream model for routing/payload rewriting, but delegate with
   // the API tag expected by pi's OpenAI Responses transport.
   const openAIResponsesModel = {
     ...streamModel,
     ...(visionEnabled && !modelInputs.includes("image")
-      ? { input: [...modelInputs.filter((value) => value !== "image"), "image"] }
+      ? {
+          input: [...modelInputs.filter((value) => value !== "image"), "image"],
+        }
       : {}),
     api: "openai-responses" as const,
   };
+  const delegateContext = prepareXaiDelegateContext(
+    context,
+    model,
+    selectedModelId,
+  );
+  const omitRejectedReasoning = shouldOmitRejectedEncryptedReasoning(
+    context,
+    model,
+    selectedModelId,
+  );
   // The OAuth bearer comes only from options.apiKey. Required proxy metadata
   // is merged last so callers cannot spoof authentication or attribution.
-  const headers = { ...scrubXaiReservedHeaders(options?.headers), ...requestHeaders };
+  const headers = {
+    ...scrubXaiReservedHeaders(options?.headers),
+    ...requestHeaders,
+  };
   const routedSourceController = new AbortController();
   const transportSignal = AbortSignal.any([
     routedSourceController.signal,
     ...(options?.signal ? [options.signal] : []),
   ]);
   const planForCapturedVisionGrant = (payload: unknown) => {
-    if (!xaiResponsesPayloadContainsImage(payload) || !visionGrantSignal) return undefined;
-    if (visionGrantSignal.aborted) throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
+    if (!xaiResponsesPayloadContainsImage(payload) || !visionGrantSignal)
+      return undefined;
+    if (visionGrantSignal.aborted)
+      throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
     const plan = visionRouting?.plan(selectedModelId, payload);
     if (!plan || plan.signal !== visionGrantSignal) {
       throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
@@ -469,7 +649,7 @@ export function streamSimpleXaiResponses(
     try {
       const inner = streamSimpleOpenAIResponses(
         openAIResponsesModel as Model<"openai-responses">,
-        context,
+        delegateContext,
         {
           ...options,
           signal: transportSignal,
@@ -484,17 +664,30 @@ export function streamSimpleXaiResponses(
           maxRetries: 0,
           async onPayload(payload) {
             const canonicalInput = canonicalizeXaiResponsesPayload(payload);
-            if (xaiResponsesPayloadContainsLocalImageReference(canonicalInput)) {
+            if (
+              xaiResponsesPayloadContainsLocalImageReference(canonicalInput)
+            ) {
               const inputPlan = planForCapturedVisionGrant(canonicalInput);
-              if (!inputPlan) assertXaiRuntimeModelAcceptsPayload(selectedModelId, canonicalInput);
+              if (!inputPlan)
+                assertXaiRuntimeModelAcceptsPayload(
+                  selectedModelId,
+                  canonicalInput,
+                );
             }
-            const rewritten = rewriteXaiResponsesPayload(canonicalInput, streamModel, {
-              ...options,
-              sessionId: sessionId || routingSessionId,
-              preserveCurrentToolImages: visionEnabled,
-              omitConsumedVisionImages: visionEnabled,
-            });
-            const userRewritten = await options?.onPayload?.(rewritten, streamModel);
+            const rewritten = rewriteXaiResponsesPayload(
+              canonicalInput,
+              streamModel,
+              {
+                ...options,
+                sessionId: sessionId || routingSessionId,
+                preserveCurrentToolImages: visionEnabled,
+                omitConsumedVisionImages: visionEnabled,
+              },
+            );
+            const userRewritten = await options?.onPayload?.(
+              rewritten,
+              streamModel,
+            );
             const canonicalPayload = canonicalizeXaiResponsesPayload(
               userRewritten === undefined ? rewritten : userRewritten,
             );
@@ -504,29 +697,51 @@ export function streamSimpleXaiResponses(
             const visionSafePayload = visionEnabled
               ? omitConsumedXaiResponsesVisionImages(canonicalPayload)
               : canonicalPayload;
-            const policyPayload = applyXaiOAuthResponsesPolicy(visionSafePayload);
-            grokNativeToolRoutes = xaiPayloadGrokNativeToolRoutes(policyPayload);
+            const replaySafePayload = omitRejectedReasoning
+              ? omitRejectedEncryptedReasoning(visionSafePayload)
+              : visionSafePayload;
+            const policyPayload =
+              applyXaiOAuthResponsesPolicy(replaySafePayload);
+            grokNativeToolRoutes =
+              xaiPayloadGrokNativeToolRoutes(policyPayload);
             let exposedPayload = exposeGrokNativeToolNames(policyPayload);
             pinXaiPayloadModel(selectedModelId, exposedPayload);
 
             const plan = planForCapturedVisionGrant(exposedPayload);
             if (plan) {
-              const compactedVisionPayload = await compactXaiInlineImages(exposedPayload) as Record<string, unknown>;
-              if (!visionRouting?.validate(plan)) throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
+              const compactedVisionPayload = (await compactXaiInlineImages(
+                exposedPayload,
+              )) as Record<string, unknown>;
+              if (!visionRouting?.validate(plan))
+                throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
               if (typeof options?.apiKey !== "string" || !options.apiKey) {
-                throw new Error("xAI vision routing could not resolve the current OAuth credential; no xAI request was sent");
+                throw new Error(
+                  "xAI vision routing could not resolve the current OAuth credential; no xAI request was sent",
+                );
               }
               const response = await createXaiResponse(
                 { kind: "oauth-session", token: options.apiKey },
-                buildXaiVisionDescriptionPayload(compactedVisionPayload, plan.targetModelId) as Record<string, any>,
-                AbortSignal.any([plan.signal, ...(options.signal ? [options.signal] : [])]),
+                buildXaiVisionDescriptionPayload(
+                  compactedVisionPayload,
+                  plan.targetModelId,
+                ) as Record<string, unknown>,
+                AbortSignal.any([
+                  plan.signal,
+                  ...(options.signal ? [options.signal] : []),
+                ]),
                 () => {
-                  if (!visionRouting?.validate(plan)) throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
+                  if (!visionRouting?.validate(plan))
+                    throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
                 },
                 256 * 1024,
               );
-              if (!visionRouting?.validate(plan)) throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
-              plan.signal.addEventListener("abort", () => routedSourceController.abort(), { once: true });
+              if (!visionRouting?.validate(plan))
+                throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
+              plan.signal.addEventListener(
+                "abort",
+                () => routedSourceController.abort(),
+                { once: true },
+              );
               if (plan.signal.aborted) routedSourceController.abort();
               const description = extractStrictResponsesText(response).trim();
               if (!description) throw new Error(XAI_VISION_DESCRIPTION_ERROR);
@@ -537,7 +752,10 @@ export function streamSimpleXaiResponses(
               pinXaiPayloadModel(selectedModelId, exposedPayload);
             }
 
-            assertXaiRuntimeModelAcceptsPayload(selectedModelId, exposedPayload);
+            assertXaiRuntimeModelAcceptsPayload(
+              selectedModelId,
+              exposedPayload,
+            );
             const finalPayload = await compactXaiInlineImages(exposedPayload);
             assertXaiRuntimeModelAcceptsPayload(selectedModelId, finalPayload);
             return finalPayload;
@@ -545,19 +763,26 @@ export function streamSimpleXaiResponses(
         },
       );
       for await (const event of inner as AsyncIterable<AssistantStreamEvent>) {
-        if (event.type === "done" || event.type === "error") releaseRedirectGuard();
-        stream.push(normalizeXaiStreamEvent(event, grokNativeToolRoutes, model));
+        if (event.type === "done" || event.type === "error")
+          releaseRedirectGuard();
+        stream.push(
+          normalizeXaiStreamEvent(event, grokNativeToolRoutes, model),
+        );
       }
       releaseRedirectGuard();
       stream.end();
     } catch (error) {
       releaseRedirectGuard();
-      const safeError = error instanceof Error && (
-          /Image file does not exist or is not a valid URL:/.test(error.message) ||
-          /\b(?:EACCES|EPERM|EISDIR|ENOENT):\b/.test(error.message)
-        )
-        ? new Error("xAI image input could not be safely resolved; no xAI request was sent")
-        : error;
+      const safeError =
+        error instanceof Error &&
+        (/Image file does not exist or is not a valid URL:/.test(
+          error.message,
+        ) ||
+          /\b(?:EACCES|EPERM|EISDIR|ENOENT):\b/.test(error.message))
+          ? new Error(
+              "xAI image input could not be safely resolved; no xAI request was sent",
+            )
+          : error;
       const message = streamErrorMessage(model, safeError);
       stream.push({ type: "error", reason: "error", error: message });
       stream.end(message);

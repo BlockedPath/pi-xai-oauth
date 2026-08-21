@@ -24,7 +24,7 @@ The upstream sampler posts paths relative to a configured base URL. That does no
 These values have separate meanings and must not be conflated:
 
 | Value | Local policy |
-|---|---|
+| --- | --- |
 | `x-grok-client-identifier` | Always the truthful npm package name, `pi-xai-oauth`. |
 | `User-Agent` | Always `pi-xai-oauth/<package version>`. |
 | `x-grok-client-version` | The installed `pi-xai-oauth` package version. It is the only truthful controlled version available to this third-party client. |
@@ -37,7 +37,7 @@ The reviewed source treats `x-grok-client-version` as a proxy gate input, but it
 All listed headers are internally owned. Caller/model headers are scrubbed case-insensitively before the route contract is appended.
 
 | Request | Pinned route | Required contract | Explicit exclusions |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Browser authorization | `https://auth.x.ai/oauth2/authorize` | PKCE S256, state, nonce, pinned client ID/scopes/redirect | No bearer or CLI-proxy headers |
 | Device initiation | `https://auth.x.ai/oauth2/device/code` | JSON accept, form content type, truthful User-Agent, client version/surface | No bearer or CLI-proxy headers |
 | Browser/device/refresh token | `https://auth.x.ai/oauth2/token` | JSON accept, form content type, truthful User-Agent, client version/surface | No CLI-proxy headers; no response-body reflection |
@@ -94,11 +94,12 @@ Issue [#79](https://github.com/BlockedPath/pi-xai-oauth/issues/79) implements th
 - active, uncompacted multi-turn input keeps a stable serialized prefix;
 - Pi permits replay only when provider, API, and exact model match, and omits failed or aborted assistant turns;
 - API-key direct Responses, media, catalog, usage, auth, and non-Responses routes do not receive this package policy;
-- a proxy HTTP 400 containing the narrow `encrypted_content` marker produces fixed clean-session/model guidance, is redacted, and is not automatically retried.
+- a proxy HTTP 400 containing the narrow `encrypted_content` marker, or an HTTP-200 SSE `response.failed` carrying both `invalid_request` and that marker, produces fixed clean-session/model guidance, is redacted, and is not automatically retried;
+- after that fixed failure is retained in same-model history, the next request omits encrypted reasoning items from the rejected chain while preserving visible messages, function calls, tool results, and the `store:false` / encrypted-include policy; unrelated failures do not activate this omission.
 
 Encrypted content is ordinary local Pi session state. `store:false` disables server-side response storage but does not prevent Pi from writing the complete item to its session JSONL under normal permissions and retention. This package does not separately encrypt, duplicate, inspect, render, or log it. Compaction may intentionally replace older active context, and trusted local extensions or users with file access can inspect session state.
 
-Pi's delegated SSE error shape does not preserve an HTTP status for failures that arrive after a successful stream connection. The narrow HTTP 400 classifier therefore applies to initial Responses HTTP failures; later in-stream failures remain generic and redacted rather than being guessed from message text.
+Pi's delegated SSE error shape does not preserve an HTTP status for failures that arrive after a successful stream connection. The stream classifier is therefore separately bounded to a terminal `response.failed` result whose redacted delegate text contains both xAI's `invalid_request` code and the `encrypted_content` marker. Other streamed failures remain generic and redacted, and numeric status/retry wording is preserved when the delegate supplies it.
 
 ## Repeatable upstream review procedure
 
