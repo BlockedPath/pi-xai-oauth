@@ -322,7 +322,19 @@ function streamErrorMessage(model: Model<Api>, error: unknown) {
   };
 }
 
-/** POST a JSON body to an xAI endpoint with bearer authentication. */
+/**
+ * POST a JSON body to a pinned xAI endpoint with protected bearer headers.
+ *
+ * @param authToken OAuth session token or API key selected by the caller's route policy.
+ * @param url Internally selected xAI endpoint; redirects are always rejected.
+ * @param body Canonical JSON-compatible request body.
+ * @param signal Optional cancellation signal forwarded to fetch and bounded body reads.
+ * @param contractHeaders Approved internally owned proxy metadata.
+ * @param maxResponseBytes Optional response bound used by strict auxiliary Responses calls.
+ * @returns The parsed successful JSON response.
+ * @throws {XaiHttpError} For non-success HTTP responses, with only safe route/status detail.
+ * @throws {Error} When a bounded auxiliary response is oversized or malformed.
+ */
 export async function postXaiJson(
   authToken: string,
   url: string,
@@ -389,7 +401,21 @@ export function assertXaiRuntimeModelAcceptsPayload(modelId: string, payload: un
   }
 }
 
-/** Create one xAI Responses result using explicit credential-aware routing. */
+/**
+ * Create one xAI Responses result using explicit credential-aware routing.
+ *
+ * OAuth requests receive the final `store: false` and encrypted-reasoning
+ * include policy after canonicalization, model pinning, entitlement checks,
+ * and inline-image compaction; API-key requests retain their separate route.
+ *
+ * @param credential Explicit OAuth-session or API-key credential and catalog scope.
+ * @param body Caller Responses body, canonicalized before policy checks or transport.
+ * @param signal Optional cancellation signal for transport and bounded response reads.
+ * @param beforeSend Optional final guard invoked after local validation and before network I/O.
+ * @param maxResponseBytes Optional strict response-size bound for auxiliary calls.
+ * @returns The parsed successful Responses JSON result.
+ * @throws {Error} When canonicalization, entitlement, payload policy, or transport validation fails.
+ */
 export async function createXaiResponse(
   credential: XaiCredential,
   body: Record<string, unknown>,
@@ -450,11 +476,15 @@ export async function createXaiResponse(
  * Returned events are forwarded through an assistant stream exposing async
  * iteration and `result()`. Delegate load or stream failures are converted
  * into terminal error events with xAI provider metadata instead of escaping
- * as unstructured promise failures.
+ * as unstructured promise failures. Canonical and persisted delegate-tagged
+ * same-model history are aligned only for internal conversion; after a fixed
+ * encrypted-reasoning mismatch, the next same-model request omits rejected
+ * encrypted reasoning while retaining visible and tool-result history.
  *
  * @param model xAI provider model selected by pi.
  * @param context Conversation messages and tool context to stream.
  * @param options Simple stream options, including OAuth token, session ID, cancellation, and payload hooks.
+ * @param visionRouting Optional session-scoped controller for explicit text-only model routing.
  * @returns A forwarding assistant stream compatible with pi's async iterator and `result()` contract.
  */
 export function streamSimpleXaiResponses(

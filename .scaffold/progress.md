@@ -26,6 +26,7 @@
 
 - [x] Rebased PR #190 onto refreshed `main`, resolved the scaffold-only conflict, and repushed with force-with-lease.
 - [x] Confirmed PR #190 is approved and mergeable with policy, exact Pi 0.80.1/0.84.2, Socket, and CodeRabbit checks passing.
+- [x] Addressed CodeRabbit's sole actionable review by expanding exported-function JSDoc without changing test helpers or runtime behavior.
 
 ## Next
 

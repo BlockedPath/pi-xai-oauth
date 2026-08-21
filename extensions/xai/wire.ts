@@ -257,7 +257,20 @@ function routeLabel(routeKind: XaiHttpRouteKind): string {
   return "request";
 }
 
-/** Return stable transport text without reflecting raw upstream response bodies. */
+/**
+ * Return stable transport text without reflecting raw upstream response bodies.
+ *
+ * An explicit numeric status wins over status text parsed from `detail`. A
+ * status-less streamed failure is classified as an encrypted-reasoning
+ * mismatch only when `streamedFailure` is true and the bounded delegate detail
+ * contains both the `invalid_request` code and `encrypted_content` marker.
+ *
+ * @param detail Bounded transport or delegate error text used only for classification.
+ * @param status Numeric HTTP status when the transport preserved one.
+ * @param routeKind Internally selected pinned route classification.
+ * @param streamedFailure Whether the status-less detail came from a terminal streamed failure.
+ * @returns A fixed, non-reflective error message with safe route and status classification.
+ */
 export function safeXaiTransportErrorMessage(
   detail: string,
   status?: number,
