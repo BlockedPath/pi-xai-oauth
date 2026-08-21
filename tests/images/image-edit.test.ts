@@ -14,6 +14,7 @@ import type { ImageCodec } from "../../extensions/xai/media/compression";
 import {
   IMAGE_EDIT_MAX_OUTPUT_BYTES,
   IMAGE_EDIT_MAX_OUTPUT_PIXELS,
+  IMAGE_EDIT_MAX_PROMPT_CHARS,
   IMAGE_EDIT_MAX_REQUEST_JSON_BYTES,
   MEDIA_REFERENCE_PASSTHROUGH_MAX_BYTES,
 } from "../../extensions/xai/media/constants";
@@ -51,6 +52,14 @@ describe("image-edit validation and wire payload", () => {
       { prompt: "edit", image: [{ data_url: dataUrl }], aspect_ratio: 1 },
       { prompt: "edit", image: [{ data_url: dataUrl }, { data_url: dataUrl }] },
       { prompt: "edit", image: [{ data_url: dataUrl }, { data_url: dataUrl }], aspect_ratio: "bad" },
+      null,
+      [],
+      "edit",
+      { prompt: "edit", image: [{ data_url: dataUrl }], seed: 1 },
+      { prompt: "a".repeat(IMAGE_EDIT_MAX_PROMPT_CHARS + 1), image: [{ data_url: dataUrl }] },
+      { prompt: "edit", image: [{ path: "" }] },
+      { prompt: "edit", image: [{ data_url: "   " }] },
+      { prompt: "edit", image: ["not-an-object"] },
     ]) {
       expect(() => validateXaiEditImageInput(input)).toThrow(ImageEditOperationError);
     }
@@ -124,6 +133,26 @@ describe("image-edit validation and wire payload", () => {
       height: 1,
       wasCompressed: false,
     }])).toThrow(/aggregate request-byte limit/);
+  });
+
+  it("rejects a prepared-reference count mismatch and multi-image payloads without aspect_ratio", () => {
+    const singular = validateXaiEditImageInput({
+      prompt: "edit",
+      image: [{ data_url: dataUrl }],
+    });
+    const reference = {
+      dataUrl,
+      mimeType: "image/png" as const,
+      byteLength: png.length,
+      width: 1,
+      height: 1,
+      wasCompressed: false,
+    };
+    expect(() => buildXaiImageEditPayload(singular, [])).toThrow(/does not match the request/);
+    expect(() => buildXaiImageEditPayload(
+      { prompt: "combine", image: [{ data_url: dataUrl }, { data_url: dataUrl }] } as XaiEditImageInput,
+      [reference, reference],
+    )).toThrow(/require a supported aspect_ratio/);
   });
 });
 
@@ -212,6 +241,59 @@ describe("bounded xAI image-edit execution", () => {
     controller.abort();
     await expect(pending).rejects.toMatchObject({ code: "cancelled" });
     await expect(lstat(imageEditOutputRoot(sessionManager()))).rejects.toThrow();
+  });
+
+  it("maps session-directory failures, network throws, and invalid JSON without reflecting secrets", async () => {
+    const secret = "SESSION_SECRET_TOKEN";
+    await expect(executeXaiImageEdit({
+      credential: { kind: "oauth-session", token: "token" },
+      input: input(),
+      workspaceRoot,
+      sessionManager: {
+        getSessionDir: () => {
+          throw new Error(`unavailable ${secret}`);
+        },
+        getSessionId: () => "image-edit-session",
+      },
+    }, dependencies())).rejects.toMatchObject({
+      code: "output_failure",
+      message: /safe Pi session output directory is unavailable/,
+    });
+
+    const network = await executeXaiImageEdit({
+      credential: { kind: "oauth-session", token: "token" },
+      input: input(),
+      workspaceRoot,
+      sessionManager: sessionManager(),
+    }, {
+      codec,
+      fetch: vi.fn(async () => {
+        throw new TypeError(`fetch failed ${secret}`);
+      }),
+    }).then(() => undefined, (error: unknown) => error);
+    expect(network).toMatchObject({
+      code: "network_failure",
+      message: /request failed\. Check the network/,
+    });
+    expect(JSON.stringify(network)).not.toContain(secret);
+
+    const invalidJson = await executeXaiImageEdit({
+      credential: { kind: "oauth-session", token: "token" },
+      input: input(),
+      workspaceRoot,
+      sessionManager: sessionManager(),
+    }, {
+      codec,
+      fetch: vi.fn(async () => new Response(`not-json ${secret}`, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })),
+    }).then(() => undefined, (error: unknown) => error);
+    expect(invalidJson).toMatchObject({
+      code: "invalid_response",
+      message: /invalid JSON response/,
+    });
+    expect(JSON.stringify(invalidJson)).not.toContain(secret);
   });
 
   it("rejects pre-cancellation before session, codec, filesystem, or network access", async () => {

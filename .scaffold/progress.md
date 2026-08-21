@@ -1,20 +1,18 @@
-# Execution Progress — daily coverage pass 2026-08-20
+# Execution Progress — daily coverage pass 2026-08-21
 
-**Branch:** `cursor/missing-test-coverage-d5a8`
+**Branch:** `cursor/missing-test-coverage-7872`
 
 ## Completed
 
-- [x] Inspected recent merges and leftover gaps from the 2026-08-19 coverage pass (PR #186 still open on a different branch).
-- [x] Added catalog atomic-write failure tests: uncommitted previous-account cache is dropped, and leftover readable cache refuses remote success.
-- [x] Added browser callback CORS, 404, preflight-does-not-consume-state, and default-port fallback tests.
-- [x] Added custom-tool transport redaction, generate_image size/n validation, JSON format, and image URL/empty-result mapping.
-- [x] Added vision-routing `isEnabledFor`/`signalFor` grant scoping and video-download SSRF/timeout/MIME/byte-limit paths.
-- [x] Passed focused unit tests, `npm run typecheck`, `npm test` (642), and `npm run test:coverage` (89.79 / 83.42 / 92.61 / 93.12).
-
-## In Progress
-
-- [ ] Exact packed Pi boundary matrix.
+- [x] Inspected recent merges (#186/#187 coverage PRs already on main) and leftover gaps from the 2026-08-20 pass.
+- [x] Added vision-routing image-shape normalization, computer-call association, and description-bound tests.
+- [x] Added catalog post-rename `commitAllowed` restore plus 408/425/429/400 fetch classification.
+- [x] Added image-edit validation/wire/session/network/JSON redaction tests.
+- [x] Added custom media-tool generic catch redaction and missing-credential refusals.
+- [x] Added OAuth already-aborted callback wait and cancel-during-catalog-handoff tests.
+- [x] `npm test` 687 passed, `npm run typecheck` passed, coverage 92.17 / 86.82 / 93.23 / 95.51.
+- [x] Packed `compatibility:boundaries` failed twice on isolated `npm install` (`Cannot read properties of null (reading 'edgesOut')`) before tests ran — environment/npm installer, not a test flake.
 
 ## Next
 
-Commit, push, open PR, and post Slack summary. Remaining lower-priority gaps: `custom-tools.ts` edit/video generic catch branches, `vision-routing.ts` image-part normalization, `oauth.ts` leftover login-cancel lines.
+Commit, push, open PR, and post Slack summary.

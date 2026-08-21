@@ -345,6 +345,26 @@ describe("catalog cache selection", () => {
     expect(await readFile(path, "utf8")).toBe(before);
   });
 
+  it("restores the previous cache when the commit guard flips after a successful rename", async () => {
+    const path = join(temp.path, "post-write-guard", "models-v2.json");
+    await writeCache(path, now - XAI_MODEL_CATALOG_FRESH_TTL_MS);
+    let checks = 0;
+    await expect(
+      selectXaiModelCatalog({
+        credential: { access: token },
+        cachePath: path,
+        now,
+        commitAllowed: () => ++checks < 3,
+        fetchImpl: async () => jsonResponse(removalsPayload),
+      }),
+    ).rejects.toBeInstanceOf(XaiCatalogCancelledError);
+    expect(
+      JSON.parse(await readFile(path, "utf8")).models.map(
+        (model: any) => model.id,
+      ),
+    ).toEqual(additions.map(({ id }) => id));
+  });
+
   it("restores the previous cache when the commit guard changes", async () => {
     const path = join(temp.path, "guard", "models-v2.json");
     await writeCache(path, now - XAI_MODEL_CATALOG_FRESH_TTL_MS);
@@ -561,5 +581,23 @@ describe("catalog cache selection", () => {
         { fetchImpl: async () => jsonResponse(additionsPayload) },
       ),
     ).resolves.toMatchObject({ kind: "success" });
+  });
+
+  it.each([408, 425, 429, 503])("classifies HTTP %s catalog responses as transient", async (status) => {
+    await expect(
+      fetchXaiModelCatalog(
+        { access: token },
+        { fetchImpl: async () => jsonResponse({}, status) },
+      ),
+    ).resolves.toEqual({ kind: "transient" });
+  });
+
+  it("classifies other non-success catalog HTTP statuses as permanent", async () => {
+    await expect(
+      fetchXaiModelCatalog(
+        { access: token },
+        { fetchImpl: async () => jsonResponse({}, 400) },
+      ),
+    ).resolves.toEqual({ kind: "permanent" });
   });
 });
