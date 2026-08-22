@@ -56,6 +56,6 @@
     "@vitest/coverage-v8": "4.1.10",
     "jiti": "^2.7.0",
     "typescript": "^7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
