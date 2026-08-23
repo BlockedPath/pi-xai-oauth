@@ -278,7 +278,7 @@ function printNextSteps(nonInteractive = false) {
     console.log(`   ${color("3.", "bold")} Use package tools and subscription usage on either provider:`);
     console.log("      /xai-tools   — opt-in network tools (web/X search, images, etc.)");
     console.log("      /xai-usage   — SuperGrok subscription usage\n");
-    console.log(`   ${color("4.", "bold")} Start chatting with Grok 4.5 (default model)`);
+    console.log(`   ${color("4.", "bold")} Start chatting with ${DEFAULT_XAI_MODEL} (default model)`);
     console.log(`      ${color("pi", "cyan")}\n`);
   } else {
     console.log("Package tools and /xai-usage are installed. Chat defaults to Pi's built-in xAI provider when unset.\n");
@@ -388,7 +388,7 @@ Update this file frequently.`,
 **Date:** ${date}
 
 ## Key Context
-- This project provides xAI OAuth + Grok 4.5 for pi agents.
+- This project provides xAI OAuth + ${DEFAULT_XAI_MODEL} for pi agents.
 - Use subagent tool for delegation.
 - Persistent state lives in .scaffold/.
 
