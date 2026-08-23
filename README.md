@@ -999,7 +999,7 @@ pi-xai-oauth/
 │   ├── decisions/            # Package-scope and constrained-sampling ADRs
 │   ├── bridge-xai-tools.md   # xAI tools menu bridge protocol v1
 │   └── model-input-modalities.md
-├── vitest.config.ts          # Node isolation and measured V8 coverage floors
+├── vitest.config.mts         # Node isolation and measured V8 coverage floors
 ├── .scaffold/                # Persistent agent state (plan, progress, etc.)
 ├── AGENTS.md                 # AI agent operations manual
 ├── package.json

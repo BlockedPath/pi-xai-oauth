@@ -225,7 +225,7 @@ function verifyPackedPackage() {
       "scripts/prepare-github-package.js",
       "scripts/verify-github-package.js",
       "scripts/verify-extension-loader.mjs",
-      "vitest.config.ts",
+      "vitest.config.mts",
       ...listGitVisibleFiles(path.join(repoRoot, "tests")),
     ];
     for (const file of required) assert.ok(packed.files.includes(file), `Packed package is missing ${file}`);
