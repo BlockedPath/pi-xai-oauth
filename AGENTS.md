@@ -42,6 +42,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Keep both Pi peers aligned to the checked-in bounded range in `compatibility/pi-versions.json`
 - Keep npmjs `pi-xai-oauth` canonical and publish GitHub Packages only as the exact scoped mirror `@blockedpath/pi-xai-oauth`; setup must treat both names as aliases and prevent duplicate registration
 - Install/report exact Pi matrix versions from a clean packed package; never reuse the repository lockfile for boundary jobs
+- Keep `tests/`, its fixtures, `vitest.config.mts`, and `tsconfig.json` inside the packed tarball; `scripts/run-compatibility-matrix.js` extracts the pack and runs `npm test` plus `npm run typecheck` inside it, so excluding them silently breaks both exact-Pi boundary jobs
 - Keep normal Pi dev dependencies exact at the policy's latest tested release and review candidate releases before widening support
 - Resolve `x-userid` transiently from the pinned authenticated CLI-proxy `/user` endpoint before any billing request
 - Keep `/xai-usage` explicit, and keep its optional status off by default, session-scoped, bounded, and inactive outside xAI models
@@ -100,6 +101,7 @@ pi-xai-oauth/
 │   └── ci.yml           # PR/main policy and exact Pi boundary matrix
 ├── package.json
 ├── tsconfig.json
+├── .pi-lens.json         # Disables agent formatter/autofix mutations (no repo formatter)
 ├── README.md
 ├── AGENTS.md             # This file
 └── .scaffold/            # Persistent agent state (auto-generated on init)
@@ -120,6 +122,7 @@ Start any task by reading:
 ## Style & Quality Rules
 
 - Use TypeScript strict mode
+- This repository runs no formatter or linter; `npm run typecheck` is the static gate. `.pi-lens.json` disables pi-lens format/autofix mutations because its defaults reflow files to a narrower width than the checked-in style, which buries real changes in unrelated churn. Do not commit whole-file reformatting, and do not adopt a formatter as a drive-by change
 - Prefer async/await for OAuth and API calls
 - Add JSDoc for all exported functions
 - Keep OAuth callback server minimal and secure

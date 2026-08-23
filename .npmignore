@@ -10,6 +10,7 @@ coverage/
 .vscode/
 .omp/
 .pi-subagents/
+.pi-lens.json
 .scaffold/
 .claude/
 CLAUDE.md
