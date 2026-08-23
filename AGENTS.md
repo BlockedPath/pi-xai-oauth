@@ -89,7 +89,7 @@ pi-xai-oauth/
 │   ├── pi-versions.json # Peer range plus exact minimum/latest matrix policy
 │   └── grok-build-wire-protocol.md # Pinned xAI route/header review procedure
 ├── tests/                    # Focused typed Vitest domain suites + isolated fixtures
-├── vitest.config.ts          # Node isolation and measured V8 coverage floors
+├── vitest.config.mts         # Node isolation and measured V8 coverage floors
 ├── scripts/
 │   ├── verify-extension-loader.mjs # Small real Pi loader smoke
 │   ├── verify-compatibility.js # Policy/range/registry/pack/unsupported-peer checks

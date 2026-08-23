@@ -3,6 +3,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
+    // Keep console output from the real installer/provider code paths out of
+    // passing runs; it is still printed in full for any failing test.
+    silent: "passed-only",
     include: ["tests/**/*.test.ts"],
     setupFiles: ["./tests/setup.ts"],
     isolate: true,
