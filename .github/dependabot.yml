@@ -8,6 +8,19 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Lockstep-versioned dev dependencies must move in a single PR. Vitest pins
+    # `@vitest/coverage-v8` to an exact matching `vitest` peer, and the two Pi
+    # peers are kept aligned to compatibility/pi-versions.json, so ungrouped
+    # per-package PRs fail `npm ci` with ERESOLVE (see PRs #193 / #194).
+    groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      pi-peers:
+        patterns:
+          - "@earendil-works/pi-ai"
+          - "@earendil-works/pi-coding-agent"
     ignore:
       # Dependabot security run 27856660362 / job 82445322754 failed with
       # `security_update_not_needed` for protobufjs; keep this ignored until
