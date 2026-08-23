@@ -1,38 +1,28 @@
-# Execution Progress — coverage pass (rebased 2026-08-22)
+# Execution Progress — v1.5.2 release
 
-**Branch:** `chore/rebase-189` (rebase of `cursor/missing-test-coverage-7872` onto `main`)
+**Branch:** `release/v1.5.2`
 
 ## Previously landed on `main`
 
-- [x] PR #190 (issue #188 streamed reasoning-mismatch recovery) merged as `8eaf274`.
-- [x] v1.5.1 released via PR #192.
-- [x] PR #195 merged: combined `vitest` + `@vitest/coverage-v8` 4.1.11 bump and Dependabot
-      `groups` for the vitest packages and both Pi peers, superseding the split PRs #193/#194.
+- [x] v1.5.1 released via PR #192 and GitHub Release `v1.5.1`.
+- [x] PR #195 merged: combined `vitest` + `@vitest/coverage-v8` 4.1.11 bump.
+- [x] PR #196 / #197: coverage regressions plus quieter Vitest output.
+- [x] PR #198: raised V8 coverage floors to the measured baseline.
+- [x] PR #199: stopped agent formatter churn and pinned the packed-test requirement.
+- [x] PR #201: pinned streamed HTTP 400 mismatch classification.
+- [x] PR #202 (issue #200): Grok-native reads/writes through checked descriptors.
 
 ## Completed (this branch)
 
-- [x] Inspected recent merges (#186/#187 coverage PRs already on main) and leftover gaps from the 2026-08-20 pass.
-- [x] Added vision-routing image-shape normalization, computer-call association, and description-bound tests.
-- [x] Added catalog post-rename `commitAllowed` restore plus 408/425/429/400 fetch classification.
-- [x] Added image-edit validation/wire/session/network/JSON redaction tests.
-- [x] Added custom media-tool generic catch redaction and missing-credential refusals.
-- [x] Added OAuth already-aborted callback wait and cancel-during-catalog-handoff tests.
-- [x] Rebased onto `main` after #190/#192/#195; only `.scaffold/progress.md` conflicted, all seven test
-      files applied clean.
-- [x] Re-verified on rebased `main`: `npm test` 55 files / 692 tests passed plus the real Pi loader
-      smoke, and `npm run typecheck` passed.
-- [x] Re-measured coverage against the current baseline: 90.93 / 84.89 / 93.30 / 94.14 on `main`
-      rises to 92.17 / 86.87 / 93.30 / 95.41 with this branch.
+- [x] Bumped package and lock metadata to 1.5.2.
+- [x] Finalized the Grok-native descriptor-I/O changelog entry.
+- [x] Updated README latest-release and Updating version references.
+- [x] Passed `npm test` (696 tests), `npm run typecheck`, `npm run compatibility:check`, both exact Pi 0.80.1/0.84.2 packed boundaries, `npm pack --dry-run --json` (147 files), and `git diff --check` for v1.5.2.
 
-## Notes
+## In Progress
 
-- The pre-rebase run reported 687 tests and 92.17 / 86.82 / 93.23 / 95.51; the deltas are #190's tests
-  landing on `main` since the branch was cut, not a behavior change here.
-- Packed `compatibility:boundaries` failed twice in the original cloud image on isolated `npm install`
-  (`Cannot read properties of null (reading 'edgesOut')`) before tests ran — environment/npm installer,
-  not a test flake. The hosted Pi 0.80.1 and 0.84.2 boundary jobs passed in CI.
+- [ ] Merge the release PR, publish GitHub Release `v1.5.2`, and monitor both registry publish steps.
 
 ## Next
 
-Land the rebased coverage branch, then resume the regular coverage cadence against the remaining
-`extensions/xai-oauth.ts` and `media/output-storage.ts` gaps.
+Publish v1.5.2 through the GitHub Release workflow (`publish.yml`).

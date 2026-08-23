@@ -36,9 +36,9 @@ pi --model grok-4.6:low "Quick status check"   # fast mode
 
 This package adds xAI's **account-specific OAuth model catalog** to pi, with **Grok 4.6** as the offline fallback/default, proper OAuth login, automatic token refresh, and a suite of custom xAI tools (`xai_generate_text`, `web_search`, `xai_x_search`, etc.). The normalized cache remains exact; registration may additionally expose narrowly verified compatibility routes such as Grok 4.3 and Composer only while their required authenticated entitlement source is present. Entitled accounts that still receive `grok-4.5` keep that model as a first-class catalog entry.
 
-> **Latest release:** `pi-xai-oauth` **1.5.1** recovers same-model turns after streamed encrypted-reasoning mismatches while keeping rejected reasoning and upstream details redacted. It publishes the canonical `pi-xai-oauth` package on npmjs and a scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages from the same validated GitHub Release. Setup treats both registry names as one extension and removes duplicate aliases before they can register conflicting tools. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
+> **Latest release:** `pi-xai-oauth` **1.5.2** closes the remaining Grok-native leaf-symlink race by reading and writing through checked descriptors. It publishes the canonical `pi-xai-oauth` package on npmjs and a scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages from the same validated GitHub Release. Setup treats both registry names as one extension and removes duplicate aliases before they can register conflicting tools. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
 >
-> **Compatibility:** 1.5.1 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. The exact tested boundaries are 0.80.1 and 0.84.2.
+> **Compatibility:** 1.5.2 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. The exact tested boundaries are 0.80.1 and 0.84.2.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and fix history.
 
@@ -813,7 +813,7 @@ pi update npm:pi-xai-oauth
 
 This pulls the latest version from npm and updates your installed extension.
 
-Version 1.5.1 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.2. It preserves Pi 0.84.2 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall the checkout:
+Version 1.5.2 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.2. It preserves Pi 0.84.2 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall the checkout:
 
 ```bash
 pi remove npm:pi-xai-oauth && pi install .
