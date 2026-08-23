@@ -5,6 +5,7 @@ import {
   setXaiRuntimeModels,
 } from "../../extensions/xai/models";
 import { streamSimpleXaiResponses } from "../../extensions/xai/responses";
+import { XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE } from "../../extensions/xai/wire";
 import { requestBody } from "../fixtures/http";
 import { TEST_MODEL } from "../fixtures/models";
 
@@ -242,6 +243,92 @@ describe("encrypted reasoning stream recovery", () => {
       );
     },
   );
+
+  it("classifies a streamed mismatch from text-extracted HTTP 400 without an invalid_request code", async () => {
+    const requests: any[] = [];
+    const responses = [
+      sse([
+        failedEvent(
+          "server_error",
+          "HTTP 400 STREAM_SECRET encrypted_content belongs to another model",
+        ),
+      ]),
+      sse([completedEvent("resp_recovered_400")]),
+      sse([completedEvent("resp_reasoning_restored")]),
+    ];
+    const fetchMock = vi.fn(async (_url: any, init: RequestInit = {}) => {
+      requests.push(requestBody(init));
+      return responses.shift()!;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const selectedModel = model("grok-4.6");
+    const history = priorToolHistory("openai-responses");
+
+    const failure = await streamSimpleXaiResponses(
+      selectedModel,
+      { messages: history } as any,
+      { apiKey: "oauth-token", sessionId: "issue-191" } as any,
+    ).result();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      requests[0].input.find((item: any) => item.type === "reasoning"),
+    ).toEqual(reasoningItem);
+    expect(failure).toMatchObject({
+      provider: "xai-auth",
+      model: "grok-4.6",
+      stopReason: "error",
+    });
+    expect(failure.errorMessage).toBe(XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE);
+    expect(failure.errorMessage).not.toMatch(
+      /STREAM_SECRET|encrypted_content|server_error|400/,
+    );
+
+    const recovered = await streamSimpleXaiResponses(
+      selectedModel,
+      {
+        messages: [
+          ...history,
+          failure,
+          { role: "user", content: "continue", timestamp: 5 },
+        ],
+      } as any,
+      { apiKey: "oauth-token", sessionId: "issue-191" } as any,
+    ).result();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(recovered).toMatchObject({
+      stopReason: "stop",
+      responseId: "resp_recovered_400",
+    });
+    expectVisibleToolHistory(requests[1]);
+    expect(
+      requests[1].input.some((item: any) => item.type === "reasoning"),
+    ).toBe(false);
+
+    const restored = await streamSimpleXaiResponses(
+      selectedModel,
+      {
+        messages: [
+          ...history,
+          failure,
+          { role: "user", content: "continue", timestamp: 5 },
+          recovered,
+          { role: "user", content: "keep going", timestamp: 7 },
+        ],
+      } as any,
+      { apiKey: "oauth-token", sessionId: "issue-191" } as any,
+    ).result();
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(restored).toMatchObject({
+      stopReason: "stop",
+      responseId: "resp_reasoning_restored",
+    });
+    expect(
+      requests[2].input.find((item: any) => item.type === "reasoning"),
+    ).toEqual(reasoningItem);
+  });
 
   it("does not clear reasoning after an unrelated streamed failure and preserves numeric status text", async () => {
     const requests: any[] = [];
