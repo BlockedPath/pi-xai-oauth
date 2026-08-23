@@ -11,9 +11,7 @@ import {
   lstat,
   open,
   readdir,
-  readFile,
   realpath,
-  writeFile as writeFileUtf8,
 } from "node:fs/promises";
 import { Worker } from "node:worker_threads";
 import { basename, dirname, extname, isAbsolute, join, relative, sep } from "node:path";
@@ -366,17 +364,34 @@ async function toWorkspaceToolPath(cwd: string, absolutePath: string): Promise<s
   return relativePath;
 }
 
+function noFollowFlag(): number {
+  return typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
+}
+
+function nonBlockFlag(): number {
+  return typeof constants.O_NONBLOCK === "number" ? constants.O_NONBLOCK : 0;
+}
+
+/** Open a path without following a leaf symlink. */
+async function openUnfollowedFile(
+  absolutePath: string,
+  flags: number,
+): Promise<Awaited<ReturnType<typeof open>>> {
+  return open(absolutePath, flags | noFollowFlag());
+}
+
 async function readContainedTextFile(
   absolutePath: string,
   requestedPath: string,
   signal?: AbortSignal,
 ): Promise<string> {
   throwIfAborted(signal);
-  const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
-  const nonBlock = typeof constants.O_NONBLOCK === "number" ? constants.O_NONBLOCK : 0;
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
-    handle = await open(absolutePath, constants.O_RDONLY | noFollow | nonBlock);
+    handle = await openUnfollowedFile(
+      absolutePath,
+      constants.O_RDONLY | nonBlockFlag(),
+    );
     const info = await handle.stat();
     if (!info.isFile()) throw new Error(`Not a file: ${requestedPath}`);
     if (info.size > MAX_GROK_NATIVE_TEXT_FILE_BYTES) {
@@ -404,6 +419,28 @@ async function readContainedTextFile(
     }
     throwIfAborted(signal);
     return Buffer.concat(chunks, totalBytes).toString("utf8");
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+async function writeContainedTextFile(
+  absolutePath: string,
+  content: string,
+  requestedPath: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  throwIfAborted(signal);
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    handle = await openUnfollowedFile(
+      absolutePath,
+      constants.O_WRONLY | constants.O_TRUNC,
+    );
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error(`Not a file: ${requestedPath}`);
+    throwIfAborted(signal);
+    await handle.writeFile(content, "utf8");
   } finally {
     await handle?.close().catch(() => undefined);
   }
@@ -627,14 +664,27 @@ async function runLocalGrep(
       limitReached = true;
       break;
     }
-    const info = await lstat(filePath).catch(skipUnreadableSearchEntry);
-    if (!info?.isFile() || info.size > MAX_GROK_GREP_FILE_BYTES) continue;
-    if (totalScannedBytes + info.size > MAX_GROK_GREP_TOTAL_BYTES) {
-      scanLimitReached = true;
-      break;
+    let handle: Awaited<ReturnType<typeof open>> | undefined;
+    let rawContent: string | undefined;
+    try {
+      handle = await openUnfollowedFile(
+        filePath,
+        constants.O_RDONLY | nonBlockFlag(),
+      );
+      const info = await handle.stat();
+      if (!info.isFile() || info.size > MAX_GROK_GREP_FILE_BYTES) continue;
+      if (totalScannedBytes + info.size > MAX_GROK_GREP_TOTAL_BYTES) {
+        scanLimitReached = true;
+        break;
+      }
+      totalScannedBytes += info.size;
+      rawContent = await handle.readFile("utf8");
+    } catch (error) {
+      skipUnreadableSearchEntry(error);
+      continue;
+    } finally {
+      await handle?.close().catch(() => undefined);
     }
-    totalScannedBytes += info.size;
-    const rawContent = await readFile(filePath, "utf8").catch(skipUnreadableSearchEntry);
     if (rawContent === undefined) continue;
     checkGrepBudget(signal, deadline);
     const content = rawContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -842,7 +892,7 @@ async function executeSearchReplace(
           normalized.path,
         );
         throwIfAborted(signal);
-        await writeFileUtf8(queuedPath, replacementContent, "utf8");
+        await writeContainedTextFile(queuedPath, replacementContent, normalized.path, signal);
       },
     },
   }).execute(
