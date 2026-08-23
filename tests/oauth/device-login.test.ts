@@ -187,6 +187,38 @@ describe("OAuth login method and device integration", () => {
     ).rejects.toThrow("Login cancelled");
   });
 
+  it("does not keep credentials when the catalog handoff throws after cancellation", async () => {
+    const controller = new AbortController();
+    const clock = makeClock();
+    const progress: string[] = [];
+    const oauth = createXaiOAuth({
+      getExistingCredentials: () => null,
+      deviceAuth: {
+        now: clock.now,
+        sleep: clock.sleep,
+        fetchImpl: async (url) =>
+          String(url) === XAI_OAUTH_DEVICE_URL
+            ? jsonResponse(devicePayload({ interval: 1 }))
+            : jsonResponse(tokenPayload()),
+      },
+      onLoginCredentials: async () => {
+        controller.abort();
+        throw new Error("catalog failure included secret-access-token");
+      },
+    });
+    await expect(
+      oauth.login({
+        onPrompt: async () => "n",
+        onAuth: () => {},
+        onDeviceCode: () => {},
+        onSelect: async () => XAI_DEVICE_LOGIN_METHOD,
+        onProgress: (message: string) => progress.push(message),
+        signal: controller.signal,
+      } as any),
+    ).rejects.toThrow("Login cancelled");
+    expect(progress.join("\n")).not.toMatch(/curated fallback|secret-access-token/);
+  });
+
   it("keeps a valid login without reflecting the catalog handoff error", async () => {
     const clock = makeClock();
     const progress: string[] = [];

@@ -52,6 +52,31 @@ describe("browser OAuth cancellation cleanup", () => {
     ).rejects.toThrow(/cancelled/i);
     expect(requestSignal?.aborted).toBe(true);
   });
+  it("treats an already-aborted signal as cancelled before waiting for the callback", async () => {
+    const controller = new AbortController();
+    let redirect = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: any, init: RequestInit) => {
+        if (String(input).startsWith("http://127.0.0.1:"))
+          return nativeFetch(input, init);
+        return jsonResponse(discovery());
+      }),
+    );
+    await expect(
+      createXaiOAuth({ getExistingCredentials: () => null }).login({
+        ...base,
+        signal: controller.signal,
+        onAuth(auth: any) {
+          redirect = new URL(auth.url).searchParams.get("redirect_uri")!;
+          controller.abort();
+        },
+      }),
+    ).rejects.toThrow(/cancelled/i);
+    expect(redirect).toMatch(/^http:\/\/127\.0\.0\.1:/);
+    await expect(nativeFetch(redirect)).rejects.toThrow();
+  });
+
   it("closes the callback listener when cancelled while waiting", async () => {
     const controller = new AbortController();
     let redirect = "";

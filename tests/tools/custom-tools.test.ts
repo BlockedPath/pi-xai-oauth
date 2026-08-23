@@ -137,6 +137,30 @@ describe("custom xAI tools", () => {
     expect(result.content[0].text).toMatch(/No xAI OAuth credentials/);
     expect(requests).toHaveLength(0);
   });
+  it.each([
+    ["xai_x_search", { query: "guard" }],
+    ["xai_multi_agent", { query: "guard" }],
+    ["xai_code_execution", { code: "print(1)" }],
+    ["xai_generate_image", { prompt: "guard" }],
+    ["xai_edit_image", { prompt: "edit", image: [{ data_url: `data:image/png;base64,${tinyPngBytes().toString("base64")}` }] }],
+    ["xai_image_to_video", { image: { data_url: `data:image/png;base64,${tinyPngBytes().toString("base64")}` } }],
+    ["xai_critique", { content: "guard" }],
+    ["xai_analyze_image", { image: "https://example.test/a.png" }],
+    ["xai_deep_research", { topic: "guard" }],
+  ] as const)("refuses %s without OAuth credentials before network", async (name, params) => {
+    vi.stubEnv("XAI_API_KEY", "must-not-use");
+    setXaiNetworkToolActive(h.api, TEST_MODEL, name, true);
+    const result = await h.tools.get(name).execute(
+      "call",
+      params,
+      undefined,
+      () => {},
+      { model: TEST_MODEL, modelRegistry: { find: () => undefined } },
+    );
+    expect(result.content[0].text).toMatch(/No xAI OAuth credentials/);
+    expect(JSON.stringify(result)).not.toContain("must-not-use");
+    expect(requests).toHaveLength(0);
+  });
   it("uses Grok 4.5 and high reasoning by default", async () => {
     await run("xai_generate_text", { prompt: "hi", model: "grok-4.5" });
     expect(requests.at(-1)?.body).toMatchObject({
