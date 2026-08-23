@@ -42,6 +42,26 @@ floor:
 
 `npm run test:coverage` remains the source of truth for future changes.
 
+## PR #198 realignment
+
+Measured on `@vitest/coverage-v8` 4.1.11 after the PR #196 coverage pass landed
+(vision image shapes, catalog cancel-after-write, media-tool redaction). The
+floors had drifted roughly six points below measurement, so a change deleting
+every test added by #196 would still have passed the gate. Realigned to the
+documented convention of one to two points of headroom:
+
+| Metric | Measured | Previous floor | Configured floor |
+|---|---:|---:|---:|
+| Statements | 92.17% (4405/4779) | 86% | 90% |
+| Branches | 86.87% (3635/4184) | 80% | 85% |
+| Functions | 93.30% (599/642) | 87% | 91% |
+| Lines | 95.41% (3995/4187) | 90% | 93% |
+
+The floors are enforced in CI by the `policy` job, which runs
+`npm run test:coverage` on every pull request. The packed exact-Pi
+compatibility matrix runs `npm test` rather than `test:coverage`, so these
+thresholds do not affect the boundary jobs.
+
 The image-edit tests directly cover endpoint pinning, disabled zero-I/O,
 workspace and symlink escapes, strict media validation, per-item and aggregate
 budgets, real PNG/JPEG codec paths, cancellation/timeouts, response redaction,
