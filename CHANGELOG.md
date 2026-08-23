@@ -6,6 +6,12 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.5.2 - 2026-08-23
+
+### Fixed
+
+- Closed the remaining Grok-native leaf-symlink race by opening `search_replace` writes and `grep` reads with `O_NOFOLLOW` and performing I/O through the checked descriptor, without changing the already-safe contained text-file read contract.
+
 ## 1.5.1 - 2026-08-21
 
 ### Fixed

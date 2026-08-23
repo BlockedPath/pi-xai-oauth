@@ -1,6 +1,6 @@
 {
   "name": "pi-xai-oauth",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "xAI OAuth provider with an authenticated account-specific Grok model catalog for pi",
   "keywords": [
     "pi-package",
