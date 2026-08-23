@@ -439,9 +439,10 @@ export function assertXaiRuntimeModelAcceptsPayload(
 /**
  * Create one xAI Responses result using explicit credential-aware routing.
  *
- * OAuth requests receive the final `store: false` and encrypted-reasoning
- * include policy after canonicalization, model pinning, entitlement checks,
- * and inline-image compaction; API-key requests retain their separate route.
+ * OAuth requests receive the encrypted-reasoning include policy and default to
+ * `store: false` (a caller payload hook may supply its own `store`) after
+ * canonicalization, model pinning, entitlement checks, and inline-image
+ * compaction; API-key requests retain their separate route.
  *
  * @param credential Explicit OAuth-session or API-key credential and catalog scope.
  * @param body Caller Responses body, canonicalized before policy checks or transport.
