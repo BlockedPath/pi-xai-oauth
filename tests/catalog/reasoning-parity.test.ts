@@ -57,10 +57,32 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     expect(ids).not.toContain("grok-composer-2.5-fast");
   });
 
-  it("keeps grok-4.3 levels identical across both providers", () => {
-    expect(supportedLevels(known("grok-4.3"))).toEqual(
-      getSupportedThinkingLevels(XAI_MODELS["grok-4.3"]),
-    );
+  it("documents the grok-4.3 reasoning levels across providers", () => {
+    // Built-in `xai` switched from openai-completions to openai-responses in
+    // Pi 0.84.3 (PR #8124), where grok-4.3 explicitly denies `minimal`.
+    // Prior Pi lines (0.80 - 0.84.2) used completions without a thinkingLevelMap,
+    // which defaulted to exposing `minimal`.
+    const builtIn43 = builtIn("grok-4.3");
+    const thinkingLevelMap = (builtIn43 as { thinkingLevelMap?: unknown } | undefined)?.thinkingLevelMap;
+    if (thinkingLevelMap) {
+      expect(getSupportedThinkingLevels(builtIn43!)).toEqual([
+        "off",
+        "low",
+        "medium",
+        "high",
+      ]);
+    } else if (builtIn43) {
+      expect(supportedLevels(known("grok-4.3"))).toEqual(
+        getSupportedThinkingLevels(builtIn43),
+      );
+    }
+    expect(supportedLevels(known("grok-4.3"))).toEqual([
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+    ]);
   });
 
   it("documents the intentional grok-4.5 minimal difference", () => {
