@@ -1,9 +1,7 @@
 import type { Api, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { XAI_GROK_NATIVE_TOOL_NAME_MAP } from "./constants";
 import { grokSupportsReasoningEffort, isGrokCliCompatibilityModel } from "./models";
-import {
-  normalizeXaiResponsesInput,
-} from "./payload-refactor/vision-input";
+import { normalizeXaiResponsesInput } from "./payload-refactor/vision-input";
 import { textFromResponsesContent } from "./text";
 
 export {
