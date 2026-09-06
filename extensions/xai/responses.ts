@@ -19,15 +19,21 @@ import {
   applyXaiOAuthResponsesPolicy,
   canonicalizeXaiResponsesPayload,
   exposeGrokNativeToolNames,
-  internalizeGrokNativeToolCalls,
   omitConsumedXaiResponsesVisionImages,
   rewriteXaiResponsesPayload,
   type GrokNativeToolRoutes,
-  XAI_PAYLOAD_CANONICALIZATION_ERROR,
   xaiPayloadGrokNativeToolRoutes,
   xaiResponsesPayloadContainsImage,
   xaiResponsesPayloadContainsLocalImageReference,
 } from "./payload";
+import {
+  createForwardingAssistantStream,
+  normalizeXaiStreamEvent,
+  streamErrorMessage,
+  type AssistantStreamEvent,
+  XAI_PAYLOAD_MODEL_ERROR,
+} from "./responses-refactor/assistant-stream";
+import { acquireXaiRedirectGuard } from "./responses-refactor/redirect-guard";
 import { resolveXaiRoute, type XaiCredential } from "./routing";
 import { extractStrictResponsesText } from "./text";
 import {
@@ -38,7 +44,6 @@ import {
   type XaiVisionRoutingController,
 } from "./vision-routing";
 import {
-  safeXaiTransportErrorMessage,
   scrubXaiReservedHeaders,
   XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
   xaiHttpErrorFromResponse,
@@ -46,93 +51,7 @@ import {
   xaiProxyRequestHeaders,
 } from "./wire";
 
-interface AssistantStreamEvent {
-  type: string;
-  partial?: any;
-  toolCall?: any;
-  message?: any;
-  error?: any;
-  reason?: string;
-  [key: string]: unknown;
-}
-
 const streamSimpleOpenAIResponses = openAIResponsesApi().streamSimple;
-const SAFE_TEXT_ONLY_ERROR_PATTERN =
-  /^xAI OAuth model [A-Za-z0-9][A-Za-z0-9._:-]{0,127} is explicitly text-only in the authenticated model catalog; no xAI request was sent$/;
-const SAFE_PAYLOAD_MODEL_ERROR =
-  "xAI OAuth payload hooks cannot change the selected model; no xAI request was sent";
-
-const guardedRedirectUrls = new Map<string, number>();
-let unguardedFetch: typeof fetch | undefined;
-let redirectGuardFetch: typeof fetch | undefined;
-
-function fetchRequestUrl(input: string | URL | Request): string {
-  return input instanceof Request ? input.url : String(input);
-}
-
-function acquireRedirectGuard(url: string): () => void {
-  if (!redirectGuardFetch) {
-    unguardedFetch = globalThis.fetch;
-    const baseFetch = unguardedFetch;
-    redirectGuardFetch = async (input, init) => {
-      const url = fetchRequestUrl(input);
-      const guarded = guardedRedirectUrls.has(url);
-      const response = await baseFetch(
-        input,
-        guarded ? { ...init, redirect: "error" } : init,
-      );
-      if (!guarded || response.ok) return response;
-      const requestSignal =
-        init?.signal ?? (input instanceof Request ? input.signal : undefined);
-      const error = await xaiHttpErrorFromResponse(
-        response,
-        url,
-        requestSignal,
-      );
-      const marker =
-        error.code === "encrypted-content-mismatch"
-          ? "encrypted_content"
-          : error.code === "proxy-version-gate"
-            ? "update_required"
-            : "request failed";
-      return new Response(JSON.stringify({ error: { message: marker } }), {
-        status: response.status,
-        statusText: response.statusText,
-        headers: { "Content-Type": "application/json" },
-      });
-    };
-    globalThis.fetch = redirectGuardFetch;
-  }
-  guardedRedirectUrls.set(url, (guardedRedirectUrls.get(url) ?? 0) + 1);
-
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    const remaining = (guardedRedirectUrls.get(url) ?? 1) - 1;
-    if (remaining > 0) guardedRedirectUrls.set(url, remaining);
-    else guardedRedirectUrls.delete(url);
-    if (guardedRedirectUrls.size === 0) {
-      if (globalThis.fetch === redirectGuardFetch && unguardedFetch) {
-        globalThis.fetch = unguardedFetch;
-      }
-      redirectGuardFetch = undefined;
-      unguardedFetch = undefined;
-    }
-  };
-}
-
-function resultFromStreamEvent(event: AssistantStreamEvent): any {
-  if (event.type === "done") return event.message;
-  if (event.type === "error") return event.error;
-  return undefined;
-}
-
-function normalizeXaiErrorText(value: string): string {
-  return /^OpenAI API error\b/i.test(value)
-    ? safeXaiTransportErrorMessage(value, undefined, "responses-proxy")
-    : value;
-}
 
 const XAI_RESPONSES_DELEGATE_API = "openai-responses";
 
@@ -202,156 +121,6 @@ function omitRejectedEncryptedReasoning(
     : { ...payload, input };
 }
 
-function restoreXaiMessageIdentity<T>(value: T, model: Model<Api>): T {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const message = value as Record<string, unknown>;
-  if (message.role !== "assistant") return value;
-  return {
-    ...message,
-    api: model.api,
-    provider: model.provider,
-    model: model.id,
-  } as T;
-}
-
-function normalizeXaiStreamEvent(
-  event: AssistantStreamEvent,
-  grokNativeToolRoutes: GrokNativeToolRoutes,
-  model: Model<Api>,
-): AssistantStreamEvent {
-  const partial = internalizeGrokNativeToolCalls(
-    restoreXaiMessageIdentity(event.partial, model),
-    grokNativeToolRoutes,
-  );
-  const toolCall = internalizeGrokNativeToolCalls(
-    event.toolCall,
-    grokNativeToolRoutes,
-  );
-  const message = internalizeGrokNativeToolCalls(
-    restoreXaiMessageIdentity(event.message, model),
-    grokNativeToolRoutes,
-  );
-  const restoredError = restoreXaiMessageIdentity(event.error, model);
-  const internalized =
-    partial !== event.partial ||
-    toolCall !== event.toolCall ||
-    message !== event.message ||
-    restoredError !== event.error
-      ? { ...event, partial, toolCall, message, error: restoredError }
-      : event;
-  if (
-    internalized.type !== "error" ||
-    !internalized.error ||
-    typeof internalized.error !== "object"
-  ) {
-    return internalized;
-  }
-  const error = internalized.error as Record<string, unknown>;
-  if (typeof error.errorMessage !== "string") return internalized;
-  return {
-    ...internalized,
-    error: {
-      ...error,
-      errorMessage:
-        SAFE_TEXT_ONLY_ERROR_PATTERN.test(error.errorMessage) ||
-        error.errorMessage === SAFE_PAYLOAD_MODEL_ERROR ||
-        error.errorMessage === XAI_PAYLOAD_CANONICALIZATION_ERROR ||
-        error.errorMessage === XAI_VISION_DESCRIPTION_ERROR ||
-        error.errorMessage === XAI_VISION_ROUTING_INVALIDATED_ERROR
-          ? error.errorMessage
-          : safeXaiTransportErrorMessage(
-              error.errorMessage,
-              typeof error.status === "number" ? error.status : undefined,
-              "responses-proxy",
-              // Pi 0.84 preserves `response.failed` here; the supported 0.80
-              // boundary does not. In both cases the additional classifier still
-              // requires xAI's invalid_request code plus encrypted-content marker.
-              error.rawStopReason === "failed" ||
-                error.rawStopReason === undefined,
-            ),
-    },
-  };
-}
-
-function createForwardingAssistantStream() {
-  const queue: AssistantStreamEvent[] = [];
-  const waiting: Array<(result: IteratorResult<AssistantStreamEvent>) => void> =
-    [];
-  let done = false;
-  let resolveResult: (result: any) => void = () => {};
-  const resultPromise = new Promise<any>((resolve) => {
-    resolveResult = resolve;
-  });
-
-  function finish(result: any) {
-    if (done) return;
-    done = true;
-    resolveResult(result);
-  }
-
-  return {
-    push(event: AssistantStreamEvent) {
-      const finalResult = resultFromStreamEvent(event);
-      const isTerminal = event.type === "done" || event.type === "error";
-      if (isTerminal) finish(finalResult);
-      if (done && !isTerminal) return;
-      const waiter = waiting.shift();
-      if (waiter) {
-        waiter({ value: event, done: false });
-      } else {
-        queue.push(event);
-      }
-    },
-    end(result?: any) {
-      finish(result);
-      while (waiting.length > 0) {
-        waiting.shift()?.({ value: undefined as any, done: true });
-      }
-    },
-    result() {
-      return resultPromise;
-    },
-    async *[Symbol.asyncIterator]() {
-      while (true) {
-        if (queue.length > 0) {
-          yield queue.shift()!;
-        } else if (done) {
-          return;
-        } else {
-          const result = await new Promise<
-            IteratorResult<AssistantStreamEvent>
-          >((resolve) => waiting.push(resolve));
-          if (result.done) return;
-          yield result.value;
-        }
-      }
-    },
-  };
-}
-
-function streamErrorMessage(model: Model<Api>, error: unknown) {
-  return {
-    role: "assistant",
-    content: [],
-    api: model.api,
-    provider: model.provider,
-    model: model.id,
-    usage: {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    },
-    stopReason: "error",
-    errorMessage: normalizeXaiErrorText(
-      error instanceof Error ? error.message : String(error),
-    ),
-    timestamp: Date.now(),
-  };
-}
-
 /**
  * POST a JSON body to a pinned xAI endpoint with protected bearer headers.
  *
@@ -401,7 +170,7 @@ export async function postXaiJson(
 
 function pinXaiPayloadModel(modelId: string, payload: unknown): void {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new Error(SAFE_PAYLOAD_MODEL_ERROR);
+    throw new Error(XAI_PAYLOAD_MODEL_ERROR);
   }
   const body = payload as Record<string, unknown>;
   if (
@@ -409,7 +178,7 @@ function pinXaiPayloadModel(modelId: string, payload: unknown): void {
     (typeof body.model !== "string" ||
       normalizedXaiModelId(body.model) !== normalizedXaiModelId(modelId))
   ) {
-    throw new Error(SAFE_PAYLOAD_MODEL_ERROR);
+    throw new Error(XAI_PAYLOAD_MODEL_ERROR);
   }
   body.model = modelId;
 }
@@ -646,7 +415,7 @@ export function streamSimpleXaiResponses(
     // Keep one URL-scoped guard installed only for the lifetime of active xAI
     // streams; unrelated requests pass through unchanged, and overlapping xAI
     // streams share the same guard until the last request completes.
-    const releaseRedirectGuard = acquireRedirectGuard(route.url);
+    const releaseRedirectGuard = acquireXaiRedirectGuard(route.url);
     try {
       const inner = streamSimpleOpenAIResponses(
         openAIResponsesModel as Model<"openai-responses">,
