@@ -10,6 +10,10 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 - Added `/xai-usage csv` to display copyable current/history usage CSV with exact cent values, blank missing fields, and spreadsheet-formula protection. It reuses the explicit bounded OAuth-only lookup, exports no identity, headers, or raw bodies, writes no files, and leaves status opt-in unchanged.
 
+### Fixed
+
+- Omitted empty `current` rows from `/xai-usage csv` while retaining valid zero/false values and history-only exports. Empty snapshots now emit only the CSV header; documented that `total_used_cents` is history-only and excludes current usage (#213).
+
 ## 1.5.2 - 2026-08-23
 
 ### Fixed

@@ -28,9 +28,43 @@ describe("xAI usage CSV rendering", () => {
     ].join("\r\n"));
   });
 
+  it.each([
+    {},
+    { config: null },
+    { config: {} },
+    { config: { currentPeriod: {}, creditUsagePercent: -1, used: { val: -1 } }, subscriptionTier: "" },
+    { userId: "PRIVATE_ID", headers: { Authorization: "Bearer PRIVATE_TOKEN" }, rawBody: "PRIVATE_BODY" },
+  ])("returns only the header when no supported fields remain: %j", (input) => {
+    expect(renderXaiUsageCsv(parseXaiUsage(input))).toBe(`${header}\r\n`);
+  });
+
+  it("exports history without inventing an empty current period", () => {
+    const usage = parseXaiUsage({ config: { history: legacyCredits.config.history } });
+    expect(renderXaiUsageCsv(usage)).toBe([
+      header,
+      "history,,,,2026,6,,,,1800,,0,1800,,,",
+      "",
+    ].join("\r\n"));
+  });
+
+  it.each([
+    { input: { config: { creditUsagePercent: 0 } }, column: 7, value: "0" },
+    { input: { config: { used: {} } }, column: 9, value: "0" },
+    { input: { onDemandEnabled: false }, column: 14, value: "false" },
+    { input: { config: { isUnifiedBillingUser: false } }, column: 15, value: "false" },
+    { input: { subscriptionTier: "SuperGrok" }, column: 6, value: "SuperGrok" },
+    { input: { config: { currentPeriod: { end: "2026-08-01T00:00:00Z" } } }, column: 3, value: "2026-08-01T00:00:00Z" },
+  ])("keeps a current row with only column $column populated", ({ input, column, value }) => {
+    const records = renderXaiUsageCsv(parseXaiUsage(input)).trimEnd().split("\r\n");
+    expect(records).toHaveLength(2);
+    const cells = records[1].split(",");
+    expect(cells).toHaveLength(16);
+    expect(cells[0]).toBe("current");
+    expect(cells[column]).toBe(value);
+    expect(cells[12]).toBe(""); // total_used_cents is history-only, never inferred.
+  });
+
   it("leaves missing values blank but preserves zero and false", () => {
-    const empty = renderXaiUsageCsv(parseXaiUsage({}));
-    expect(empty).toBe(`${header}\r\ncurrent${",".repeat(15)}\r\n`);
     const usage = parseXaiUsage({
       config: { creditUsagePercent: 0, used: {}, isUnifiedBillingUser: false },
       onDemandEnabled: false,
@@ -93,7 +127,7 @@ describe("xAI usage CSV rendering", () => {
     const history = Array.from({ length: XAI_USAGE_MAX_HISTORY_PERIODS }, (_, index) => ({
       totalUsed: { val: index },
     }));
-    const csv = renderXaiUsageCsv(parseXaiUsage({ config: { history } }));
+    const csv = renderXaiUsageCsv(parseXaiUsage({ subscriptionTier: "SuperGrok", config: { history } }));
     const records = csv.trimEnd().split("\r\n");
     expect(records).toHaveLength(XAI_USAGE_MAX_HISTORY_PERIODS + 2);
     expect(records.every((record) => record.split(",").length === 16)).toBe(true);
