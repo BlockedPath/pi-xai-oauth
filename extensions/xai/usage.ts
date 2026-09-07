@@ -27,7 +27,7 @@ import type { XaiCredential } from "./routing";
 import { xaiUsageHeaders } from "./wire";
 
 const XAI_USAGE_STATUS_KEY = "xai-usage";
-const XAI_USAGE_COMMAND_HELP = "Usage: /xai-usage [status [on|off]]";
+const XAI_USAGE_COMMAND_HELP = "Usage: /xai-usage [csv|status [on|off]]";
 const MAX_USER_ID_LENGTH = 256;
 const MAX_LABEL_LENGTH = 80;
 const MAX_TIMESTAMP_LENGTH = 64;
@@ -476,6 +476,42 @@ export function renderXaiUsage(usage: XaiUsageSnapshot): string {
   return lines.join("\n");
 }
 
+function usageCsvCell(value: string | number | boolean | undefined): string {
+  if (value === undefined) return "";
+  let text = String(value);
+  // CSV quoting alone does not prevent spreadsheet formula execution.
+  if (typeof value === "string" && /^\s*[=+@-]/.test(text)) text = `'${text}`;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** Render a parsed, bounded usage snapshot as CSV, without identity or raw response fields. */
+export function renderXaiUsageCsv(usage: XaiUsageSnapshot): string {
+  // Keep an explicit allowlist: never enumerate properties from authenticated data.
+  const rows: Array<Array<string | number | boolean | undefined>> = [
+    [
+      "record_type", "period_type", "period_start", "period_end", "billing_year", "billing_month",
+      "subscription_tier", "credit_usage_percent", "monthly_limit_cents", "included_used_cents",
+      "on_demand_cap_cents", "on_demand_used_cents", "total_used_cents", "prepaid_balance_cents",
+      "on_demand_enabled", "is_unified_billing_user",
+    ],
+    [
+      "current", usage.currentPeriod?.type, usage.currentPeriod?.start, usage.currentPeriod?.end,
+      undefined, undefined, usage.subscriptionTier, usage.creditUsagePercent,
+      usage.monthlyLimitCents, usage.usedCents, usage.onDemandCapCents, usage.onDemandUsedCents,
+      undefined, usage.prepaidBalanceCents, usage.onDemandEnabled, usage.isUnifiedBillingUser,
+    ],
+  ];
+  for (const entry of usage.history) {
+    rows.push([
+      "history", entry.period?.type, entry.period?.start, entry.period?.end,
+      entry.billingCycle?.year, entry.billingCycle?.month, undefined, undefined,
+      undefined, entry.includedUsedCents, undefined, entry.onDemandUsedCents,
+      entry.totalUsedCents, undefined, undefined, undefined,
+    ]);
+  }
+  return rows.map((row) => row.map(usageCsvCell).join(",")).join("\r\n") + "\r\n";
+}
+
 /** Render a compact footer value without account identity. */
 export function renderXaiUsageStatus(usage: XaiUsageSnapshot): string {
   const percent = effectivePercent(usage);
@@ -570,6 +606,9 @@ export function registerXaiUsage(
         "xAI OAuth credentials are required. Run /login xai or /login xai-auth first.",
       );
     }
+    if (signal?.aborted) {
+      throw new XaiUsageError("cancelled", "xAI usage request was cancelled.");
+    }
     return dependencies.fetchUsage(credential, signal);
   };
 
@@ -627,10 +666,11 @@ export function registerXaiUsage(
   };
 
   pi.registerCommand("xai-usage", {
-    description: "Show xAI subscription usage or manage the optional session status",
+    description: "Show xAI subscription usage, export CSV, or manage the optional session status",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const parts = args.trim().split(/\s+/).filter(Boolean).map((part) => part.toLowerCase());
-      if (parts.length === 0) {
+      const csv = parts.length === 1 && parts[0] === "csv";
+      if (parts.length === 0 || csv) {
         oneShotController?.abort();
         const controller = new AbortController();
         oneShotController = controller;
@@ -640,12 +680,14 @@ export function registerXaiUsage(
         ctx.signal?.addEventListener("abort", forwardAbort, { once: true });
         if (ctx.signal?.aborted) controller.abort();
         try {
+          if (controller.signal.aborted) return;
           const usage = await resolveUsage(ctx, controller.signal);
           if (
             requestGeneration === oneShotGeneration
             && sessionGeneration === generation
+            && !controller.signal.aborted
           ) {
-            ctx.ui.notify(renderXaiUsage(usage), "info");
+            ctx.ui.notify(csv ? renderXaiUsageCsv(usage) : renderXaiUsage(usage), "info");
           }
         } catch (error) {
           if (
