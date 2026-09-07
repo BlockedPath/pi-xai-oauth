@@ -494,13 +494,15 @@ export function renderXaiUsageCsv(usage: XaiUsageSnapshot): string {
       "on_demand_cap_cents", "on_demand_used_cents", "total_used_cents", "prepaid_balance_cents",
       "on_demand_enabled", "is_unified_billing_user",
     ],
-    [
-      "current", usage.currentPeriod?.type, usage.currentPeriod?.start, usage.currentPeriod?.end,
-      undefined, undefined, usage.subscriptionTier, usage.creditUsagePercent,
-      usage.monthlyLimitCents, usage.usedCents, usage.onDemandCapCents, usage.onDemandUsedCents,
-      undefined, usage.prepaidBalanceCents, usage.onDemandEnabled, usage.isUnifiedBillingUser,
-    ],
   ];
+  const currentRow = [
+    "current", usage.currentPeriod?.type, usage.currentPeriod?.start, usage.currentPeriod?.end,
+    undefined, undefined, usage.subscriptionTier, usage.creditUsagePercent,
+    usage.monthlyLimitCents, usage.usedCents, usage.onDemandCapCents, usage.onDemandUsedCents,
+    undefined, usage.prepaidBalanceCents, usage.onDemandEnabled, usage.isUnifiedBillingUser,
+  ];
+  // Ignore the record type, but keep valid zero/false values. Empty snapshots stay header-only.
+  if (currentRow.slice(1).some((cell) => cell !== undefined && cell !== "")) rows.push(currentRow);
   for (const entry of usage.history) {
     rows.push([
       "history", entry.period?.type, entry.period?.start, entry.period?.end,

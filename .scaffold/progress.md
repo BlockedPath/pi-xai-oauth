@@ -1,6 +1,19 @@
-# Execution Progress — xAI usage CSV export
+# Execution Progress — Issue #213: empty CSV current row
 
-**Active branch:** `feature/xai-usage-csv-export`
+**Active branch:** `fix/xai-usage-csv-empty-row`
+
+- Ran the requested fetch/checkout/fast-forward/new-branch sequence, then read issue #213 and `extensions/xai/usage.ts`.
+- Reproduced seven failures with `npm run test:unit -- tests/usage/csv.test.ts tests/usage/csv-command.test.ts`: the renderer unconditionally inserted a current row even when every data cell was absent.
+- Current rows now require at least one nonblank allowlisted data cell. Zero/false remain valid; empty snapshots are header-only, and history-only snapshots retain their history without a fabricated current row.
+- All 79 focused usage tests pass, including header-only command output, privacy bounds, history-only export, and individually populated zero/false/metadata fields.
+- Updated README and changelog: header-only empty exports, optional current rows, and history-only `total_used_cents`; no inferred current totals or transport changes.
+- Validation passed: `npm test` (750 tests plus loader), `npm run typecheck`, `npm run test:coverage` (all floors met), primary LSP diagnostics, session diagnostics, and `git diff --check`.
+- Exact packed Pi 0.80.1 and 0.84.4 boundaries passed: each ran 749 tests (one Git-only test intentionally skipped), loader smoke, and typecheck.
+- Fix complete. User requested commit, PR merge after checks, and synchronization of local `main`. `IDEA.md` remains untouched and untracked.
+
+## Previous CSV export progress
+
+**Branch:** `feature/xai-usage-csv-export`
 
 - Read AGENTS.md, provider entrypoint, usage implementation/tests, setup, README, and Pi command docs.
 - Keep `/xai-usage csv` explicit: reuse the bounded identity-first lookup and display copyable CSV without automatic file writes, cached snapshots, or status opt-in.

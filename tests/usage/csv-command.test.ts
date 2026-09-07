@@ -64,6 +64,30 @@ describe("CSV command through real usage resolution and transport", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("returns header-only CSV for an empty normalized snapshot without changing status", async () => {
+    const state = setup();
+    const fetchMock = vi.fn(async (input: string | URL | Request) =>
+      String(input) === XAI_CLI_USER_URL
+        ? jsonResponse({ userId: "PRIVATE_ID" })
+        : jsonResponse({ config: {}, rawBody: "PRIVATE_BODY", token: "PRIVATE_TOKEN" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await state.run();
+    expect(fetchMock.mock.calls.map(([input]) => String(input)))
+      .toEqual([XAI_CLI_USER_URL, XAI_CLI_BILLING_URL]);
+    expect(state.notifications).toHaveLength(1);
+    expect(state.notifications[0].type).toBe("info");
+    const records = state.notifications[0].message.split("\r\n");
+    expect(records).toHaveLength(2);
+    expect(records[0]).toMatch(/^record_type,period_type,/);
+    expect(records[0].split(",")).toHaveLength(16);
+    expect(records[1]).toBe("");
+    expect(state.notifications[0].message).not.toMatch(/PRIVATE_|Bearer|rawBody|userId/);
+    expect(state.setStatus).not.toHaveBeenCalled();
+    await state.refresh();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it.each([TEST_MODEL, BUILTIN_XAI_TEST_MODEL])("rejects API-key provenance on $provider without requests", async (model) => {
     const state = setup(model, false);
     const fetchMock = vi.fn();
