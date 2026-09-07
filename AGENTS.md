@@ -12,6 +12,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 
 - Install / setup: `node bin/setup.js` or `npm run setup`
 - Install as pi extension: `pi install npm:pi-xai-oauth`
+- Explicit usage CSV export in Pi TUI/RPC: `/xai-usage csv` (normalized fields only, copyable output, no automatic file writes or status opt-in)
 - Full policy/unit/loader gate: `npm test`
 - Focused Vitest suite: `npm run test:unit -- tests/oauth/browser-login.test.ts`
 - V8 coverage: `npm run test:coverage`

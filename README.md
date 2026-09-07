@@ -299,6 +299,16 @@ The command displays only validated fields that xAI actually returned, such as i
 
 The billing surface is **not a stable public xAI API**. This implementation is pinned to [`xai-org/grok-build@b189869`](https://github.com/xai-org/grok-build/blob/b189869b7755d2b482969acf6c92da3ecfeffd36/crates/codegen/xai-grok-shell/src/extensions/billing.rs): it first makes authenticated `GET /v1/user`, uses the returned validated `userId` only for the immediately following `GET /v1/billing?format=credits`, then discards it. The command accepts a current Pi-stored OAuth credential under this package's `xai-auth` provider or Pi's built-in `xai` SuperGrok/X Premium provider, and rejects stored, environment, or runtime API-key provenance. Account identity, bearer/authenticated headers, and raw response bodies are never logged, displayed, cached, or persisted. If identity cannot be resolved safely, billing is not requested.
 
+To export a fresh usage snapshot as copyable CSV in the Pi TUI or RPC UI:
+
+```text
+/xai-usage csv
+```
+
+Copy the CSV notification into a `.csv` file or spreadsheet import. This command does not write a file, cache a snapshot, or enable status. It uses the same bounded, OAuth-only identity-first lookup as `/xai-usage`, without pagination or extra requests. Output contains a header, one `current` row, and up to 24 validated `history` rows in response order, with comma-separated fields and CRLF record endings.
+
+Columns are `record_type`, `period_type`, `period_start`, `period_end`, `billing_year`, `billing_month`, `subscription_tier`, `credit_usage_percent`, `monthly_limit_cents`, `included_used_cents`, `on_demand_cap_cents`, `on_demand_used_cents`, `total_used_cents`, `prepaid_balance_cents`, `on_demand_enabled`, and `is_unified_billing_user`. Credit amounts remain integer **cents**, percentages remain numbers on the 0–100 scale, and booleans are `true`/`false`. Missing or inapplicable values are blank, not zero; current `usedCents` maps to `included_used_cents`. Percentages are not inferred, nor are current subscription settings copied into history rows. Quoted cells escape commas and double quotes; formula-like text beginning with `=`, `+`, `-`, or `@` (including after whitespace) is prefixed with an apostrophe for spreadsheet safety. Only allowlisted normalized usage fields are exported—never identity, bearer headers, or raw usage bodies. Any CSV you save contains billing information; handle it accordingly.
+
 The compact footer status is off by default and requires a separate per-session opt-in while an `xai-auth` or built-in `xai` model is active with Pi-managed OAuth:
 
 ```text
@@ -676,6 +686,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 | Set default model | `/model grok-4.6` (in TUI) |
 | Set thinking level | `/think high` (in TUI) |
 | Show subscription usage | `/xai-usage` (unofficial, explicit request) |
+| Export copyable usage CSV | `/xai-usage csv` (no automatic file writes) |
 | Manage optional usage status | `/xai-usage status on\|off` (off by default) |
 | Manage outbound xAI tools | `/xai-tools` (in TUI) |
 | Recreate extension/catalog state | `/reload` (respects the 15-minute cache TTL) |

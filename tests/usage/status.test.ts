@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   registerXaiUsage,
+  renderXaiUsageCsv,
   type XaiUsageSnapshot,
 } from "../../extensions/xai/usage";
 import { commandContext, createExtensionHarness } from "../fixtures/extension-api";
@@ -82,6 +83,34 @@ describe("/xai-usage command and status lifecycle", () => {
     expect(notifications.at(-1)?.message).toMatch(/status is off/);
   });
 
+  it.each([TEST_MODEL, BUILTIN_XAI_TEST_MODEL])("exports CSV explicitly on $provider without enabling status", async (model) => {
+    const state = setup(model);
+    await state.feature.refreshStatus(state.ctx as any);
+    expect(state.fetchUsage).not.toHaveBeenCalled();
+    await state.run("  CSV  ");
+    expect(state.fetchUsage).toHaveBeenCalledTimes(1);
+    expect(state.notifications).toEqual([{ message: renderXaiUsageCsv(usage), type: "info" }]);
+    expect(state.statuses).toEqual([]);
+    await state.run("status");
+    expect(state.notifications.at(-1)?.message).toMatch(/status is off/);
+    await state.feature.refreshStatus(state.ctx as any);
+    expect(state.fetchUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["csv extra", "csv status on", "status csv", "--csv", "export csv"])(
+    "rejects unsupported CSV arguments without fetching: %s",
+    async (args) => {
+      const state = setup();
+      await state.run(args);
+      expect(state.resolveCredential).not.toHaveBeenCalled();
+      expect(state.fetchUsage).not.toHaveBeenCalled();
+      expect(state.notifications).toEqual([{
+        message: "Usage: /xai-usage [csv|status [on|off]]",
+        type: "error",
+      }]);
+    },
+  );
+
   it("keeps status off for non-xAI models and validates command arguments", async () => {
     const { fetchUsage, notifications, run, statuses } = setup({ provider: "anthropic", id: "claude" });
     await run("status on");
@@ -89,7 +118,7 @@ describe("/xai-usage command and status lifecycle", () => {
     expect(notifications.at(-1)?.message).toMatch(/Select an xAI\/Grok model/);
     expect(statuses.at(-1)).toEqual({ key: "xai-usage", text: undefined });
     await run("enable");
-    expect(notifications.at(-1)?.message).toBe("Usage: /xai-usage [status [on|off]]");
+    expect(notifications.at(-1)?.message).toBe("Usage: /xai-usage [csv|status [on|off]]");
   });
   it("enables status for a built-in xAI model with SuperGrok OAuth", async () => {
     const state = setup(BUILTIN_XAI_TEST_MODEL);
@@ -186,7 +215,7 @@ describe("/xai-usage command and status lifecycle", () => {
     expect(state.notifications.at(-1)?.message).toMatch(/status is off/);
   });
 
-  it("suppresses a stale one-shot completion after an account or session reset", async () => {
+  it.each(["", "csv"])("suppresses stale one-shot errors after a reset (%s)", async (args) => {
     const state = setup();
     state.fetchUsage.mockImplementationOnce(async (_credential: any, signal?: AbortSignal) =>
       new Promise<XaiUsageSnapshot>((_resolve, reject) => {
@@ -196,11 +225,75 @@ describe("/xai-usage command and status lifecycle", () => {
           { once: true },
         );
       }));
-    const pending = state.run("");
+    const pending = state.run(args);
     await vi.waitFor(() => expect(state.fetchUsage).toHaveBeenCalledTimes(1));
     state.feature.reset(state.ctx as any);
     await pending;
     expect(state.notifications).toEqual([]);
+  });
+
+  it.each(["cancel", "reset", "supersede"])("suppresses late CSV success after %s", async (action) => {
+    const state = setup();
+    const controller = new AbortController();
+    state.ctx.signal = controller.signal;
+    let complete!: (value: XaiUsageSnapshot) => void;
+    state.fetchUsage.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const pending = state.run("csv");
+    await vi.waitFor(() => expect(state.fetchUsage).toHaveBeenCalledTimes(1));
+    if (action === "cancel") controller.abort();
+    else if (action === "reset") state.feature.reset(state.ctx as any);
+    else await state.run("csv");
+    expect(state.fetchUsage.mock.calls[0][1]?.aborted).toBe(true);
+    const before = [...state.notifications];
+    complete({ subscriptionTier: "STALE_ACCOUNT", history: [] });
+    await pending;
+    expect(state.notifications).toEqual(before);
+    expect(JSON.stringify(state.notifications)).not.toContain("STALE_ACCOUNT");
+  });
+
+  it("does not resolve credentials for an already-cancelled export", async () => {
+    const state = setup();
+    state.ctx.signal = AbortSignal.abort();
+    await state.run("csv");
+    expect(state.resolveCredential).not.toHaveBeenCalled();
+    expect(state.fetchUsage).not.toHaveBeenCalled();
+    expect(state.notifications).toEqual([]);
+  });
+
+  it("does not fetch after cancellation during credential resolution", async () => {
+    const state = setup();
+    const controller = new AbortController();
+    state.ctx.signal = controller.signal;
+    state.resolveCredential.mockImplementationOnce(async () => {
+      controller.abort();
+      return { kind: "oauth-session", token: "SECRET" };
+    });
+    await state.run("csv");
+    expect(state.fetchUsage).not.toHaveBeenCalled();
+    expect(state.notifications).toEqual([{
+      message: "xAI usage request was cancelled.", type: "error",
+    }]);
+  });
+
+  it("redacts CSV credential and fetch errors without changing an enabled status", async () => {
+    const state = setup();
+    await state.run("status on");
+    const before = [...state.statuses];
+    state.resolveCredential.mockRejectedValueOnce(new Error("PRIVATE_AUTH"));
+    await state.run("csv");
+    expect(state.notifications.at(-1)).toEqual({
+      message: "xAI OAuth credentials could not be resolved. Run /login xai or /login xai-auth first.",
+      type: "error",
+    });
+    state.fetchUsage.mockRejectedValueOnce(new Error("PRIVATE_BODY"));
+    await state.run("csv");
+    expect(state.notifications.at(-1)).toEqual({ message: "xAI usage request failed.", type: "error" });
+    await state.run("csv");
+    expect(state.notifications.at(-1)).toEqual({ message: renderXaiUsageCsv(usage), type: "info" });
+    expect(state.statuses).toEqual(before);
+    await state.run("status");
+    expect(state.notifications.at(-1)?.message).toMatch(/status is on/);
+    expect(JSON.stringify(state.notifications)).not.toContain("PRIVATE_");
   });
 
   it("aborts an in-flight status refresh without a late footer write", async () => {

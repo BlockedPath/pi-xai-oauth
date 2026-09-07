@@ -6,6 +6,10 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Added
+
+- Added `/xai-usage csv` to display copyable current/history usage CSV with exact cent values, blank missing fields, and spreadsheet-formula protection. It reuses the explicit bounded OAuth-only lookup, exports no identity, headers, or raw bodies, writes no files, and leaves status opt-in unchanged.
+
 ## 1.5.2 - 2026-08-23
 
 ### Fixed
