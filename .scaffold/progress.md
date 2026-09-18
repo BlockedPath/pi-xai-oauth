@@ -11,6 +11,7 @@
 - Local Linux Node 24.19.0 / npm 11.6.2 gates passed: 788 tests, real loader, typecheck, unchanged coverage floors, and both clean packed Pi 0.80.1/0.85.1 boundaries (787 passing tests plus the intentional Git-only skip, loader, and typecheck each).
 - Package/mirror and registry verification passed. Strict installs reject 0.79.10, excluded 0.85.0, and 0.86.0; isolated forced installs emit peer warnings for each.
 - Independent final review approved code and lock metadata. Ready to push #216 and require fresh GitHub CI before merge; no package release is published by this change.
+- Verified published 1.5.2 npm metadata directly: its development Pi endpoint was 0.84.2, so README's historical release references retain that endpoint rather than the subsequently tested 0.84.4 checkout.
 
 ## Previous progress — PR #215: Vitest 5 migration
 
