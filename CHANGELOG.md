@@ -10,6 +10,11 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 - Added `/xai-usage csv` to display copyable current/history usage CSV with exact cent values, blank missing fields, and spreadsheet-formula protection. It reuses the explicit bounded OAuth-only lookup, exports no identity, headers, or raw bodies, writes no files, and leaves status opt-in unchanged.
 
+### Changed
+
+- Extended aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.86.0`, with exact packed-package matrix endpoints at 0.80.1 and 0.85.1. Pi 0.85.0 remains explicitly excluded, and unsupported-version checks cover that gap as well as the lower and upper limits.
+- Made reasoning-parity tests tolerate Pi 0.85's removal of the built-in API-key-only `grok-build-0.1` entry while preserving unconditional rejection of that model from the OAuth catalog.
+
 ### Fixed
 
 - Omitted empty `current` rows from `/xai-usage csv` while retaining valid zero/false values and history-only exports. Empty snapshots now emit only the CSV header; documented that `total_used_cents` is history-only and excludes current usage (#213).

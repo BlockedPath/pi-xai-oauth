@@ -1,4 +1,19 @@
-# Execution Progress — PR #215: Vitest 5 migration
+# Execution Progress — PR #216: Pi 0.85.1 compatibility
+
+**Active branch:** `dependabot/npm_and_yarn/pi-peers-973734b516`
+
+- Independent pre-implementation review approved bounded disjoint peer intervals and explicit negative npm fixtures for known-broken releases.
+- Preserve existing support, add Pi 0.85.1, and exclude 0.85.0: `>=0.80.1 <0.85.0 || >=0.85.1 <0.86.0`.
+- Extend plain-Node policy validation for ordered ranges, boundary alignment, exclusions, and negative install tests; add focused policy regressions.
+- Remove obsolete host-catalog membership assumptions while retaining unconditional OAuth metadata exclusion and catalog rejection for `grok-build-0.1`.
+- Document the unreleased range separately from published 1.5.2 and explain the 0.85.0 SDK packaging failure.
+- Regenerated lock metadata with npm 11.6.2; both manifest/lock peer unions match, with both development Pi versions exactly 0.85.1.
+- Local Linux Node 24.19.0 / npm 11.6.2 gates passed: 788 tests, real loader, typecheck, unchanged coverage floors, and both clean packed Pi 0.80.1/0.85.1 boundaries (787 passing tests plus the intentional Git-only skip, loader, and typecheck each).
+- Package/mirror and registry verification passed. Strict installs reject 0.79.10, excluded 0.85.0, and 0.86.0; isolated forced installs emit peer warnings for each.
+- Independent final review approved code and lock metadata. Ready to push #216 and require fresh GitHub CI before merge; no package release is published by this change.
+- Verified published 1.5.2 npm metadata directly: its development Pi endpoint was 0.84.2, so README's historical release references retain that endpoint rather than the subsequently tested 0.84.4 checkout.
+
+## Previous progress — PR #215: Vitest 5 migration
 
 **Active branch:** `dependabot/npm_and_yarn/vitest-d440b5915d`
 

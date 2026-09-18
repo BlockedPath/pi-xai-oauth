@@ -32,7 +32,8 @@ const supportedLevels = (model: XaiCatalogModel) =>
 /**
  * Look up a built-in model by id without assuming it exists on every supported
  * Pi line. `XAI_MODELS` is a literal type whose membership changes across the
- * range (0.80.1 has no `grok-4.5`), so index it through a widened record.
+ * range (0.80.1 has no `grok-4.5`, and 0.85 removes `grok-build-0.1`), so
+ * index it through a widened record.
  */
 const builtIn = (id: string): Model<Api> | undefined =>
   (XAI_MODELS as unknown as Record<string, Model<Api> | undefined>)[id];
@@ -47,11 +48,11 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
   it("inventories the built-in Grok models this package advertises or aliases", () => {
     // Built-in catalog membership changes across the supported Pi range: 0.80.1
     // still ships grok-3 / grok-code-fast-1 and has no grok-4.5, while 0.81+
-    // drops the legacy entries. Assert the invariants that must hold on every
-    // supported boundary rather than one line's exact membership.
+    // drops the legacy entries and 0.85 removes grok-build-0.1. Assert the
+    // invariants that must hold on every supported boundary rather than one
+    // line's exact membership.
     const ids = Object.keys(XAI_MODELS);
     expect(ids).toContain("grok-4.3");
-    expect(ids).toContain("grok-build-0.1");
     // Package-owned entitlement models never appear in Pi's API-key catalog.
     expect(ids).not.toContain("grok-build");
     expect(ids).not.toContain("grok-composer-2.5-fast");
@@ -138,8 +139,8 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     expect(supportedLevels(known("grok-4.6"))).not.toContain("max");
   });
 
-  it("never advertises the API-key-only built-in grok-build-0.1 through xai-auth", () => {
-    expect(XAI_MODELS["grok-build-0.1"]).toBeDefined();
+  it("never advertises the API-key-only grok-build-0.1 through xai-auth", () => {
+    // This exclusion applies even when Pi no longer lists the API-key model.
     expect(KNOWN_XAI_MODEL_METADATA.map(({ id }) => id)).not.toContain(
       "grok-build-0.1",
     );
