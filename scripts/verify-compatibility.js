@@ -23,9 +23,11 @@ function parseJson(text, source) {
 const policy = parseJson(fs.readFileSync(policyPath, "utf8"), policyPath);
 
 function parseVersion(version) {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
   assert.ok(match, `Expected an exact stable semantic version, received ${JSON.stringify(version)}`);
-  return match.slice(1).map(Number);
+  const parts = match.slice(1).map(Number);
+  assert.ok(parts.every(Number.isSafeInteger), "Version components must be safe integers");
+  return parts;
 }
 
 function compareVersions(left, right) {
@@ -37,15 +39,56 @@ function compareVersions(left, right) {
   return 0;
 }
 
+/** Parse ordered, separated stable-version intervals with explicit lower and upper bounds. */
 function parsePeerRange(range) {
-  const match = /^>=(\d+\.\d+\.\d+) <(\d+\.\d+\.\d+)$/.exec(range);
-  assert.ok(match, `Peer range must use the explicit ">=minimum <next-line" policy form: ${range}`);
-  return { minimum: match[1], upper: match[2] };
+  assert.strictEqual(typeof range, "string", "Peer range must be a string");
+  const intervals = range.split(" || ").map((part) => {
+    const match = /^>=(\d+\.\d+\.\d+) <(\d+\.\d+\.\d+)$/.exec(part);
+    assert.ok(match, `Peer range must use bounded ">=minimum <upper" intervals joined by " || ": ${range}`);
+    const bounds = { minimum: match[1], upper: match[2] };
+    assert.ok(compareVersions(bounds.minimum, bounds.upper) < 0, "Peer intervals must not be empty or inverted");
+    return bounds;
+  });
+  for (let index = 1; index < intervals.length; index++) {
+    assert.ok(
+      compareVersions(intervals[index - 1].upper, intervals[index].minimum) < 0,
+      "Peer intervals must be ordered and separated by an excluded gap",
+    );
+  }
+  return intervals;
 }
 
+/** Check stable-version membership in the union of supported peer intervals. */
 function satisfiesPeerRange(version, range = policy.peerRange) {
-  const bounds = parsePeerRange(range);
-  return compareVersions(version, bounds.minimum) >= 0 && compareVersions(version, bounds.upper) < 0;
+  return parsePeerRange(range).some((bounds) =>
+    compareVersions(version, bounds.minimum) >= 0 && compareVersions(version, bounds.upper) < 0);
+}
+
+/** Validate matrix boundaries and explicit negative fixtures against the supported intervals. */
+function verifyRangePolicy(activePolicy) {
+  const intervals = parsePeerRange(activePolicy.peerRange);
+  const first = intervals[0];
+  const last = intervals.at(-1);
+  const excluded = activePolicy.unsupported.excluded === undefined ? [] : activePolicy.unsupported.excluded;
+  assert.ok(Array.isArray(excluded), "Excluded releases must be an array");
+  assert.strictEqual(new Set(excluded).size, excluded.length, "Excluded releases must be unique");
+  assert.strictEqual(first.minimum, activePolicy.minimum, "Peer lower bound must match policy.minimum");
+  assert.strictEqual(last.upper, activePolicy.unsupported.upper, "Upper sentinel must match the final excluded bound");
+  assert.ok(
+    compareVersions(activePolicy.latest, last.minimum) >= 0 && compareVersions(activePolicy.latest, last.upper) < 0,
+    "Latest matrix release must belong to the final supported interval",
+  );
+  assert.ok(compareVersions(activePolicy.unsupported.older, first.minimum) < 0, "Older sentinel must precede the peer lower bound");
+  for (const version of excluded) {
+    assert.ok(
+      compareVersions(version, first.minimum) >= 0 && compareVersions(version, last.upper) < 0,
+      `Excluded release ${version} must lie inside the overall range bounds`,
+    );
+    assert.ok(!satisfiesPeerRange(version, activePolicy.peerRange), `Excluded release ${version} must not be supported`);
+  }
+  for (const bounds of intervals.slice(0, -1)) {
+    assert.ok(excluded.includes(bounds.upper), `Internal gap at ${bounds.upper} must have an explicit negative fixture`);
+  }
 }
 
 function readJson(filePath) {
@@ -92,7 +135,7 @@ function assertPeerDiagnostics(output, version) {
     `Expected npm peer diagnostics to name a Pi peer for ${version}`,
   );
   assert.ok(
-    output.includes(policy.peerRange) || output.includes(policy.peerRange.replace(" ", "")),
+    output.replace(/\s+/g, "").includes(policy.peerRange.replace(/\s+/g, "")),
     `Expected npm peer diagnostics to include ${policy.peerRange} for ${version}`,
   );
 }
@@ -110,14 +153,7 @@ function verifyPolicy() {
   assert.ok(ranges.every((range) => range === expectedPeerRange), "Pi peer ranges must match the active compatibility policy");
   assert.strictEqual(new Set(ranges).size, 1, "Pi peer ranges must remain aligned");
 
-  const bounds = parsePeerRange(policy.peerRange);
-  assert.strictEqual(bounds.minimum, policy.minimum, "Peer lower bound must match policy.minimum");
-  assert.strictEqual(bounds.upper, policy.unsupported.upper, "Upper sentinel must be the peer range's immediate excluded line");
-  assert.ok(satisfiesPeerRange(policy.minimum), "Minimum release must satisfy the peer range");
-  assert.ok(satisfiesPeerRange(policy.latest), "Latest matrix release must satisfy the peer range");
-  assert.ok(!satisfiesPeerRange(policy.unsupported.older), "Older unsupported release must not satisfy the peer range");
-  assert.ok(!satisfiesPeerRange(policy.unsupported.upper), "Upper breaking-line release must not satisfy the peer range");
-  assert.ok(compareVersions(policy.minimum, policy.latest) <= 0, "Minimum must not exceed latest");
+  verifyRangePolicy(policy);
 
   for (const packageName of policy.packages) {
     assert.strictEqual(
@@ -282,7 +318,7 @@ function verifyUnsupportedInstalls() {
   const packed = packProject();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-xai-oauth-peer-negative-"));
   try {
-    for (const version of [policy.unsupported.older, policy.unsupported.upper]) {
+    for (const version of [policy.unsupported.older, ...(policy.unsupported.excluded || []), policy.unsupported.upper]) {
       const strictDirectory = path.join(root, version, "strict");
       writeConsumer(strictDirectory, packed.tarballPath, version, path.join(root, version, "strict-stubs"));
       const strict = run(
@@ -329,4 +365,6 @@ function main() {
   throw new Error(`Unknown compatibility verification command: ${command}`);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { parsePeerRange, satisfiesPeerRange, verifyRangePolicy };

@@ -41,6 +41,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Keep the normalized token-free catalog cache atomic and apply the documented TTL/stale/fallback policy
 - Preserve known model metadata and compatibility behavior without inventing unentitled model families; known aliases and independently verified OAuth request slugs may be advertised only while their entitlement source is present at registration/runtime (cache stays exact)
 - Keep both Pi peers aligned to the checked-in bounded range in `compatibility/pi-versions.json`
+- Preserve explicit unsupported-version exclusions when widening Pi support; Pi 0.85.0 stays excluded, and strict-resolution negative fixtures must cover the lower sentinel, excluded releases, and the upper sentinel
 - Keep npmjs `pi-xai-oauth` canonical and publish GitHub Packages only as the exact scoped mirror `@blockedpath/pi-xai-oauth`; setup must treat both names as aliases and prevent duplicate registration
 - Install/report exact Pi matrix versions from a clean packed package; never reuse the repository lockfile for boundary jobs
 - Keep `tests/`, its fixtures, `vitest.config.mts`, and `tsconfig.json` inside the packed tarball; `scripts/run-compatibility-matrix.js` extracts the pack and runs `npm test` plus `npm run typecheck` inside it, so excluding them silently breaks both exact-Pi boundary jobs
