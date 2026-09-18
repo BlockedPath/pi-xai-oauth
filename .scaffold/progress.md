@@ -1,4 +1,15 @@
-# Execution Progress — Issue #213: empty CSV current row
+# Execution Progress — PR #215: Vitest 5 migration
+
+**Active branch:** `dependabot/npm_and_yarn/vitest-d440b5915d`
+
+- Reviewed all three dependency PRs; merged the validated Node typings update #217 and incorporated current main.
+- Independent pre-implementation review confirmed the two removed `describe.sequential` calls are the required Vitest 5 migration.
+- Migrated catalog lifecycle and ownership-race suites to explicit `{ concurrent: false }`; retained all coverage floors and paired Vitest/coverage versions.
+- Validation passed under Linux Node 24.19.0 / npm 11.6.2: all 750 tests, real loader, typecheck, coverage floors, and compatibility/package/mirror checks. Both clean packed Pi 0.80.1 and 0.84.4 boundaries passed (749 tests plus the intentional Git-only skip, loader, and typecheck each).
+- Independent final review found no actionable issues. Ready to push the migration and require fresh GitHub CI before merging #215.
+- Keep #216 held: the Pi 0.85.1 candidate fails two host-catalog assertions and typecheck after upstream removed `grok-build-0.1`. Its loader passes, but exact Pi 0.85.0 fails the loader with missing `@earendil-works/pi-server`; widening support requires an explicit exclusion as well as test/policy/docs updates. No compatibility policy change in this PR.
+
+## Previous progress — Issue #213: empty CSV current row
 
 **Active branch:** `fix/xai-usage-csv-empty-row`
 
