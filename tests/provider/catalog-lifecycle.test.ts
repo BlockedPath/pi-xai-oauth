@@ -70,7 +70,7 @@ async function loadAndLogin(catalog: any) {
   return { h, credentials };
 }
 
-describe.sequential("authenticated provider catalog lifecycle", () => {
+describe("authenticated provider catalog lifecycle", { concurrent: false }, () => {
   it("immediately replaces fallback models after login", async () => {
     const { h, credentials } = await loadAndLogin({
       data: [

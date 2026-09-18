@@ -100,7 +100,7 @@ async function login(
   });
 }
 
-describe.sequential("catalog refresh ownership races", () => {
+describe("catalog refresh ownership races", { concurrent: false }, () => {
   it("prevents a late old-account refresh from overwriting a new login", async () => {
     let authUrl: URL | undefined;
     let releaseOld!: () => void;
