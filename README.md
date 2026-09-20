@@ -223,7 +223,7 @@ On the pinned OAuth Responses route, requests default an absent `store` to `fals
 
 `store: false` disables server-side response storage, but it does **not** mean no local sensitive state. Complete encrypted reasoning items are stored in ordinary Pi session JSONL under Pi's normal permissions and retention. This package does not separately encrypt that file, copy reasoning into another cache, or protect it from the user or trusted local extensions.
 
-If xAI reports that encrypted reasoning is incompatible with the selected model, the rejected request is not retried automatically and the error remains fixed, redacted clean-session/turn guidance. A subsequent same-model turn omits the rejected encrypted reasoning chain while preserving visible conversation and tool-result history; switching targets retains the existing cross-model replay protection.
+If xAI reports that encrypted reasoning is incompatible with the selected model, this package retries once in the same turn after omitting the rejected encrypted reasoning chain while preserving visible conversation and tool-result history. When that sanitized retry still fails, the rejected request is not retried further and the error remains fixed, redacted clean-session/turn guidance. A subsequent same-model turn that retains the mismatch error also omits the rejected encrypted reasoning; switching targets retains the existing cross-model replay protection.
 
 ---
 

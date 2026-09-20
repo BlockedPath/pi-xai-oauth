@@ -169,6 +169,32 @@ function promoteOpaqueResponsesFailure(
   };
 }
 
+function isAssistantContentStreamEvent(event: AssistantStreamEvent): boolean {
+  return (
+    event.type === "text_start" ||
+    event.type === "text_delta" ||
+    event.type === "text_end" ||
+    event.type === "thinking_start" ||
+    event.type === "thinking_delta" ||
+    event.type === "thinking_end" ||
+    event.type === "toolcall_start" ||
+    event.type === "toolcall_delta" ||
+    event.type === "toolcall_end"
+  );
+}
+
+function mismatchErrorMessage(event: AssistantStreamEvent): string | undefined {
+  if (event.type !== "error" || !event.error || typeof event.error !== "object") {
+    return undefined;
+  }
+  const message = (event.error as Record<string, unknown>).errorMessage;
+  return typeof message === "string" ? message : undefined;
+}
+
+function isEncryptedReasoningMismatchMessage(message: string | undefined): boolean {
+  return message === XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
+}
+
 function omitRejectedEncryptedReasoning(
   payload: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -360,10 +386,13 @@ export async function createXaiResponse(
  * into terminal error events with xAI provider metadata instead of escaping
  * as unstructured promise failures. Canonical and persisted delegate-tagged
  * same-model history are aligned only for internal conversion; after a fixed
- * encrypted-reasoning mismatch, the next same-model request omits rejected
- * encrypted reasoning while retaining visible and tool-result history.
- * Status-less `Responses failed` errors with replayable encrypted reasoning
- * are promoted onto the same mismatch recovery path.
+ * encrypted-reasoning mismatch, this stream omits rejected encrypted reasoning
+ * and retries once in the same turn when no assistant content has been
+ * forwarded yet. If an earlier mismatch error remains in history, the next
+ * same-model request also omits rejected encrypted reasoning while retaining
+ * visible and tool-result history. Status-less `Responses failed` errors with
+ * replayable encrypted reasoning are promoted onto the same mismatch recovery
+ * path.
  *
  * @param model xAI provider model selected by pi.
  * @param context Conversation messages and tool context to stream.
@@ -450,6 +479,12 @@ export function streamSimpleXaiResponses(
     model,
     selectedModelId,
   );
+  const canSameTurnOmitRetry =
+    !omitRejectedReasoning &&
+    contextHasReplayableEncryptedReasoning(context, model, selectedModelId);
+  // Mutable for the one same-turn sanitized retry after an encrypted-reasoning
+  // mismatch. Entitlement-sensitive transport retries stay disabled below.
+  let omitForAttempt = omitRejectedReasoning;
   // The OAuth bearer comes only from options.apiKey. Required proxy metadata
   // is merged last so callers cannot spoof authentication or attribution.
   const headers = {
@@ -481,145 +516,7 @@ export function streamSimpleXaiResponses(
     // streams; unrelated requests pass through unchanged, and overlapping xAI
     // streams share the same guard until the last request completes.
     const releaseRedirectGuard = acquireXaiRedirectGuard(route.url);
-    try {
-      const inner = streamSimpleOpenAIResponses(
-        openAIResponsesModel as Model<"openai-responses">,
-        delegateContext,
-        {
-          ...options,
-          signal: transportSignal,
-          // Prevent Pi's generic OpenAI delegate from adding its own
-          // session_id/x-client-request-id affinity headers. The xAI payload
-          // rewrite below still receives the stable session for cache keys.
-          sessionId: undefined,
-          headers,
-          // A retry would reuse a once-validated payload after the current
-          // entitlement snapshot may have changed. Higher layers can retry by
-          // starting a fresh request that repeats every local guard.
-          maxRetries: 0,
-          async onPayload(payload) {
-            const canonicalInput = canonicalizeXaiResponsesPayload(payload);
-            if (
-              xaiResponsesPayloadContainsLocalImageReference(canonicalInput)
-            ) {
-              const inputPlan = planForCapturedVisionGrant(canonicalInput);
-              if (!inputPlan)
-                assertXaiRuntimeModelAcceptsPayload(
-                  selectedModelId,
-                  canonicalInput,
-                );
-            }
-            const rewritten = rewriteXaiResponsesPayload(
-              canonicalInput,
-              streamModel,
-              {
-                ...options,
-                sessionId: sessionId || routingSessionId,
-                preserveCurrentToolImages: visionEnabled,
-                omitConsumedVisionImages: visionEnabled,
-              },
-            );
-            const userRewritten = await options?.onPayload?.(
-              rewritten,
-              streamModel,
-            );
-            const canonicalPayload = canonicalizeXaiResponsesPayload(
-              userRewritten === undefined ? rewritten : userRewritten,
-            );
-            // A caller hook can reconstruct history after the initial rewrite.
-            // Reapply the same consumed-image rule before planning, but only for
-            // the vision grant captured when this stream started.
-            const visionSafePayload = visionEnabled
-              ? omitConsumedXaiResponsesVisionImages(canonicalPayload)
-              : canonicalPayload;
-            const replaySafePayload = omitRejectedReasoning
-              ? omitRejectedEncryptedReasoning(visionSafePayload)
-              : visionSafePayload;
-            const policyPayload =
-              applyXaiOAuthResponsesPolicy(replaySafePayload);
-            grokNativeToolRoutes =
-              xaiPayloadGrokNativeToolRoutes(policyPayload);
-            let exposedPayload = exposeGrokNativeToolNames(policyPayload);
-            pinXaiPayloadModel(selectedModelId, exposedPayload);
-
-            const plan = planForCapturedVisionGrant(exposedPayload);
-            if (plan) {
-              const compactedVisionPayload = (await compactXaiInlineImages(
-                exposedPayload,
-              )) as Record<string, unknown>;
-              if (!visionRouting?.validate(plan))
-                throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
-              if (typeof options?.apiKey !== "string" || !options.apiKey) {
-                throw new Error(
-                  "xAI vision routing could not resolve the current OAuth credential; no xAI request was sent",
-                );
-              }
-              const response = await createXaiResponse(
-                { kind: "oauth-session", token: options.apiKey },
-                buildXaiVisionDescriptionPayload(
-                  compactedVisionPayload,
-                  plan.targetModelId,
-                ) as Record<string, unknown>,
-                AbortSignal.any([
-                  plan.signal,
-                  ...(options.signal ? [options.signal] : []),
-                ]),
-                () => {
-                  if (!visionRouting?.validate(plan))
-                    throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
-                },
-                256 * 1024,
-              );
-              if (!visionRouting?.validate(plan))
-                throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
-              plan.signal.addEventListener(
-                "abort",
-                () => routedSourceController.abort(),
-                { once: true },
-              );
-              if (plan.signal.aborted) routedSourceController.abort();
-              const description = extractStrictResponsesText(response).trim();
-              if (!description) throw new Error(XAI_VISION_DESCRIPTION_ERROR);
-              exposedPayload = replaceXaiPayloadImagesWithDescription(
-                compactedVisionPayload,
-                description,
-              );
-              pinXaiPayloadModel(selectedModelId, exposedPayload);
-            }
-
-            assertXaiRuntimeModelAcceptsPayload(
-              selectedModelId,
-              exposedPayload,
-            );
-            const finalPayload = await compactXaiInlineImages(exposedPayload);
-            assertXaiRuntimeModelAcceptsPayload(selectedModelId, finalPayload);
-            return finalPayload;
-          },
-        },
-      );
-      for await (const event of inner as AsyncIterable<AssistantStreamEvent>) {
-        if (event.type === "done" || event.type === "error")
-          releaseRedirectGuard();
-        const normalized = normalizeXaiStreamEvent(
-          event,
-          grokNativeToolRoutes,
-          model,
-        );
-        stream.push(
-          normalized.type === "error"
-            ? promoteOpaqueResponsesFailure(
-                normalized,
-                context,
-                model,
-                selectedModelId,
-              )
-            : normalized,
-        );
-      }
-      releaseRedirectGuard();
-      stream.end();
-    } catch (error) {
-      releaseRedirectGuard();
+    const pushTerminalError = (error: unknown) => {
       const safeError =
         error instanceof Error &&
         (/Image file does not exist or is not a valid URL:/.test(
@@ -643,6 +540,230 @@ export function streamSimpleXaiResponses(
       }
       stream.push({ type: "error", reason: "error", error: message });
       stream.end(message);
+    };
+    try {
+      const maxAttempts = canSameTurnOmitRetry ? 2 : 1;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        omitForAttempt = omitRejectedReasoning || attempt > 0;
+        grokNativeToolRoutes = {};
+        const attemptHeaders =
+          attempt === 0
+            ? headers
+            : {
+                ...headers,
+                ...xaiProxyRequestHeaders(
+                  selectedModelId,
+                  credentialKind,
+                  {
+                    conversationId: routingSessionId,
+                    requestId: randomUUID(),
+                    sessionId: routingSessionId,
+                  },
+                  { streaming: true },
+                ),
+              };
+        const inner = streamSimpleOpenAIResponses(
+          openAIResponsesModel as Model<"openai-responses">,
+          delegateContext,
+          {
+            ...options,
+            signal: transportSignal,
+            // Prevent Pi's generic OpenAI delegate from adding its own
+            // session_id/x-client-request-id affinity headers. The xAI payload
+            // rewrite below still receives the stable session for cache keys.
+            sessionId: undefined,
+            headers: attemptHeaders,
+            // Transport-level retries stay off: entitlement can change between
+            // attempts. Encrypted-reasoning mismatch recovery is handled here by
+            // starting a fresh request that repeats every local guard with omit.
+            maxRetries: 0,
+            async onPayload(payload) {
+              const canonicalInput = canonicalizeXaiResponsesPayload(payload);
+              if (
+                xaiResponsesPayloadContainsLocalImageReference(canonicalInput)
+              ) {
+                const inputPlan = planForCapturedVisionGrant(canonicalInput);
+                if (!inputPlan)
+                  assertXaiRuntimeModelAcceptsPayload(
+                    selectedModelId,
+                    canonicalInput,
+                  );
+              }
+              const rewritten = rewriteXaiResponsesPayload(
+                canonicalInput,
+                streamModel,
+                {
+                  ...options,
+                  sessionId: sessionId || routingSessionId,
+                  preserveCurrentToolImages: visionEnabled,
+                  omitConsumedVisionImages: visionEnabled,
+                },
+              );
+              const userRewritten = await options?.onPayload?.(
+                rewritten,
+                streamModel,
+              );
+              const canonicalPayload = canonicalizeXaiResponsesPayload(
+                userRewritten === undefined ? rewritten : userRewritten,
+              );
+              // A caller hook can reconstruct history after the initial rewrite.
+              // Reapply the same consumed-image rule before planning, but only for
+              // the vision grant captured when this stream started.
+              const visionSafePayload = visionEnabled
+                ? omitConsumedXaiResponsesVisionImages(canonicalPayload)
+                : canonicalPayload;
+              const replaySafePayload = omitForAttempt
+                ? omitRejectedEncryptedReasoning(visionSafePayload)
+                : visionSafePayload;
+              const policyPayload =
+                applyXaiOAuthResponsesPolicy(replaySafePayload);
+              grokNativeToolRoutes =
+                xaiPayloadGrokNativeToolRoutes(policyPayload);
+              let exposedPayload = exposeGrokNativeToolNames(policyPayload);
+              pinXaiPayloadModel(selectedModelId, exposedPayload);
+
+              const plan = planForCapturedVisionGrant(exposedPayload);
+              if (plan) {
+                const compactedVisionPayload = (await compactXaiInlineImages(
+                  exposedPayload,
+                )) as Record<string, unknown>;
+                if (!visionRouting?.validate(plan))
+                  throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
+                if (typeof options?.apiKey !== "string" || !options.apiKey) {
+                  throw new Error(
+                    "xAI vision routing could not resolve the current OAuth credential; no xAI request was sent",
+                  );
+                }
+                const response = await createXaiResponse(
+                  { kind: "oauth-session", token: options.apiKey },
+                  buildXaiVisionDescriptionPayload(
+                    compactedVisionPayload,
+                    plan.targetModelId,
+                  ) as Record<string, unknown>,
+                  AbortSignal.any([
+                    plan.signal,
+                    ...(options.signal ? [options.signal] : []),
+                  ]),
+                  () => {
+                    if (!visionRouting?.validate(plan))
+                      throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
+                  },
+                  256 * 1024,
+                );
+                if (!visionRouting?.validate(plan))
+                  throw new Error(XAI_VISION_ROUTING_INVALIDATED_ERROR);
+                plan.signal.addEventListener(
+                  "abort",
+                  () => routedSourceController.abort(),
+                  { once: true },
+                );
+                if (plan.signal.aborted) routedSourceController.abort();
+                const description = extractStrictResponsesText(response).trim();
+                if (!description) throw new Error(XAI_VISION_DESCRIPTION_ERROR);
+                exposedPayload = replaceXaiPayloadImagesWithDescription(
+                  compactedVisionPayload,
+                  description,
+                );
+                pinXaiPayloadModel(selectedModelId, exposedPayload);
+              }
+
+              assertXaiRuntimeModelAcceptsPayload(
+                selectedModelId,
+                exposedPayload,
+              );
+              const finalPayload = await compactXaiInlineImages(exposedPayload);
+              assertXaiRuntimeModelAcceptsPayload(selectedModelId, finalPayload);
+              return finalPayload;
+            },
+          },
+        );
+
+        const buffered: AssistantStreamEvent[] = [];
+        let forwarded = false;
+        let streamedContent = false;
+        let retrySameTurn = false;
+
+        for await (const event of inner as AsyncIterable<AssistantStreamEvent>) {
+          const normalized = normalizeXaiStreamEvent(
+            event,
+            grokNativeToolRoutes,
+            model,
+          );
+          const outward =
+            normalized.type === "error"
+              ? promoteOpaqueResponsesFailure(
+                  normalized,
+                  context,
+                  model,
+                  selectedModelId,
+                )
+              : normalized;
+
+          // Drain a rejected first attempt fully before the sanitized retry so
+          // the abandoned delegate iterator cannot race the next request.
+          if (retrySameTurn) {
+            if (outward.type === "error" || outward.type === "done") break;
+            continue;
+          }
+
+          if (isAssistantContentStreamEvent(outward)) streamedContent = true;
+
+          if (!forwarded) {
+            if (
+              outward.type === "error" &&
+              attempt + 1 < maxAttempts &&
+              !streamedContent &&
+              isEncryptedReasoningMismatchMessage(
+                mismatchErrorMessage(outward),
+              )
+            ) {
+              buffered.length = 0;
+              retrySameTurn = true;
+              continue;
+            }
+            if (outward.type === "error" || outward.type === "done") {
+              for (const item of buffered) stream.push(item);
+              buffered.length = 0;
+              stream.push(outward);
+              releaseRedirectGuard();
+              stream.end(
+                outward.type === "done" ? outward.message : outward.error,
+              );
+              return;
+            }
+            if (isAssistantContentStreamEvent(outward)) {
+              forwarded = true;
+              for (const item of buffered) stream.push(item);
+              buffered.length = 0;
+              stream.push(outward);
+              continue;
+            }
+            buffered.push(outward);
+            continue;
+          }
+
+          stream.push(outward);
+          if (outward.type === "error" || outward.type === "done") {
+            releaseRedirectGuard();
+            stream.end(
+              outward.type === "done" ? outward.message : outward.error,
+            );
+            return;
+          }
+        }
+
+        if (retrySameTurn) continue;
+
+        if (!forwarded && buffered.length > 0) {
+          for (const item of buffered) stream.push(item);
+        }
+        releaseRedirectGuard();
+        stream.end();
+        return;
+      }
+    } catch (error) {
+      releaseRedirectGuard();
+      pushTerminalError(error);
     } finally {
       releaseRedirectGuard();
     }

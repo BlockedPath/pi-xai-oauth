@@ -17,6 +17,7 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ### Fixed
 
+- Retried encrypted-reasoning mismatches once in the same turn by omitting rejected encrypted reasoning before surfacing the fixed clean-session guidance (#220).
 - Omitted empty `current` rows from `/xai-usage csv` while retaining valid zero/false values and history-only exports. Empty snapshots now emit only the CSV header; documented that `total_used_cents` is history-only and excludes current usage (#213).
 
 ## 1.5.3 - 2026-09-20

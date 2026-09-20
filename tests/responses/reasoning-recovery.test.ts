@@ -7,7 +7,6 @@ import {
 import { streamSimpleXaiResponses } from "../../extensions/xai/responses";
 import {
   XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
-  XAI_OPAQUE_RESPONSES_FAILED_MESSAGE,
 } from "../../extensions/xai/wire";
 import { requestBody } from "../fixtures/http";
 import { TEST_MODEL } from "../fixtures/models";
@@ -110,13 +109,14 @@ function inputTypes(body: any): string[] {
   return body.input.map((item: any) => item.type ?? item.role);
 }
 
-function expectVisibleToolHistory(body: any) {
+function expectVisibleToolHistory(body: any, options?: { trailingUser?: boolean }) {
+  const trailingUser = options?.trailingUser !== false;
   expect(inputTypes(body)).toEqual([
     "user",
     "message",
     "function_call",
     "function_call_output",
-    "user",
+    ...(trailingUser ? ["user"] : []),
   ]);
   expect(JSON.stringify(body.input)).toContain("I will inspect it.");
   expect(JSON.stringify(body.input)).toContain("visible tool output");
@@ -127,6 +127,104 @@ afterEach(() => setXaiRuntimeModels(CURATED_FALLBACK_MODELS));
 
 describe("encrypted reasoning stream recovery", () => {
   it.each(["xai-responses", "openai-responses"] as const)(
+    "retries once in the same turn by omitting encrypted reasoning for history tagged %s",
+    async (sourceApi) => {
+      const requests: any[] = [];
+      const responses = [
+        sse([
+          failedEvent(
+            "invalid_request",
+            "STREAM_SECRET encrypted_content belongs to another model",
+          ),
+        ]),
+        sse([completedEvent("resp_same_turn")]),
+      ];
+      const fetchMock = vi.fn(async (_url: any, init: RequestInit = {}) => {
+        requests.push(requestBody(init));
+        return responses.shift()!;
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const selectedModel = model("grok-4.6");
+      const history = priorToolHistory(sourceApi);
+
+      const recovered = await streamSimpleXaiResponses(
+        selectedModel,
+        { messages: history } as any,
+        { apiKey: "oauth-token", sessionId: "issue-3-same-turn" } as any,
+      ).result();
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(inputTypes(requests[0])).toContain("reasoning");
+      expect(
+        requests[0].input.find((item: any) => item.type === "reasoning"),
+      ).toEqual(reasoningItem);
+      expect(recovered).toMatchObject({
+        api: "xai-responses",
+        provider: "xai-auth",
+        model: "grok-4.6",
+        stopReason: "stop",
+        responseId: "resp_same_turn",
+      });
+      expectVisibleToolHistory(requests[1], { trailingUser: false });
+      expect(
+        requests[1].input.some((item: any) => item.type === "reasoning"),
+      ).toBe(false);
+      expect(requests[1]).toMatchObject({
+        store: false,
+        include: ["reasoning.encrypted_content"],
+      });
+    },
+  );
+
+  it("surfaces the fixed mismatch after the same-turn sanitized retry also fails",
+    async () => {
+      const requests: any[] = [];
+      const responses = [
+        sse([
+          failedEvent(
+            "invalid_request",
+            "STREAM_SECRET encrypted_content belongs to another model",
+          ),
+        ]),
+        sse([
+          failedEvent(
+            "invalid_request",
+            "STREAM_SECRET encrypted_content still incompatible",
+          ),
+        ]),
+      ];
+      const fetchMock = vi.fn(async (_url: any, init: RequestInit = {}) => {
+        requests.push(requestBody(init));
+        return responses.shift()!;
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const selectedModel = model("grok-4.6");
+      const history = priorToolHistory("openai-responses");
+
+      const failure = await streamSimpleXaiResponses(
+        selectedModel,
+        { messages: history } as any,
+        { apiKey: "oauth-token", sessionId: "issue-3-retry-exhausted" } as any,
+      ).result();
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(
+        requests[0].input.some((item: any) => item.type === "reasoning"),
+      ).toBe(true);
+      expect(
+        requests[1].input.some((item: any) => item.type === "reasoning"),
+      ).toBe(false);
+      expect(failure).toMatchObject({
+        stopReason: "error",
+        errorMessage: XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
+      });
+      expect(failure.errorMessage).not.toMatch(
+        /STREAM_SECRET|encrypted_content|invalid_request/,
+      );
+    },
+  );
+
+  it.each(["xai-responses", "openai-responses"] as const)(
     "classifies a streamed mismatch and recovers same-model history tagged %s",
     async (sourceApi) => {
       const requests: any[] = [];
@@ -135,6 +233,12 @@ describe("encrypted reasoning stream recovery", () => {
           failedEvent(
             "invalid_request",
             "STREAM_SECRET encrypted_content belongs to another model",
+          ),
+        ]),
+        sse([
+          failedEvent(
+            "invalid_request",
+            "STREAM_SECRET encrypted_content still incompatible",
           ),
         ]),
         sse([completedEvent("resp_recovered")]),
@@ -154,11 +258,14 @@ describe("encrypted reasoning stream recovery", () => {
       );
       const failure = await first.result();
 
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(inputTypes(requests[0])).toContain("reasoning");
       expect(
         requests[0].input.find((item: any) => item.type === "reasoning"),
       ).toEqual(reasoningItem);
+      expect(
+        requests[1].input.some((item: any) => item.type === "reasoning"),
+      ).toBe(false);
       expect(failure).toMatchObject({
         api: "xai-responses",
         provider: "xai-auth",
@@ -193,16 +300,16 @@ describe("encrypted reasoning stream recovery", () => {
       );
       const recovered = await second.result();
 
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
       expect(recovered).toMatchObject({
         stopReason: "stop",
         responseId: "resp_recovered",
       });
-      expectVisibleToolHistory(requests[1]);
+      expectVisibleToolHistory(requests[2]);
       expect(
-        requests[1].input.some((item: any) => item.type === "reasoning"),
+        requests[2].input.some((item: any) => item.type === "reasoning"),
       ).toBe(false);
-      expect(requests[1]).toMatchObject({
+      expect(requests[2]).toMatchObject({
         store: false,
         include: ["reasoning.encrypted_content"],
       });
@@ -267,55 +374,32 @@ describe("encrypted reasoning stream recovery", () => {
     const selectedModel = model("grok-4.6");
     const history = priorToolHistory("openai-responses");
 
-    const failure = await streamSimpleXaiResponses(
+    const recovered = await streamSimpleXaiResponses(
       selectedModel,
       { messages: history } as any,
       { apiKey: "oauth-token", sessionId: "issue-191" } as any,
     ).result();
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(
       requests[0].input.find((item: any) => item.type === "reasoning"),
     ).toEqual(reasoningItem);
-    expect(failure).toMatchObject({
-      provider: "xai-auth",
-      model: "grok-4.6",
-      stopReason: "error",
-    });
-    expect(failure.errorMessage).toBe(XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE);
-    expect(failure.errorMessage).not.toMatch(
-      /STREAM_SECRET|encrypted_content|server_error|400/,
-    );
-
-    const recovered = await streamSimpleXaiResponses(
-      selectedModel,
-      {
-        messages: [
-          ...history,
-          failure,
-          { role: "user", content: "continue", timestamp: 5 },
-        ],
-      } as any,
-      { apiKey: "oauth-token", sessionId: "issue-191" } as any,
-    ).result();
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(recovered).toMatchObject({
-      stopReason: "stop",
-      responseId: "resp_recovered_400",
-    });
-    expectVisibleToolHistory(requests[1]);
     expect(
       requests[1].input.some((item: any) => item.type === "reasoning"),
     ).toBe(false);
+    expect(recovered).toMatchObject({
+      provider: "xai-auth",
+      model: "grok-4.6",
+      stopReason: "stop",
+      responseId: "resp_recovered_400",
+    });
+    expectVisibleToolHistory(requests[1], { trailingUser: false });
 
     const restored = await streamSimpleXaiResponses(
       selectedModel,
       {
         messages: [
           ...history,
-          failure,
-          { role: "user", content: "continue", timestamp: 5 },
           recovered,
           { role: "user", content: "keep going", timestamp: 7 },
         ],
@@ -386,7 +470,7 @@ describe("encrypted reasoning stream recovery", () => {
     ).toEqual(reasoningItem);
   });
 
-  it("promotes an opaque Responses failed into mismatch recovery for the next turn", async () => {
+  it("promotes an opaque Responses failed into same-turn mismatch recovery", async () => {
     const requests: any[] = [];
     const responses = [
       sse([failedEvent("server_error", "temporary upstream blip")]),
@@ -400,41 +484,25 @@ describe("encrypted reasoning stream recovery", () => {
     const selectedModel = model("grok-4.6");
     const history = priorToolHistory("openai-responses");
 
-    const failure = await streamSimpleXaiResponses(
+    const recovered = await streamSimpleXaiResponses(
       selectedModel,
       { messages: history } as any,
       { apiKey: "oauth-token", sessionId: "opaque-promote" } as any,
     ).result();
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(failure).toMatchObject({
-      provider: "xai-auth",
-      model: "grok-4.6",
-      stopReason: "error",
-      errorMessage: XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
-    });
-    expect(failure.errorMessage).not.toBe(XAI_OPAQUE_RESPONSES_FAILED_MESSAGE);
-
-    const recovered = await streamSimpleXaiResponses(
-      selectedModel,
-      {
-        messages: [
-          ...history,
-          failure,
-          { role: "user", content: "continue", timestamp: 5 },
-        ],
-      } as any,
-      { apiKey: "oauth-token", sessionId: "opaque-promote" } as any,
-    ).result();
-
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(recovered).toMatchObject({
-      stopReason: "stop",
-      responseId: "resp_opaque_recovered",
-    });
-    expectVisibleToolHistory(requests[1]);
+    expect(
+      requests[0].input.some((item: any) => item.type === "reasoning"),
+    ).toBe(true);
     expect(
       requests[1].input.some((item: any) => item.type === "reasoning"),
     ).toBe(false);
+    expect(recovered).toMatchObject({
+      provider: "xai-auth",
+      model: "grok-4.6",
+      stopReason: "stop",
+      responseId: "resp_opaque_recovered",
+    });
+    expectVisibleToolHistory(requests[1], { trailingUser: false });
   });
 });

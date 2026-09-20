@@ -94,8 +94,8 @@ Issue [#79](https://github.com/BlockedPath/pi-xai-oauth/issues/79) implements th
 - active, uncompacted multi-turn input keeps a stable serialized prefix;
 - Pi permits replay only when provider, API, and exact model match, and omits failed or aborted assistant turns;
 - API-key direct Responses, media, catalog, usage, auth, and non-Responses routes do not receive this package policy;
-- a proxy HTTP 400 containing the narrow `encrypted_content` marker, or an HTTP-200 SSE `response.failed` carrying both `invalid_request` and that marker, produces fixed clean-session/model guidance, is redacted, and is not automatically retried;
-- after that fixed failure is retained in same-model history, the next request omits encrypted reasoning items from the rejected chain while preserving visible messages, function calls, tool results, and the `store:false` / encrypted-include policy; unrelated failures do not activate this omission.
+- a proxy HTTP 400 containing the narrow `encrypted_content` marker, or an HTTP-200 SSE `response.failed` carrying both `invalid_request` and that marker, produces fixed clean-session/model guidance and is redacted; when the current turn still has replayable encrypted reasoning and no assistant content has been forwarded, the stream omits those encrypted reasoning items and retries once before surfacing the failure;
+- after that fixed failure is retained in same-model history, the next request also omits encrypted reasoning items from the rejected chain while preserving visible messages, function calls, tool results, and the `store:false` / encrypted-include policy; unrelated failures do not activate this omission.
 
 Encrypted content is ordinary local Pi session state. `store:false` disables server-side response storage but does not prevent Pi from writing the complete item to its session JSONL under normal permissions and retention. This package does not separately encrypt, duplicate, inspect, render, or log it. Compaction may intentionally replace older active context, and trusted local extensions or users with file access can inspect session state.
 
