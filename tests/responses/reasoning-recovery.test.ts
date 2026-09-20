@@ -5,7 +5,10 @@ import {
   setXaiRuntimeModels,
 } from "../../extensions/xai/models";
 import { streamSimpleXaiResponses } from "../../extensions/xai/responses";
-import { XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE } from "../../extensions/xai/wire";
+import {
+  XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
+  XAI_OPAQUE_RESPONSES_FAILED_MESSAGE,
+} from "../../extensions/xai/wire";
 import { requestBody } from "../fixtures/http";
 import { TEST_MODEL } from "../fixtures/models";
 
@@ -381,5 +384,57 @@ describe("encrypted reasoning stream recovery", () => {
     expect(
       requests[1].input.find((item: any) => item.type === "reasoning"),
     ).toEqual(reasoningItem);
+  });
+
+  it("promotes an opaque Responses failed into mismatch recovery for the next turn", async () => {
+    const requests: any[] = [];
+    const responses = [
+      sse([failedEvent("server_error", "temporary upstream blip")]),
+      sse([completedEvent("resp_opaque_recovered")]),
+    ];
+    const fetchMock = vi.fn(async (_url: any, init: RequestInit = {}) => {
+      requests.push(requestBody(init));
+      return responses.shift()!;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const selectedModel = model("grok-4.6");
+    const history = priorToolHistory("openai-responses");
+
+    const failure = await streamSimpleXaiResponses(
+      selectedModel,
+      { messages: history } as any,
+      { apiKey: "oauth-token", sessionId: "opaque-promote" } as any,
+    ).result();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(failure).toMatchObject({
+      provider: "xai-auth",
+      model: "grok-4.6",
+      stopReason: "error",
+      errorMessage: XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
+    });
+    expect(failure.errorMessage).not.toBe(XAI_OPAQUE_RESPONSES_FAILED_MESSAGE);
+
+    const recovered = await streamSimpleXaiResponses(
+      selectedModel,
+      {
+        messages: [
+          ...history,
+          failure,
+          { role: "user", content: "continue", timestamp: 5 },
+        ],
+      } as any,
+      { apiKey: "oauth-token", sessionId: "opaque-promote" } as any,
+    ).result();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(recovered).toMatchObject({
+      stopReason: "stop",
+      responseId: "resp_opaque_recovered",
+    });
+    expectVisibleToolHistory(requests[1]);
+    expect(
+      requests[1].input.some((item: any) => item.type === "reasoning"),
+    ).toBe(false);
   });
 });

@@ -44,6 +44,9 @@ const ENCRYPTED_CONTENT_MISMATCH_PATTERN = /encrypted_content/;
 const INVALID_REQUEST_PATTERN = /\binvalid_request\b/i;
 export const XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE =
   "xAI could not replay encrypted reasoning for this model. Start a clean session or turn using the same xAI model.";
+/** Status-less responses-proxy failure text returned by safeXaiTransportErrorMessage. */
+export const XAI_OPAQUE_RESPONSES_FAILED_MESSAGE =
+  "xAI API error: Responses failed";
 
 export type XaiClientMode = "interactive" | "headless";
 export type XaiOAuthClientSurface = "ui" | "cli" | "headless";
@@ -319,7 +322,10 @@ export function safeXaiTransportErrorMessage(
     return `xAI proxy rejected ${XAI_CLIENT_IDENTIFIER}'s reviewed client/version contract${statusText}. Update ${XAI_CLIENT_IDENTIFIER}; if already current, open a compatibility issue with the HTTP status only. Last reviewed Grok Build revision: ${XAI_GROK_BUILD_REVIEWED_REVISION}.`;
   }
   const statusText = resolvedStatus ? ` with status ${resolvedStatus}` : "";
-  return `xAI API error: ${routeLabel(routeKind)} failed${statusText}`;
+  const message = `xAI API error: ${routeLabel(routeKind)} failed${statusText}`;
+  return routeKind === "responses-proxy" && !resolvedStatus
+    ? XAI_OPAQUE_RESPONSES_FAILED_MESSAGE
+    : message;
 }
 
 /** HTTP error carrying only stable route/status classification. */

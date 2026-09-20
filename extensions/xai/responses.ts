@@ -46,6 +46,7 @@ import {
 import {
   scrubXaiReservedHeaders,
   XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
+  XAI_OPAQUE_RESPONSES_FAILED_MESSAGE,
   xaiHttpErrorFromResponse,
   xaiJsonPostHeaders,
   xaiProxyRequestHeaders,
@@ -104,6 +105,68 @@ function shouldOmitRejectedEncryptedReasoning(
     );
   }
   return false;
+}
+
+function contextHasReplayableEncryptedReasoning(
+  context: Context,
+  model: Model<Api>,
+  selectedModelId: string,
+): boolean {
+  for (const message of context.messages) {
+    if (!isReplayCompatibleXaiMessage(message, model, selectedModelId))
+      continue;
+    for (const block of message.content ?? []) {
+      if (
+        !block ||
+        typeof block !== "object" ||
+        (block as { type?: unknown }).type !== "thinking"
+      ) {
+        continue;
+      }
+      const signature = (block as { thinkingSignature?: unknown })
+        .thinkingSignature;
+      if (typeof signature !== "string" || !signature) continue;
+      try {
+        const parsed = JSON.parse(signature) as { encrypted_content?: unknown };
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          typeof parsed.encrypted_content === "string" &&
+          parsed.encrypted_content.length > 0
+        ) {
+          return true;
+        }
+      } catch {
+        // Ignore malformed signatures; replay code will drop them later.
+      }
+    }
+  }
+  return false;
+}
+
+function promoteOpaqueResponsesFailure(
+  event: AssistantStreamEvent,
+  context: Context,
+  model: Model<Api>,
+  selectedModelId: string,
+): AssistantStreamEvent {
+  if (
+    event.type !== "error" ||
+    !event.error ||
+    typeof event.error !== "object" ||
+    !contextHasReplayableEncryptedReasoning(context, model, selectedModelId)
+  ) {
+    return event;
+  }
+  const error = event.error as Record<string, unknown>;
+  if (error.errorMessage !== XAI_OPAQUE_RESPONSES_FAILED_MESSAGE) return event;
+  return {
+    ...event,
+    error: {
+      ...error,
+      errorMessage: XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE,
+    },
+  };
 }
 
 function omitRejectedEncryptedReasoning(
@@ -299,6 +362,8 @@ export async function createXaiResponse(
  * same-model history are aligned only for internal conversion; after a fixed
  * encrypted-reasoning mismatch, the next same-model request omits rejected
  * encrypted reasoning while retaining visible and tool-result history.
+ * Status-less `Responses failed` errors with replayable encrypted reasoning
+ * are promoted onto the same mismatch recovery path.
  *
  * @param model xAI provider model selected by pi.
  * @param context Conversation messages and tool context to stream.
@@ -535,8 +600,20 @@ export function streamSimpleXaiResponses(
       for await (const event of inner as AsyncIterable<AssistantStreamEvent>) {
         if (event.type === "done" || event.type === "error")
           releaseRedirectGuard();
+        const normalized = normalizeXaiStreamEvent(
+          event,
+          grokNativeToolRoutes,
+          model,
+        );
         stream.push(
-          normalizeXaiStreamEvent(event, grokNativeToolRoutes, model),
+          normalized.type === "error"
+            ? promoteOpaqueResponsesFailure(
+                normalized,
+                context,
+                model,
+                selectedModelId,
+              )
+            : normalized,
         );
       }
       releaseRedirectGuard();
@@ -554,6 +631,16 @@ export function streamSimpleXaiResponses(
             )
           : error;
       const message = streamErrorMessage(model, safeError);
+      if (
+        message.errorMessage === XAI_OPAQUE_RESPONSES_FAILED_MESSAGE &&
+        contextHasReplayableEncryptedReasoning(
+          context,
+          model,
+          selectedModelId,
+        )
+      ) {
+        message.errorMessage = XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE;
+      }
       stream.push({ type: "error", reason: "error", error: message });
       stream.end(message);
     } finally {

@@ -19,6 +19,12 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 - Omitted empty `current` rows from `/xai-usage csv` while retaining valid zero/false values and history-only exports. Empty snapshots now emit only the CSV header; documented that `total_used_cents` is history-only and excludes current usage (#213).
 
+## 1.5.3 - 2026-09-20
+
+### Fixed
+
+- Promoted status-less `Responses failed` errors with replayable encrypted reasoning onto the existing same-model mismatch recovery path so `continue` omits rejected encrypted reasoning (#1).
+
 ## 1.5.2 - 2026-08-23
 
 ### Fixed
