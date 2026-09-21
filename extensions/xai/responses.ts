@@ -5,7 +5,7 @@ import type {
   Model,
   SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
-import { openAIResponsesApi } from "@earendil-works/pi-ai/compat";
+import * as piAiCompat from "@earendil-works/pi-ai/compat";
 import { randomUUID } from "crypto";
 import { readBoundedResponseText } from "./bounded-body";
 import { compactXaiInlineImages } from "./images";
@@ -51,7 +51,14 @@ import {
   xaiProxyRequestHeaders,
 } from "./wire";
 
-const streamSimpleOpenAIResponses = openAIResponsesApi().streamSimple;
+const streamSimpleOpenAIResponses = piAiCompat.openAIResponsesApi().streamSimple;
+type DelegateContext = Parameters<typeof streamSimpleOpenAIResponses>[1];
+// SAFETY: Pi 0.86 exports normalizeContext with this signature; older supported
+// versions omit it and require the original top-level prompt/tools instead.
+// Infer the delegate's context type and probe without importing an absent export.
+const normalizeDelegateContext = (piAiCompat as unknown as {
+  normalizeContext?: (context: Context) => DelegateContext;
+}).normalizeContext;
 
 const XAI_RESPONSES_DELEGATE_API = "openai-responses";
 
@@ -74,7 +81,7 @@ function prepareXaiDelegateContext(
   context: Context,
   model: Model<Api>,
   selectedModelId: string,
-): Context {
+): DelegateContext {
   let changed = false;
   const messages = context.messages.map((message) => {
     if (
@@ -85,7 +92,11 @@ function prepareXaiDelegateContext(
     changed = true;
     return { ...message, api: XAI_RESPONSES_DELEGATE_API };
   });
-  return changed ? { ...context, messages } : context;
+  const alignedContext = changed ? { ...context, messages } : context;
+  if (normalizeDelegateContext) return normalizeDelegateContext(alignedContext);
+  // Only the pre-0.86 branch uses this identity conversion. Never discard its
+  // top-level fields or fabricate transcript messages for the legacy delegate.
+  return alignedContext as DelegateContext;
 }
 
 function shouldOmitRejectedEncryptedReasoning(

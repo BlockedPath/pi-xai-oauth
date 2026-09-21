@@ -8,15 +8,18 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ### Added
 
+- Added entitlement-aware Grok 4.7 (`grok-4.7`) metadata: text+image input, 500K context, official short-context pricing, low/medium/high/xhigh reasoning, Pi minimal-to-low mapping, and high-by-default text generation. Authenticated catalog membership/capabilities stay authoritative; Grok 4.6 remains the setup/offline default, with no unverified aliases or Fast service routing.
 - Added `/xai-usage csv` to display copyable current/history usage CSV with exact cent values, blank missing fields, and spreadsheet-formula protection. It reuses the explicit bounded OAuth-only lookup, exports no identity, headers, or raw bodies, writes no files, and leaves status opt-in unchanged.
 
 ### Changed
 
-- Extended aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.86.0`, with exact packed-package matrix endpoints at 0.80.1 and 0.85.1. Pi 0.85.0 remains explicitly excluded, and unsupported-version checks cover that gap as well as the lower and upper limits.
+- Extended aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.87.0`, with exact packed-package matrix endpoints at 0.80.1 and 0.86.1. Pi 0.85.0 remains explicitly excluded, and unsupported-version checks cover that gap as well as the lower and upper limits.
 - Made reasoning-parity tests tolerate Pi 0.85's removal of the built-in API-key-only `grok-build-0.1` entry while preserving unconditional rejection of that model from the OAuth catalog.
 
 ### Fixed
 
+- Kept Grok 4.7 visible when the authenticated catalog advertises its 1M completion limit alongside a 500K context window. Clamp valid independent completion limits to context instead of rejecting the model; retain absolute numeric bounds and normalized cache validation.
+- Adapted the Responses delegate to Pi 0.86's normalized transcript contract without losing legacy system prompts/tools or importing unavailable older-version exports. Transcript system/tool updates and encrypted-reasoning replay/retry remain intact.
 - Recover encrypted-reasoning mismatches within the same `xai-auth` turn by retrying once without rejected reasoning, only before assistant content is forwarded and when replayed reasoning was sent. Preserve cancellation, local validation, visible/tool history, and next-turn/cross-model protections; failed retries retain fixed, redacted guidance (#220).
 - Omitted empty `current` rows from `/xai-usage csv` while retaining valid zero/false values and history-only exports. Empty snapshots now emit only the CSV header; documented that `total_used_cents` is history-only and excludes current usage (#213).
 

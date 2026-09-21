@@ -1,0 +1,10 @@
+{
+  "data": [
+    {
+      "model": "grok-4.7",
+      "api_backend": "responses",
+      "context_window": 500000,
+      "max_completion_tokens": 1000000
+    }
+  ]
+}

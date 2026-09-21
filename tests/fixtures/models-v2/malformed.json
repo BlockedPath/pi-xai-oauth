@@ -7,7 +7,7 @@
     { "model": "missing-context", "api_backend": "responses" },
     { "model": "bad context", "api_backend": "responses", "context_window": 100000 },
     { "model": "negative-context", "api_backend": "responses", "context_window": -1 },
-    { "model": "oversized-output", "api_backend": "responses", "context_window": 10000, "max_completion_tokens": 20000 },
+    { "model": "oversized-output", "api_backend": "responses", "context_window": 10000, "max_completion_tokens": 1000001 },
     { "model": "hidden-model", "api_backend": "responses", "context_window": 100000, "hidden": true },
     { "model": "chat-only-model", "api_backend": "chat_completions", "context_window": 100000 },
     {

@@ -123,20 +123,20 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     }
   });
 
-  it("documents grok-4.6 known levels including authenticated xhigh", () => {
-    // Live `/models-v2` advertises low/medium/high/xhigh for Grok 4.6. xai-auth
-    // keeps Pi's `minimal` → xAI `low` mapping used for Grok 4.5.
-    expect(supportedLevels(known("grok-4.6"))).toEqual([
+  it.each(["grok-4.6", "grok-4.7"])("documents %s known levels including xhigh", (modelId) => {
+    // Grok 4.6 has authenticated evidence; Grok 4.7 has official public docs.
+    // Both keep Pi's `minimal` → xAI `low` mapping used for Grok 4.5.
+    expect(supportedLevels(known(modelId))).toEqual([
       "minimal",
       "low",
       "medium",
       "high",
       "xhigh",
     ]);
-    expect(known("grok-4.6").thinkingLevelMap?.minimal).toBe("low");
-    expect(known("grok-4.6").thinkingLevelMap?.xhigh).toBe("xhigh");
-    expect(supportedLevels(known("grok-4.6"))).not.toContain("off");
-    expect(supportedLevels(known("grok-4.6"))).not.toContain("max");
+    expect(known(modelId).thinkingLevelMap?.minimal).toBe("low");
+    expect(known(modelId).thinkingLevelMap?.xhigh).toBe("xhigh");
+    expect(supportedLevels(known(modelId))).not.toContain("off");
+    expect(supportedLevels(known(modelId))).not.toContain("max");
   });
 
   it("never advertises the API-key-only grok-build-0.1 through xai-auth", () => {
@@ -195,11 +195,11 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
     });
   });
 
-  it("keeps xhigh and max hidden unless the catalog names them", () => {
+  it.each(["grok-4.5", "grok-4.7"])("keeps %s xhigh and max hidden unless the catalog names them", (modelId) => {
     const [bounded] = normalizeXaiCatalogPayload({
       data: [
         {
-          model: "grok-4.5",
+          model: modelId,
           api_backend: "responses",
           context_window: 500_000,
           supports_reasoning_effort: true,
@@ -213,7 +213,7 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
     const [extended] = normalizeXaiCatalogPayload({
       data: [
         {
-          model: "grok-4.5",
+          model: modelId,
           api_backend: "responses",
           context_window: 500_000,
           supports_reasoning_effort: true,
@@ -226,12 +226,11 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
     expect(supportedLevels(extended)).not.toContain("max");
   });
 
-  it("maps authenticated grok-4.6 efforts including xhigh and minimal→low", () => {
-    const [grok46] = normalizeXaiCatalogPayload({
+  it.each(["grok-4.6", "grok-4.7"])("maps authenticated %s efforts including xhigh and minimal→low", (modelId) => {
+    const [model] = normalizeXaiCatalogPayload({
       data: [
         {
-          model: "grok-4.6",
-          name: "Grok 4.6",
+          model: modelId,
           api_backend: "responses",
           context_window: 500_000,
           supports_reasoning_effort: true,
@@ -244,15 +243,15 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
         },
       ],
     });
-    expect(grok46.id).toBe("grok-4.6");
-    expect(supportedLevels(grok46)).toEqual([
+    expect(model.id).toBe(modelId);
+    expect(supportedLevels(model)).toEqual([
       "minimal",
       "low",
       "medium",
       "high",
       "xhigh",
     ]);
-    expect(grok46.thinkingLevelMap?.minimal).toBe("low");
-    expect(grok46.thinkingLevelMap?.xhigh).toBe("xhigh");
+    expect(model.thinkingLevelMap?.minimal).toBe("low");
+    expect(model.thinkingLevelMap?.xhigh).toBe("xhigh");
   });
 });

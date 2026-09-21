@@ -20,6 +20,7 @@ import {
 import { XaiModelInputProvenance } from "../../extensions/xai/models";
 import { createTempDir } from "../fixtures/temp";
 import apiKeyOnlyFixture from "../fixtures/models-v2/api-key-only.json";
+import grok47Limits from "../fixtures/models-v2/grok-4.7-limits.json";
 import { headerValue, jsonResponse } from "../fixtures/http";
 
 const now = 2_000_000_000_000;
@@ -93,6 +94,25 @@ describe("catalog cache selection", () => {
     expect((await selectXaiModelCatalog({ cachePath: path, now })).source).toBe(
       "curated-fallback",
     );
+  });
+
+  it("retains Grok 4.7 through refresh and cache reload with its completion limit clamped", async () => {
+    const path = join(temp.path, "grok47", "models-v2.json");
+    await writeCache(path, now - 1);
+    const fetchImpl = vi.fn(async () => jsonResponse(grok47Limits));
+    const options = { credential: { access: token }, cachePath: path, now, fetchImpl };
+    const refreshed = await selectXaiModelCatalog({ ...options, forceRefresh: true });
+    expect(refreshed.source).toBe("remote");
+    expect(refreshed.models.map(({ id }) => id)).toEqual(["grok-4.7"]);
+    expect(refreshed.models[0]).toMatchObject({ contextWindow: 500_000, maxTokens: 500_000 });
+
+    const reloaded = await selectXaiModelCatalog(options);
+    expect(reloaded.source).toBe("fresh-cache");
+    expect(reloaded.models).toEqual(refreshed.models);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const contents = await readFile(path, "utf8");
+    expect(JSON.parse(contents).models).toEqual(refreshed.models);
+    expect(contents).not.toContain(token);
   });
 
   it("migrates schema 1 in memory without promoting legacy input to authenticated evidence", async () => {

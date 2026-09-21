@@ -9,36 +9,39 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 [![pi compatible](https://img.shields.io/badge/pi-Compatible-blueviolet)](https://pi.dev)
 
-**xAI (Grok) OAuth provider for pi** — now with **Grok 4.6**, reasoning, long context, and custom xAI tools.
+**xAI (Grok) OAuth provider for pi** — now with **Grok 4.7** catalog support, reasoning, long context, and custom xAI tools.
 
 ```bash
 npx pi-xai-oauth
 ```
 
-## ✨ New: Grok 4.6
+## ✨ New: Grok 4.7
 
 | | |
 | --- | --- |
-| **Model ID** | `grok-4.6` |
+| **Model ID** | `grok-4.7` |
 | **Role** | xAI flagship for coding, agentic tasks, and knowledge work |
 | **Context** | 500K tokens |
 | **Input** | text + image |
 | **Reasoning** | `low` / `medium` / `high` / `xhigh` (defaults to **high**; cannot be disabled) |
-| **Fast mode** | Same model with **`low`** reasoning effort — not a separate model ID |
-| **Pricing** | $2 / $6 per 1M input/output · $0.50 cache read |
+| **Pricing** | Below 200K prompt tokens: $2 / $6 per 1M input/output · $0.50 cache read |
+
+Available through `xai-auth` when your authenticated `/models-v2` catalog returns it. Existing selections and the Grok 4.6 setup/offline default are unchanged; public API availability alone does not establish OAuth entitlement. Run `/login xai-auth` to force an account-bound catalog refresh; `/reload` respects the 15-minute cache TTL.
 
 ```bash
-pi --model grok-4.6 "Ship this feature end-to-end"
-pi --model grok-4.6:high "Review this architecture for failure modes"
-pi --model grok-4.6:xhigh "Deep multi-step design review"
-pi --model grok-4.6:low "Quick status check"   # fast mode
+pi --provider xai-auth --model grok-4.7 "Ship this feature end-to-end"
+pi --provider xai-auth --model grok-4.7:high "Review this architecture for failure modes"
+pi --provider xai-auth --model grok-4.7:xhigh "Deep multi-step design review"
+pi --provider xai-auth --model grok-4.7:low "Quick status check"
 ```
+
+Low reasoning is a latency trade-off, **not** the separately priced **Grok 4.7 Fast** service, which xAI restricts to Cursor and Grok Build. This package does not invent a Fast model alias or enable its service routing. See [source notes](#grok-47-source-notes) for pricing and capability limits.
 
 This package adds xAI's **account-specific OAuth model catalog** to pi, with **Grok 4.6** as the offline fallback/default, proper OAuth login, automatic token refresh, and a suite of custom xAI tools (`xai_generate_text`, `web_search`, `xai_x_search`, etc.). The normalized cache remains exact; registration may additionally expose narrowly verified compatibility routes such as Grok 4.3 and Composer only while their required authenticated entitlement source is present. Entitled accounts that still receive `grok-4.5` keep that model as a first-class catalog entry.
 
 > **Latest release:** `pi-xai-oauth` **1.5.2** closes the remaining Grok-native leaf-symlink race by reading and writing through checked descriptors. It publishes the canonical `pi-xai-oauth` package on npmjs and a scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages from the same validated GitHub Release. Setup treats both registry names as one extension and removes duplicate aliases before they can register conflicting tools. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
 >
-> **Published compatibility:** 1.5.2 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. Its exact tested boundaries are 0.80.1 and 0.84.2. The unreleased checkout extends support to Pi 0.85.1 while excluding 0.85.0; see [Pi Compatibility](#pi-compatibility).
+> **Published compatibility:** 1.5.2 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. Its exact tested boundaries are 0.80.1 and 0.84.2. The unreleased checkout extends support through Pi 0.86.1 while excluding 0.85.0; see [Pi Compatibility](#pi-compatibility).
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and fix history.
 
@@ -46,7 +49,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 
 ## Table of Contents
 
-- [✨ New: Grok 4.6](#-new-grok-46)
+- [✨ New: Grok 4.7](#-new-grok-47)
 - [Features](#features)
 - [Package Scope](#package-scope)
 - [Changelog](CHANGELOG.md)
@@ -76,7 +79,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 - **Automatic browser open** — browser login opens your default browser automatically and retains the matching-state full-redirect paste fallback
 - **Token refresh** — refresh tokens are stored and rotated automatically before expiry
 - **Reuses existing credentials** — auto-detects `~/.grok/auth.json` from the official Grok CLI
-- **Grok 4.6 flagship (default)** — xAI's newest model for coding, agentic tasks, and knowledge work; 500K context, text+image input, high reasoning by default, with optional `xhigh`
+- **Grok 4.7 when entitled** — current flagship metadata, 500K context, text+image input, and `low` / `medium` / `high` / `xhigh` reasoning; authenticated capabilities remain authoritative
+- **Grok 4.6 (default)** — retained setup/offline fallback for coding, agentic tasks, and knowledge work; 500K context, text+image input, high reasoning by default, with optional `xhigh`
 - **Grok 4.6 fast mode** — same model with `low` reasoning effort (`/think low` or `grok-4.6:low`); not a separate model ID
 - **Grok 4.5 still supported** — remains a first-class entitled catalog model when `/models-v2` returns it
 - **Grok 4.3 OAuth compatibility** — advertises the independently verified `grok-4.3` request route only when `grok-4.5` is entitled, retaining authenticated input evidence and conservative limits
@@ -205,13 +209,15 @@ Authenticate with `/login xai`. Use `/login xai-auth` only when you want this pa
 The unreleased checkout uses the same bounded range for both Pi runtime peers:
 
 ```text
-@earendil-works/pi-ai:            >=0.80.1 <0.85.0 || >=0.85.1 <0.86.0
-@earendil-works/pi-coding-agent:  >=0.80.1 <0.85.0 || >=0.85.1 <0.86.0
+@earendil-works/pi-ai:            >=0.80.1 <0.85.0 || >=0.85.1 <0.87.0
+@earendil-works/pi-coding-agent:  >=0.80.1 <0.85.0 || >=0.85.1 <0.87.0
 ```
 
-The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **0.85.1**, the latest release inside the allowed line when this policy was reviewed. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
+The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **0.86.1**, the latest release inside the allowed line when this policy was reviewed. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
 
-Pi **0.85.0 is explicitly excluded** because its packaged SDK imports fail on a missing `@earendil-works/pi-server` dependency ([upstream issue #9132](https://github.com/earendil-works/pi/issues/9132)); Pi 0.85.1 fixes that packaging defect. The exclusive `<0.86.0` upper bound remains deliberate: Pi is pre-1.0, so a new minor line may contain breaking API or loader changes and must pass the packed compatibility suite before support is claimed. Strict npm peer resolution rejects older releases such as 0.79.10, the excluded 0.85.0 release, and the untested 0.86 line. Published `pi-xai-oauth` 1.5.2 retains its original `>=0.80.1 <0.85.0` peer range until a new package release publishes this change.
+Pi 0.86 moves provider system instructions and tool declarations into normalized transcript messages. The Responses adapter uses Pi's native normalizer when available, preserving system/tool deltas and reasoning-recovery behavior; older Pi versions retain their legacy top-level prompt/tools unchanged. Both 0.86.0 and 0.86.1 passed clean packed candidate validation before widening this range.
+
+Pi **0.85.0 is explicitly excluded** because its packaged SDK imports fail on a missing `@earendil-works/pi-server` dependency ([upstream issue #9132](https://github.com/earendil-works/pi/issues/9132)); Pi 0.85.1 fixes that packaging defect. The exclusive `<0.87.0` upper bound remains deliberate: Pi is pre-1.0, so a new minor line may contain breaking API or loader changes and must pass the packed compatibility suite before support is claimed. Strict npm peer resolution rejects older releases such as 0.79.10, the excluded 0.85.0 release, and the untested 0.87 line. Published `pi-xai-oauth` 1.5.2 retains its original `>=0.80.1 <0.85.0` peer range until a new package release publishes this change.
 
 Older `pi-xai-oauth` 1.2.4 builds supported Pi 0.79.8's then-current Responses guard. Current code uses the Pi 0.80 compat dispatcher after the 1.3.2 export migration and 1.3.3 loader-resolution fix, so that historical statement is not the current minimum.
 
@@ -329,7 +335,8 @@ Common catalog entries include:
 
 | Model ID | Description |
 | ---------- | ------------- |
-| `grok-4.6` | **Default and curated offline fallback.** xAI flagship; reasoning low (**fast**) / medium / high (default) / xhigh, 500K context, text+image. |
+| `grok-4.7` | When entitled: current flagship; reasoning low / medium / high (default) / xhigh, 500K context, text+image. |
+| `grok-4.6` | **Default and curated offline fallback.** Previous flagship; reasoning low (**fast**) / medium / high (default) / xhigh, 500K context, text+image. |
 | `grok-4.5` | When entitled: previous flagship; reasoning low (**fast**) / medium / high (default), 500K context, text+image. |
 | `grok-4.3` | OAuth-compatible request model when `grok-4.5` is entitled; keeps authenticated input evidence and conservative catalog-derived limits. |
 | `grok-build` | When entitled: Grok Build coding model (same Grok-native tools as other xai-auth models). |
@@ -341,6 +348,7 @@ Common catalog entries include:
 The exact list is account-specific and can change independently of package releases. From the pi TUI:
 
 ```
+/model grok-4.7
 /model grok-4.6
 /model grok-4.5
 /model grok-4.3
@@ -353,7 +361,8 @@ The exact list is account-specific and can change independently of package relea
 From the command line:
 
 ```bash
-pi --model grok-4.6 "Your prompt here"
+pi --provider xai-auth --model grok-4.7 "Your prompt here"
+pi --model grok-4.6 "Use Grok 4.6"
 pi --model grok-4.5 "Use Grok 4.5"
 pi --model grok-4.3 "Use Grok 4.3"
 pi --model grok-build "Implement this feature"
@@ -403,13 +412,13 @@ The cache stores only normalized model definitions, bounded input-capability pro
 
 ### Reasoning / Thinking Levels
 
-Grok 4.6, Grok 4.5, and the entitlement-gated Grok 4.3 compatibility route expose configurable thinking levels via pi's `/think` command or `model:effort` syntax. There is **no separate `grok-4.6-fast` model** — on Grok 4.6, “fast mode” is **`reasoning_effort: "low"`** on the same model ID.
+Grok 4.7, Grok 4.6, Grok 4.5, and the entitlement-gated Grok 4.3 compatibility route expose configurable thinking levels via pi's `/think` command or `model:effort` syntax. Lowering reasoning effort to `low` can reduce latency on the same model ID; it does not enable the restricted Grok 4.7 Fast service.
 
 ```
-/think xhigh    # Grok 4.6 only (when catalog advertises it)
+/think xhigh    # Grok 4.7 / 4.6 (when catalog advertises it)
 /think high
 /think medium
-/think low      # Grok 4.6 / 4.5 fast mode
+/think low      # Lower-latency reasoning, not the Grok 4.7 Fast service
 ```
 
 Or via CLI:
@@ -421,14 +430,14 @@ pi --model grok-4.6:medium "Summarize this design doc"
 pi --model grok-4.6:low "What's the weather?"   # fast / latency-sensitive
 ```
 
-| Effort | Grok 4.6 behavior | Best for |
+| Effort | Grok 4.7 / 4.6 behavior | Best for |
 | -------- | ----------------------------------- | ---------- |
 | **`xhigh`** | Highest advertised reasoning effort | Hardest multi-step design and analysis |
 | **`high`** (default) | More reasoning tokens, deeper thinking | Hard coding, complex math, multi-step logic |
 | **`medium`** | Balanced thinking vs latency | Analysis and longer-context work |
-| **`low`** (**fast mode**) | Some reasoning, still fast | Latency-sensitive agents and simple tool calling |
+| **`low`** | Some reasoning, lower latency | Latency-sensitive agents and simple tool calling |
 
-`grok-4.6` defaults to **high** when no effort is specified; reasoning **cannot be disabled** (`/think off` is not supported for this model). Every model selected through the OAuth-only `xai-auth` runtime catalog sends Responses traffic through xAI's Grok CLI session endpoint using the same X account OAuth token. An entitled `grok-build` entry still receives its legacy Responses payload/header compatibility behavior, while every `xai-auth` model uses the same Grok-native local tool adapters. The Composer alias (`grok-composer-2.5-fast`) follows the Grok 4.5 payload path. `grok-4.20-0309-reasoning` reasons automatically and does not accept a configurable effort parameter. `grok-4.20-multi-agent-0309` uses `medium` for 4 agents and `high` for 16 agents.
+`grok-4.7` and `grok-4.6` default to **high** when no effort is specified; reasoning **cannot be disabled** (`/think off` is not supported for these models). Every model selected through the OAuth-only `xai-auth` runtime catalog sends Responses traffic through xAI's Grok CLI session endpoint using the same X account OAuth token. An entitled `grok-build` entry still receives its legacy Responses payload/header compatibility behavior, while every `xai-auth` model uses the same Grok-native local tool adapters. The Composer alias (`grok-composer-2.5-fast`) follows the Grok 4.5 payload path. `grok-4.20-0309-reasoning` reasons automatically and does not accept a configurable effort parameter. `grok-4.20-multi-agent-0309` uses `medium` for 4 agents and `high` for 16 agents.
 
 #### Switching between `xai` and `xai-auth`
 
@@ -436,12 +445,23 @@ Setup seeds Pi's built-in `xai` provider when no provider is configured, so the 
 
 | Model | Built-in `xai` | `xai-auth` | Why |
 | ------- | ---------------- | ------------ | ----- |
+| `grok-4.7` | follows Pi's generated catalog when present | `minimal` / `low` / `medium` / `high` / `xhigh` | Known metadata follows official docs; authenticated levels override it. Pi's `minimal` maps to xAI `low`. This package does not modify built-in `xai`. |
 | `grok-4.6` | follows Pi's generated catalog when present | `minimal` / `low` / `medium` / `high` / `xhigh` | **Intentional.** `xai-auth` maps Pi's `minimal` onto xAI's `low`, and advertises `xhigh` when `/models-v2` lists it. |
 | `grok-4.5` | `low` / `medium` / `high` | `minimal` / `low` / `medium` / `high` | **Intentional.** `xai-auth` maps Pi's `minimal` onto xAI's `low`, so `/think minimal` and `/think low` send the same `reasoning_effort: "low"` request. Selecting `minimal` never sends an effort xAI did not advertise. |
 | `grok-4.3` | `off` / `minimal` / `low` / `medium` / `high` | same | Identical on both paths. |
 | `grok-build-0.1` | available | **never advertised** | API-key-only model; it is excluded from `xai-auth` regardless of what a catalog response contains. |
 
 Authenticated evidence always wins on the `xai-auth` path. If `/models-v2` reports `supports_reasoning_effort: false`, the model drops to `off` only even when known metadata lists `low`/`medium`/`high`. Levels absent from `reasoning_efforts` stay hidden, and Pi clamps a request for a hidden level down to the nearest advertised one. `xhigh` appears when the catalog names xAI's `xhigh` or `max` effort; Pi's own `max` level is never advertised for Grok.
+
+### Grok 4.7 source notes
+
+- [Official overview](https://docs.x.ai/overview) and [Grok 4.7 model details](https://docs.x.ai/developers/models/grok-4.7) — exact model ID, Responses support, text+image input, 500K context, and standard-tier $2/$0.50/$6 input/cache-read/output pricing per million tokens.
+- [Reasoning documentation](https://docs.x.ai/developers/model-capabilities/text/reasoning) — low/medium/high/xhigh, default high, no reasoning-off mode. Public Responses returns encrypted reasoning by default; the existing exact-model replay and `store: false` policy is unchanged.
+- [Pricing](https://docs.x.ai/developers/pricing) — long-context standard pricing is $4/$1/$12 per million input/cache-read/output tokens from the 200K prompt threshold. Package cost metadata retains short-context rates, not tier-aware billing. Grok 4.7 Fast has separate rates and is restricted to Cursor/Grok Build.
+
+No Grok 4.7-specific output-token maximum is published on the model page. Known metadata retains the existing 131,072-token Responses default only when no authenticated completion limit is supplied. An explicitly authorized, redacted OAuth catalog check found a Grok 4.7 entry advertising 500,000 context tokens and 1,000,000 completion tokens independently. Valid completion limits are clamped to the context window for Pi (500,000 in that case), not used to discard the model. Regression fixtures retain only allowlisted model metadata; no raw authenticated response is stored, and no live generation was tested. Grok 4.7 is never inferred from a Grok 4.6/4.5 entitlement, and no new alias is added.
+
+If an earlier build cached a catalog without Grok 4.7, reload the updated extension and use `/login xai-auth` to force an account-bound catalog refresh. `/reload` alone still respects the 15-minute catalog cache TTL.
 
 ### Grok 4.6 source notes
 
@@ -826,7 +846,7 @@ pi update npm:pi-xai-oauth
 
 This pulls the latest version from npm and updates your installed extension.
 
-Published version 1.5.2 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.2. It preserves Pi 0.84 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. The unreleased checkout adds Pi 0.85.1 support while excluding 0.85.0, as described in [Pi Compatibility](#pi-compatibility). See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall dependencies with `npm ci` so devDependencies match the tested peer range.
+Published version 1.5.2 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.2. It preserves Pi 0.84 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. The unreleased checkout adds support through Pi 0.86.1 while excluding 0.85.0, as described in [Pi Compatibility](#pi-compatibility). See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall dependencies with `npm ci` so devDependencies match the tested peer range.
 
 ```bash
 pi remove npm:pi-xai-oauth && pi install .
