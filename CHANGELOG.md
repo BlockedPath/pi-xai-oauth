@@ -18,6 +18,7 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ### Fixed
 
+- Allowed `xhigh` reasoning in the opt-in `xai_generate_text` tool schema, with schema-validation and dispatch coverage for Grok 4.7.
 - Kept Grok 4.7 visible when the authenticated catalog advertises its 1M completion limit alongside a 500K context window. Clamp valid independent completion limits to context instead of rejecting the model; retain absolute numeric bounds and normalized cache validation.
 - Adapted the Responses delegate to Pi 0.86's normalized transcript contract without losing legacy system prompts/tools or importing unavailable older-version exports. Transcript system/tool updates and encrypted-reasoning replay/retry remain intact.
 - Recover encrypted-reasoning mismatches within the same `xai-auth` turn by retrying once without rejected reasoning, only before assistant content is forwarded and when replayed reasoning was sent. Preserve cancellation, local validation, visible/tool history, and next-turn/cross-model protections; failed retries retain fixed, redacted guidance (#220).

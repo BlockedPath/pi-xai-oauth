@@ -1,3 +1,4 @@
+import { validateToolArguments } from "@earendil-works/pi-ai";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -182,6 +183,23 @@ describe("custom xAI tools", () => {
       reasoning: { effort: "low" },
     });
     expect(requests.at(-1)?.url).toBe("https://cli-chat-proxy.grok.com/v1/responses");
+  });
+  it("accepts and dispatches Grok 4.7 xhigh through Pi's tool-schema validation", async () => {
+    const tool = h.tools.get("xai_generate_text");
+    const call = {
+      type: "toolCall" as const,
+      id: "call",
+      name: tool.name,
+      arguments: { prompt: "hi", model: "grok-4.7", reasoning_effort: "xhigh" },
+    };
+    const params = validateToolArguments(tool, call);
+    expect(params.reasoning_effort).toBe("xhigh");
+    await run(tool.name, params);
+    expect(requests.at(-1)?.body).toMatchObject({ model: "grok-4.7", reasoning: { effort: "xhigh" } });
+    expect(() => validateToolArguments(tool, {
+      ...call,
+      arguments: { ...call.arguments, reasoning_effort: "max" },
+    })).toThrow(/Validation failed/);
   });
   it("omits reasoning for Composer and uses protected proxy metadata", async () => {
     await run("xai_generate_text", {

@@ -63,7 +63,7 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
           model: { type: "string", description: "Entitled OAuth model to use; defaults to the active xAI model" },
           reasoning_effort: {
             type: "string",
-            enum: ["none", "low", "medium", "high"],
+            enum: ["none", "low", "medium", "high", "xhigh"],
             description:
               "Reasoning effort. Defaults to high for grok-4.5/grok-4.6/grok-4.7 and medium for other models when omitted.",
           },
@@ -400,7 +400,7 @@ Be specific and cite examples where helpful.`;
           return xaiToolDisabledError("xai_edit_image");
         }
 
-        let input;
+        let input: ReturnType<typeof validateXaiEditImageInput>;
         try {
           input = validateXaiEditImageInput(params);
         } catch (error) {
@@ -474,7 +474,7 @@ Be specific and cite examples where helpful.`;
         if (!activeModelForXaiTool(pi, ctx, "xai_image_to_video")) {
           return xaiToolDisabledError("xai_image_to_video");
         }
-        let input;
+        let input: ReturnType<typeof validateXaiImageToVideoInput>;
         try {
           input = validateXaiImageToVideoInput(params);
         } catch (error) {

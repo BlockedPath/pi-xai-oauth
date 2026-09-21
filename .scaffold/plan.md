@@ -27,11 +27,11 @@ After clarification, the user explicitly selected “Include Pi 0.86.1 (Recommen
 
 ## Delivery authorization
 
-After validation, the user requested a commit and PR; local commit `7558730` was created. Before push, the user paused delivery because Grok 4.7 was missing from the selector. Two separately authorized read-only catalog probes found the normalization bug: a valid 1M completion limit exceeded the 500K context window and caused the entire model to be discarded.
+After validation, the user requested a commit and PR; an initial local commit was created and later amended into published commit `3a545ff2aa26440fc5c12a0d24ff097f8c6077d4`. Before push, the user paused delivery because Grok 4.7 was missing from the selector. Two separately authorized read-only catalog probes found the normalization bug: a valid 1M completion limit exceeded the 500K context window and caused the entire model to be discarded.
 
 - [x] Reproduce the exact allowlisted metadata shape across normalization, cache refresh/reload, and provider registration.
 - [x] Keep absolute completion bounds and clamp valid independent limits to context instead of rejecting the model; focused tests and typecheck pass.
 - [x] Run full revalidation: 849 tests, loader, typecheck, coverage, policy/pack/mirror checks, static diagnostics, and Pi 0.80.1/0.86.1 packed boundaries.
 - [x] User-provided screenshot confirms Grok 4.7 is visible under `xai-auth` after the fix.
 
-Resume the original commit/push/PR request: fold the verified fix into the unpublished feature commit, push normally, and open the PR against `main`. Do not upload the user's screenshot. No merge, package publication, or additional live probe is authorized.
+PR #223 is open from the published feature branch. The user now authorizes merging if CI and review findings are clear, then syncing local `main`. Address the verified `xhigh` tool-schema finding and stale delivery note, rerun all gates, push the follow-up, and require fresh CI before merging. Do not upload the user's screenshot, publish a package, or make additional live probes.
