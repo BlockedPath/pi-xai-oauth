@@ -1,4 +1,33 @@
-# Execution Progress — PR #216: Pi 0.85.1 compatibility
+# Execution Progress — Issue #220: same-turn reasoning recovery
+
+**Active branch:** `feature/issue-220-reasoning-retry`
+
+- Identified the sole open issue #220 and read its full body/comments; base is synced `main` at `6b619c5`.
+- Refreshed dependencies with `npm ci`; the existing reasoning-recovery suite passes all 6 tests.
+- Reproduced the requested failure with `npm run test:unit -- tests/responses/reasoning-recovery.test.ts -t 'retries a mismatch in the same turn'`: expected a successful retry result, received `stopReason: error`.
+- Parallel read-only test planning and pre-implementation review completed in workflow `2d2820ff-c2de-45d7-806e-433633bc7259`; parent is sole writer. Accepted the review's bounded-attempt design and all required guards. Durable review artifacts remain in the session's `subagent-artifacts` directory (scout `6bb0cb72-46e3-4323-8658-814135cebbab`, reviewer `b0c46a77-169d-4804-96b6-06acae8b86db`).
+- Confirmed root cause: the pump forwarded the first classified terminal error, settling the outer result before any same-turn recovery. Existing classification and omission already worked.
+- Implemented a two-attempt pump with final-payload reasoning detection, buffered start/error suppression, fresh per-attempt request IDs, per-attempt tool routes, retained redirect guard, repeated hooks/local validation, and cancellation/content guards. Failed network retries preserve exact guidance for next-turn recovery; local validation and cancellation remain distinct.
+- Focused recovery suite passes 32 tests; typecheck and active primary LSP checks pass. Regressions cover HTTP/SSE mismatch success, bounded retry failures, redaction, text/thinking/tool output, hook reconstruction, no reasoning/cross-model/API/provider/history omission, unrelated failures, cancellation, catalog invalidation, and later replay.
+- Updated README, wire-protocol contract, and Unreleased changelog. No live xAI traffic or publication was performed.
+- The first minimum-Pi boundary run caught three new SSE fixture defects: Pi 0.80.1 requires `response.content_part.added` / `response.reasoning_summary_part.added` before deltas. Added those real protocol events without weakening assertions; both boundaries then passed.
+- Final validation passed: `npm test` (814 tests plus real loader), `npm run typecheck`, `npm run test:coverage` (92.47% statements / 87.26% branches / 93.16% functions / 95.66% lines), `npm run compatibility:check` (registry/pack/unsupported peers/mirror), active primary LSP diagnostics (two changed TS files, zero findings), and `git diff --check`.
+- Exact clean packed Pi 0.80.1 and 0.85.1 boundaries each passed 813 tests plus one intentional Git-only skip, real loader, and typecheck. Logs: `/tmp/pi-xai-issue-220-{test,coverage,boundaries,compatibility}.log`.
+- Final parent review confirmed every pre-implementation review guard is represented in code/tests; removed generated `.vitest` output and scratch scout/reviewer copies from the repository, retaining session-managed artifacts. Implementation is complete and uncommitted on the feature branch.
+
+## Parallel code review — Issue #220
+
+- User requested parallel subagent review; no PR exists yet, so reviewers inspected the local candidate diff against `6b619c5` (SHA256 `f17a24427219a69010f5fd8145a201eabf2523922d2d814191b1f2e652e8ffd3`). Confirmed that exact diff remained unchanged through review.
+- Workflow `7f2578da-ae60-41e8-924d-37ab5bdef4cf` ran two independent fresh-context read-only reviewers. Standards/safety: zero findings, verdict OK (`f1669efb-c879-4b09-9b88-911282e21eb9`). Spec/correctness: zero findings, verdict OK (`41104ce8-5b4d-4c7a-90c4-ac3c8c6c81e5`). Full reports remain in the session-managed `subagent-artifacts` directory.
+- Parent additionally ran the recovery, streaming, and vision suites with `NODE_OPTIONS=--unhandled-rejections=strict`: all 63 tests passed. No live xAI traffic, code changes, commits, or GitHub mutations during review.
+
+## Delivery authorization — Issue #220
+
+- User approved committing, pushing, and opening the PR after both independent reviewers returned OK. No merge or release is authorized.
+- Pre-commit fetch confirms `origin/main` remains at the reviewed base `6b619c5`; implementation/tests/docs match the reviewed diff, with only subsequent scaffold review/delivery notes added.
+- Required test/typecheck/packed-boundary evidence is verified above; publish the scoped seven-file change on `feature/issue-220-reasoning-retry` with a PR closing #220.
+
+## Previous progress — PR #216: Pi 0.85.1 compatibility
 
 **Active branch:** `dependabot/npm_and_yarn/pi-peers-973734b516`
 

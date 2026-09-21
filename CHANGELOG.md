@@ -17,6 +17,7 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ### Fixed
 
+- Recover encrypted-reasoning mismatches within the same `xai-auth` turn by retrying once without rejected reasoning, only before assistant content is forwarded and when replayed reasoning was sent. Preserve cancellation, local validation, visible/tool history, and next-turn/cross-model protections; failed retries retain fixed, redacted guidance (#220).
 - Omitted empty `current` rows from `/xai-usage csv` while retaining valid zero/false values and history-only exports. Empty snapshots now emit only the CSV header; documented that `total_used_cents` is history-only and excludes current usage (#213).
 
 ## 1.5.2 - 2026-08-23
