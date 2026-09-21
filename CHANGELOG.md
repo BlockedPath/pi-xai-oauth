@@ -6,6 +6,8 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.6.0 - 2026-09-21
+
 ### Added
 
 - Added entitlement-aware Grok 4.7 (`grok-4.7`) metadata: text+image input, 500K context, official short-context pricing, low/medium/high/xhigh reasoning, Pi minimal-to-low mapping, and high-by-default text generation. Authenticated catalog membership/capabilities stay authoritative; Grok 4.6 remains the setup/offline default, with no unverified aliases or Fast service routing.

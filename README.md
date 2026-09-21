@@ -39,9 +39,9 @@ Low reasoning is a latency trade-off, **not** the separately priced **Grok 4.7 F
 
 This package adds xAI's **account-specific OAuth model catalog** to pi, with **Grok 4.6** as the offline fallback/default, proper OAuth login, automatic token refresh, and a suite of custom xAI tools (`xai_generate_text`, `web_search`, `xai_x_search`, etc.). The normalized cache remains exact; registration may additionally expose narrowly verified compatibility routes such as Grok 4.3 and Composer only while their required authenticated entitlement source is present. Entitled accounts that still receive `grok-4.5` keep that model as a first-class catalog entry.
 
-> **Latest release:** `pi-xai-oauth` **1.5.2** closes the remaining Grok-native leaf-symlink race by reading and writing through checked descriptors. It publishes the canonical `pi-xai-oauth` package on npmjs and a scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages from the same validated GitHub Release. Setup treats both registry names as one extension and removes duplicate aliases before they can register conflicting tools. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
+> **Latest release:** `pi-xai-oauth` **1.6.0** adds entitlement-aware Grok 4.7 support, Pi 0.86.1 compatibility, copyable usage CSV, and same-turn encrypted-reasoning recovery. Grok 4.6 remains the setup/offline default. The canonical `pi-xai-oauth` package on npmjs and scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages come from the same validated GitHub Release. Setup treats both names as one extension and removes duplicate aliases before registration. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
 >
-> **Published compatibility:** 1.5.2 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. Its exact tested boundaries are 0.80.1 and 0.84.2. The unreleased checkout extends support through Pi 0.86.1 while excluding 0.85.0; see [Pi Compatibility](#pi-compatibility).
+> **Compatibility:** 1.6.0 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0 || >=0.85.1 <0.87.0`, with exact tested boundaries at 0.80.1 and 0.86.1. Pi 0.85.0 remains explicitly excluded; see [Pi Compatibility](#pi-compatibility).
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and fix history.
 
@@ -206,7 +206,7 @@ Authenticate with `/login xai`. Use `/login xai-auth` only when you want this pa
 
 ## Pi Compatibility
 
-The unreleased checkout uses the same bounded range for both Pi runtime peers:
+Version 1.6.0 uses the same bounded range for both Pi runtime peers:
 
 ```text
 @earendil-works/pi-ai:            >=0.80.1 <0.85.0 || >=0.85.1 <0.87.0
@@ -217,7 +217,7 @@ The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provid
 
 Pi 0.86 moves provider system instructions and tool declarations into normalized transcript messages. The Responses adapter uses Pi's native normalizer when available, preserving system/tool deltas and reasoning-recovery behavior; older Pi versions retain their legacy top-level prompt/tools unchanged. Both 0.86.0 and 0.86.1 passed clean packed candidate validation before widening this range.
 
-Pi **0.85.0 is explicitly excluded** because its packaged SDK imports fail on a missing `@earendil-works/pi-server` dependency ([upstream issue #9132](https://github.com/earendil-works/pi/issues/9132)); Pi 0.85.1 fixes that packaging defect. The exclusive `<0.87.0` upper bound remains deliberate: Pi is pre-1.0, so a new minor line may contain breaking API or loader changes and must pass the packed compatibility suite before support is claimed. Strict npm peer resolution rejects older releases such as 0.79.10, the excluded 0.85.0 release, and the untested 0.87 line. Published `pi-xai-oauth` 1.5.2 retains its original `>=0.80.1 <0.85.0` peer range until a new package release publishes this change.
+Pi **0.85.0 is explicitly excluded** because its packaged SDK imports fail on a missing `@earendil-works/pi-server` dependency ([upstream issue #9132](https://github.com/earendil-works/pi/issues/9132)); Pi 0.85.1 fixes that packaging defect. The exclusive `<0.87.0` upper bound remains deliberate: Pi is pre-1.0, so a new minor line may contain breaking API or loader changes and must pass the packed compatibility suite before support is claimed. Strict npm peer resolution rejects older releases such as 0.79.10, the excluded 0.85.0 release, and the untested 0.87 line. Older `pi-xai-oauth` 1.5.2 releases retain their original `>=0.80.1 <0.85.0` peer range; upgrade to 1.6.0 for Pi 0.85.1/0.86 support.
 
 Older `pi-xai-oauth` 1.2.4 builds supported Pi 0.79.8's then-current Responses guard. Current code uses the Pi 0.80 compat dispatcher after the 1.3.2 export migration and 1.3.3 loader-resolution fix, so that historical statement is not the current minimum.
 
@@ -846,7 +846,7 @@ pi update npm:pi-xai-oauth
 
 This pulls the latest version from npm and updates your installed extension.
 
-Published version 1.5.2 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.2. It preserves Pi 0.84 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. The unreleased checkout adds support through Pi 0.86.1 while excluding 0.85.0, as described in [Pi Compatibility](#pi-compatibility). See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall dependencies with `npm ci` so devDependencies match the tested peer range.
+Version 1.6.0 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0 || >=0.85.1 <0.87.0`, with exact packed-package validation at 0.80.1 and 0.86.1. It adds entitled Grok 4.7 support and preserves system prompts, tools, and reasoning recovery across Pi's transcript migration. Pi 0.85.0 remains excluded, as described in [Pi Compatibility](#pi-compatibility). Both registries publish identical release contents apart from the scoped mirror's name/registry metadata. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall dependencies with `npm ci` so devDependencies match the tested peer range.
 
 ```bash
 pi remove npm:pi-xai-oauth && pi install .
