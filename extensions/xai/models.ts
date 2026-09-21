@@ -92,6 +92,29 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
     },
   },
   {
+    id: "grok-4.7",
+    name: "Grok 4.7",
+    apiBackend: "responses",
+    reasoning: true,
+    input: ["text", "image"],
+    inputProvenance: XaiModelInputProvenance.Known,
+    // https://docs.x.ai/developers/models/grok-4.7 — standard tier, <200k prompt.
+    cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+    contextWindow: 500_000,
+    // No model-specific output maximum is published; use the existing Responses
+    // default when an authenticated completion limit is absent.
+    maxTokens: 131_072,
+    thinkingLevelMap: {
+      off: null,
+      minimal: "low",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+      // Omit `max` for Pi 0.80.1 compatibility; the level remains unsupported.
+    },
+  },
+  {
     id: "grok-4.3",
     name: "Grok 4.3",
     apiBackend: "responses",
@@ -425,6 +448,7 @@ export function grokSupportsReasoningEffort(modelId: string): boolean {
     normalized.startsWith("grok-4.20-multi-agent") ||
     normalized.startsWith("grok-4.3") ||
     normalized.startsWith("grok-4.5") ||
-    normalized.startsWith("grok-4.6")
+    normalized.startsWith("grok-4.6") ||
+    normalized.startsWith("grok-4.7")
   );
 }

@@ -11,6 +11,7 @@ import {
   CURATED_FALLBACK_MODELS,
   KNOWN_XAI_MODEL_METADATA,
   setXaiRuntimeModels,
+  xaiModelForRequest,
 } from "../../extensions/xai/models";
 import { streamSimpleXaiResponses } from "../../extensions/xai/responses";
 import { jsonResponse } from "../fixtures/http";
@@ -213,9 +214,34 @@ describe("xAI streaming adapter", () => {
     expect(result.content[0].name).toBe("xai_grok_read_file");
     expect(foreignResult.content[0].name).toBe("read_file");
   });
-  it("returns a local terminal error for an unentitled model without network", async () => {
+  it.each(["low", "medium", "high", "xhigh"] as const)("sends Grok 4.7 %s reasoning through the real streaming delegate", async (effort) => {
+    let sent: any;
+    vi.stubGlobal("fetch", vi.fn(async (_url: any, init: RequestInit = {}) => {
+      sent = JSON.parse(String(init.body));
+      const event = { type: "response.completed", response: {
+        id: "resp", status: "completed", output: [],
+        usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+      } };
+      return new Response(`data: ${JSON.stringify(event)}\n\ndata: [DONE]\n\n`, {
+        headers: { "content-type": "text/event-stream" },
+      });
+    }));
+    const stream = streamSimpleXaiResponses(
+      xaiModelForRequest("grok-4.7", "oauth-session"),
+      { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] } as any,
+      { apiKey: "oauth-token", reasoning: effort },
+    );
+    expect((await stream.result()).stopReason).toBe("stop");
+    expect(sent).toMatchObject({ model: "grok-4.7", reasoning: { effort }, store: false });
+    expect(sent.include).toContain("reasoning.encrypted_content");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/^https:\/\/cli-chat-proxy\.grok\.com\/v1\/responses/),
+      expect.any(Object),
+    );
+  });
+  it.each(["grok-build", "grok-4.7"])("returns a local terminal error for unentitled %s without network", async (id) => {
     setXaiRuntimeModels(CURATED_FALLBACK_MODELS);
-    const model = { ...TEST_MODEL, id: "grok-build" } as any;
+    const model = { ...TEST_MODEL, id } as any;
     const stream = streamSimpleXaiResponses(
       model,
       { messages: [] } as any,

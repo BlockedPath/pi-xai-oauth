@@ -1,3 +1,4 @@
+import { validateToolArguments } from "@earendil-works/pi-ai";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -168,12 +169,37 @@ describe("custom xAI tools", () => {
       reasoning: { effort: "high" },
     });
   });
-  it("uses high reasoning by default for Grok 4.6", async () => {
-    await run("xai_generate_text", { prompt: "hi", model: "grok-4.6" });
+  it.each(["grok-4.6", "grok-4.7"])("uses high reasoning by default for %s", async (model) => {
+    await run("xai_generate_text", { prompt: "hi", model });
     expect(requests.at(-1)?.body).toMatchObject({
-      model: "grok-4.6",
+      model,
       reasoning: { effort: "high" },
     });
+  });
+  it("uses the active Grok 4.7 model and honors an explicit lower effort", async () => {
+    await run("xai_generate_text", { prompt: "hi", reasoning_effort: "low" }, { ...TEST_MODEL, id: "grok-4.7" });
+    expect(requests.at(-1)?.body).toMatchObject({
+      model: "grok-4.7",
+      reasoning: { effort: "low" },
+    });
+    expect(requests.at(-1)?.url).toBe("https://cli-chat-proxy.grok.com/v1/responses");
+  });
+  it("accepts and dispatches Grok 4.7 xhigh through Pi's tool-schema validation", async () => {
+    const tool = h.tools.get("xai_generate_text");
+    const call = {
+      type: "toolCall" as const,
+      id: "call",
+      name: tool.name,
+      arguments: { prompt: "hi", model: "grok-4.7", reasoning_effort: "xhigh" },
+    };
+    const params = validateToolArguments(tool, call);
+    expect(params.reasoning_effort).toBe("xhigh");
+    await run(tool.name, params);
+    expect(requests.at(-1)?.body).toMatchObject({ model: "grok-4.7", reasoning: { effort: "xhigh" } });
+    expect(() => validateToolArguments(tool, {
+      ...call,
+      arguments: { ...call.arguments, reasoning_effort: "max" },
+    })).toThrow(/Validation failed/);
   });
   it("omits reasoning for Composer and uses protected proxy metadata", async () => {
     await run("xai_generate_text", {

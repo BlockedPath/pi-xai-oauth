@@ -63,9 +63,9 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
           model: { type: "string", description: "Entitled OAuth model to use; defaults to the active xAI model" },
           reasoning_effort: {
             type: "string",
-            enum: ["none", "low", "medium", "high"],
+            enum: ["none", "low", "medium", "high", "xhigh"],
             description:
-              "Reasoning effort. Defaults to high for grok-4.5/grok-4.6 and medium for other models when omitted.",
+              "Reasoning effort. Defaults to high for grok-4.5/grok-4.6/grok-4.7 and medium for other models when omitted.",
           },
           response_format: { type: "string", description: "Set to 'json' for JSON output" },
           previous_response_id: { type: "string", description: "Continue conversation" },
@@ -112,7 +112,7 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
         const normalizedModel = normalizedXaiModelId(model);
         const effort =
           params.reasoning_effort ||
-          (normalizedModel === "grok-4.5" || normalizedModel === "grok-4.6" || normalizedModel.startsWith("grok-4.6")
+          (normalizedModel === "grok-4.5" || normalizedModel.startsWith("grok-4.6") || normalizedModel.startsWith("grok-4.7")
             ? "high"
             : "medium");
         if (grokSupportsReasoningEffort(model) && effort !== "none") {
@@ -244,7 +244,7 @@ Summarize:
 - Notable users or conversations
 
 Be specific and cite examples where helpful.`;
-        const xSearchTool: Record<string, any> = { type: "x_search", enable_image_understanding: true };
+        const xSearchTool: Record<string, unknown> = { type: "x_search", enable_image_understanding: true };
         if (params.since) xSearchTool.from_date = params.since;
         if (params.until) xSearchTool.to_date = params.until;
         let data: any;
@@ -335,7 +335,7 @@ Be specific and cite examples where helpful.`;
         if (!credential) {
           return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { prompt: params?.prompt });
         }
-        const body: Record<string, any> = {
+        const body: Record<string, unknown> = {
           model: params.model || DEFAULT_XAI_IMAGE_MODEL,
           prompt: params.prompt,
         };
@@ -400,7 +400,7 @@ Be specific and cite examples where helpful.`;
           return xaiToolDisabledError("xai_edit_image");
         }
 
-        let input;
+        let input: ReturnType<typeof validateXaiEditImageInput>;
         try {
           input = validateXaiEditImageInput(params);
         } catch (error) {
@@ -474,7 +474,7 @@ Be specific and cite examples where helpful.`;
         if (!activeModelForXaiTool(pi, ctx, "xai_image_to_video")) {
           return xaiToolDisabledError("xai_image_to_video");
         }
-        let input;
+        let input: ReturnType<typeof validateXaiImageToVideoInput>;
         try {
           input = validateXaiImageToVideoInput(params);
         } catch (error) {

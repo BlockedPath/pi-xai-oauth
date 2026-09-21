@@ -63,6 +63,29 @@ describe("model compatibility metadata", () => {
     expect(grokSupportsReasoningEffort("xai-auth/GROK-4.6")).toBe(true);
   });
 
+  it("knows Grok 4.7 without granting an entitlement or replacing the fallback", () => {
+    const known = knownXaiModelMetadata("xai-auth/GROK-4.7");
+    expect(known).toMatchObject({
+      id: "grok-4.7",
+      name: "Grok 4.7",
+      apiBackend: "responses",
+      reasoning: true,
+      input: ["text", "image"],
+      inputProvenance: XaiModelInputProvenance.Known,
+      cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+      contextWindow: 500_000,
+      maxTokens: 131_072,
+    });
+    expect(resolveXaiCanonicalModelId("grok-4.7")).toBe("grok-4.7");
+    expect(CURATED_FALLBACK_MODELS.map(({ id }) => id)).toEqual(["grok-4.6"]);
+    expect(isXaiRuntimeModelEntitled("grok-4.7")).toBe(false);
+    expect(expandXaiCatalogWithAliases([known!]).map(({ id }) => id)).toEqual(["grok-4.7"]);
+    // Direct API-key helpers must recognize reasoning even outside the OAuth snapshot.
+    setXaiRuntimeModels([]);
+    expect(grokSupportsReasoningEffort("grok-4.7")).toBe(true);
+    expect(grokSupportsReasoningEffort("xai-auth/GROK-4.7")).toBe(true);
+  });
+
   it("expands only aliases of entitled models and preserves authenticated input", () => {
     const entitled = {
       ...CURATED_FALLBACK_MODELS[0],
@@ -84,6 +107,7 @@ describe("model compatibility metadata", () => {
     expect(ids).not.toContain("grok-4.20-0309-reasoning");
     expect(ids).not.toContain("grok-4.20");
     expect(ids).not.toContain("grok-build");
+    expect(ids).not.toContain("grok-4.7");
 
     const composer = expanded.find((model) => model.id === "grok-composer-2.5-fast");
     expect(composer).toMatchObject({

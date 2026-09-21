@@ -10,6 +10,7 @@ import { createExtensionHarness } from "../fixtures/extension-api";
 import { createTempDir } from "../fixtures/temp";
 import { discovery, OIDC_PUBLIC_JWK, signIdToken } from "../fixtures/oauth";
 import { jsonResponse } from "../fixtures/http";
+import grok47Limits from "../fixtures/models-v2/grok-4.7-limits.json";
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-lifecycle-");
@@ -96,6 +97,25 @@ describe("authenticated provider catalog lifecycle", { concurrent: false }, () =
       "grok-build-latest",
       "grok-composer-2.5-fast",
     ]);
+  });
+  it("registers Grok 4.7 only from the authenticated catalog", async () => {
+    const { h } = await loadAndLogin({ data: [{
+      ...grok47Limits.data[0],
+      name: "Grok 4.7",
+      reasoning_efforts: ["low", "medium", "high", "xhigh"],
+    }] });
+    const models = h.providers.get("xai-auth").models;
+    expect(models.map(({ id }: any) => id)).toEqual(["grok-4.7"]);
+    expect(models[0]).toMatchObject({
+      input: ["text", "image"],
+      contextWindow: 500_000,
+      maxTokens: 500_000,
+      cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+      thinkingLevelMap: { off: null, minimal: "low", xhigh: "xhigh" },
+    });
+    expect(models[0]).not.toHaveProperty("inputProvenance");
+    expect(getXaiRuntimeModel("grok-4.7")).toBeDefined();
+    expect(getXaiRuntimeModel("grok-4.6")).toBeUndefined();
   });
   it("advertises authenticated modalities without exposing internal provenance", async () => {
     const { h } = await loadAndLogin({

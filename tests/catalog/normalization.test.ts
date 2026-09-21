@@ -42,6 +42,63 @@ describe("catalog normalization", () => {
     });
   });
 
+  it("enriches Grok 4.7 without adding unrelated models or overriding authenticated limits", () => {
+    const entry = { model: "grok-4.7", api_backend: "responses", context_window: 500_000 };
+    const models = normalizeXaiCatalogPayload({ data: [entry] });
+    expect(models.map(({ id }) => id)).toEqual(["grok-4.7"]);
+    expect(models[0]).toMatchObject({
+      input: ["text", "image"],
+      inputProvenance: XaiModelInputProvenance.Known,
+      cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+      maxTokens: 131_072,
+      thinkingLevelMap: { minimal: "low", xhigh: "xhigh" },
+    });
+    const [restricted] = normalizeXaiCatalogPayload({ data: [{
+      ...entry,
+      context_window: 100_000,
+      max_completion_tokens: 8_192,
+      acceptsImages: false,
+      supports_reasoning_effort: false,
+    }] });
+    expect(restricted).toMatchObject({
+      input: ["text"],
+      inputProvenance: XaiModelInputProvenance.AuthenticatedAcceptsImages,
+      contextWindow: 100_000,
+      maxTokens: 8_192,
+      reasoning: false,
+      thinkingLevelMap: { off: "none" },
+    });
+    expect(normalizeXaiCatalogPayload({ data: [] })).toEqual([]);
+  });
+
+  it("keeps Grok 4.7 when its advertised completion limit exceeds its context", async () => {
+    // Allowlisted metadata from the observed catalog shape, never a raw response.
+    const models = normalizeXaiCatalogPayload(await fixture("grok-4.7-limits.json"));
+    expect(models).toHaveLength(1);
+    expect(models[0]).toMatchObject({
+      id: "grok-4.7",
+      contextWindow: 500_000,
+      maxTokens: 500_000,
+    });
+  });
+
+  it("also clamps independent camelCase limits in metadata for unknown models", () => {
+    const [model] = normalizeXaiCatalogPayload({ data: [{
+      model: "new-oauth-model",
+      _meta: { apiBackend: "responses", contextWindow: 100_000, maxCompletionTokens: 200_000 },
+    }] });
+    expect(model).toMatchObject({ id: "new-oauth-model", contextWindow: 100_000, maxTokens: 100_000 });
+  });
+
+  it.each([0, -1, 1.5, "1000000", null, true, 1_000_001, Infinity, NaN])(
+    "still rejects invalid or absolutely oversized completion limits: %j",
+    (max_completion_tokens) => {
+      expect(() => normalizeXaiCatalogPayload({ data: [{
+        model: "grok-4.7", api_backend: "responses", context_window: 500_000, max_completion_tokens,
+      }] })).toThrow(XaiCatalogValidationError);
+    },
+  );
+
   it("applies authenticated modality precedence without changing membership", async () => {
     const models = normalizeXaiCatalogPayload(await fixture("modalities.json"));
     expect(models.map(({ id }) => id)).toEqual([

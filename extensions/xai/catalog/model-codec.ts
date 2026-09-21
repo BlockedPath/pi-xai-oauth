@@ -41,6 +41,7 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
+// pi-lens-ignore: no-unknown-returns
 function firstValue(obj: Record<string, unknown>, meta: Record<string, unknown> | undefined, keys: string[]): unknown {
   for (const key of keys) {
     if (obj[key] !== undefined) return obj[key];
@@ -178,7 +179,7 @@ function thinkingLevelMap(levels: ThinkingLevel[], modelId: string): XaiCatalogM
   // Preserve pi-xai-oauth's Grok 4.x compatibility: pi's minimal level is sent
   // as xAI low when low is in the authenticated catalog.
   if (
-    (modelId === "grok-4.5" || modelId === "grok-4.6") &&
+    (modelId === "grok-4.5" || modelId === "grok-4.6" || modelId === "grok-4.7") &&
     map.low === "low"
   ) {
     map.minimal = "low";
@@ -223,7 +224,9 @@ function normalizeCatalogEntry(value: unknown): EntryResult {
 
   const maxValue = firstValue(obj, meta, ["maxCompletionTokens", "max_completion_tokens"]);
   const suppliedMaxTokens = maxValue === undefined ? undefined : positiveInteger(maxValue, MAX_OUTPUT_TOKENS);
-  if (maxValue !== undefined && (!suppliedMaxTokens || suppliedMaxTokens > contextWindow)) {
+  // The catalog can advertise independent limits (Grok 4.7: 1M completion,
+  // 500K context). Validate the absolute bound here; clamp to context below.
+  if (maxValue !== undefined && !suppliedMaxTokens) {
     return { kind: "malformed" };
   }
 

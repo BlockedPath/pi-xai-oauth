@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-pi-xai-oauth is a pi-package that registers the optional xAI OAuth provider (`xai-auth`) and the authenticated account's OAuth-visible Grok model catalog, with Grok 4.6 as the curated offline fallback. Opt-in network tools and `/xai-usage` also work with Pi's built-in `xai` SuperGrok/X Premium chat provider; setup seeds `defaultProvider: xai` only when unset and never overwrites an existing provider choice.
+pi-xai-oauth is a pi-package that registers the optional xAI OAuth provider (`xai-auth`) and the authenticated account's OAuth-visible Grok model catalog, including Grok 4.7 when entitled, with Grok 4.6 retained as the curated offline fallback. Opt-in network tools and `/xai-usage` also work with Pi's built-in `xai` SuperGrok/X Premium chat provider; setup seeds `defaultProvider: xai` only when unset and never overwrites an existing provider choice.
 
 Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `extensions/xai/catalog.ts` → provider registration in `extensions/xai-oauth.ts` → browser PKCE or bounded device authorization in `extensions/xai/oauth.ts` / `extensions/xai/device-auth.ts` → pinned browser OIDC/JWKS validation in `extensions/xai/oidc.ts` → streaming via xAI API helpers in `extensions/xai/responses.ts`; explicit revision-pinned subscription usage lives in `extensions/xai/usage.ts`.
 
@@ -34,13 +34,14 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Pin the device and token endpoints; wait before polling; honor interval plus cumulative slow-down; bound expiry; propagate cancellation
 - Require matching state for every HTTP or pasted browser authorization callback before token exchange
 - Validate retained fresh-login ID tokens against pinned first-party discovery/JWKS, ES256, issuer, audience, expiry, and nonce
-- Support reasoning levels: none / low / medium / high
+- Respect per-model/catalog reasoning levels; Grok 4.7 supports low / medium / high / xhigh, maps Pi minimal to low, defaults to high, and cannot disable reasoning
 - Reuse `~/.grok/auth.json` when possible without deleting or revoking it
 - Fetch OAuth-visible models only from the pinned authenticated CLI proxy `/models-v2` endpoint
 - Treat successful catalog responses as exact entitlement state; additions appear and removals disappear
 - Keep the normalized token-free catalog cache atomic and apply the documented TTL/stale/fallback policy
 - Preserve known model metadata and compatibility behavior without inventing unentitled model families; known aliases and independently verified OAuth request slugs may be advertised only while their entitlement source is present at registration/runtime (cache stays exact)
 - Keep both Pi peers aligned to the checked-in bounded range in `compatibility/pi-versions.json`
+- Use Pi 0.86's native context normalizer for the Responses delegate when available; preserve transcript system/tool deltas, and keep legacy top-level prompt/tools unchanged on older Pi
 - Preserve explicit unsupported-version exclusions when widening Pi support; Pi 0.85.0 stays excluded, and strict-resolution negative fixtures must cover the lower sentinel, excluded releases, and the upper sentinel
 - Keep npmjs `pi-xai-oauth` canonical and publish GitHub Packages only as the exact scoped mirror `@blockedpath/pi-xai-oauth`; setup must treat both names as aliases and prevent duplicate registration
 - Install/report exact Pi matrix versions from a clean packed package; never reuse the repository lockfile for boundary jobs
