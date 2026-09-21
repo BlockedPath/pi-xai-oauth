@@ -1,6 +1,18 @@
-# Execution Progress — Grok 4.7 support
+# Execution Progress — v1.6.0 release
 
-**Active branch:** `feature/grok-4-7`
+**Active branch:** `release/v1.6.0`
+
+- PR #223 merged as `3b9388b`; local main was clean and synced. The user explicitly requested a version update and npm publication through GitHub Actions.
+- Confirmed latest npm/GitHub release is 1.5.2 and v1.6.0 has no existing remote tag or branch. A minor release follows the additive Grok 4.7/catalog and usage CSV features already merged since 1.5.2.
+- Read the existing `release.published` workflow: release commit must be on main, tag must match package version, all validation gates run, then the canonical archive is published to npm through trusted publishing and mirrored exactly as `@blockedpath/pi-xai-oauth` on GitHub Packages. No local npm publish or workflow changes are planned.
+- Created `release/v1.6.0`, aligned manifest/lock root versions, finalized the 2026-09-21 changelog, and updated README release/compatibility guidance. No runtime code or dependency versions changed.
+- Release validation passed: `npm test` (850 tests + real loader), typecheck, full policy/registry/163-file-pack/negative-peer/mirror checks, and both clean packed boundaries. Pi 0.80.1 passed 846 tests (four intentional skips); Pi 0.86.1 passed 849 (one Git-only skip); both loaders/typechecks passed. Logs: `/tmp/pi-xai-v1.6.0-{test,compatibility,boundaries}.log`.
+- Reviewed the release diff: six files, version-only manifest/lock changes, finalized release docs, and scaffold state; no runtime or dependency changes. Whitespace and manifest/lock version checks passed.
+- Ready for release PR delivery. Publish only after that PR passes CI/review triage, is merged, and its exact main commit is tagged. GitHub PR/release and Actions records will provide final delivery evidence; no live xAI requests or credential changes are part of this release.
+
+## Previous progress — Grok 4.7 support
+
+**Branch:** `feature/grok-4-7`
 
 - Read provider registration, model metadata/codec, custom tools, setup, README, and repository rules on clean `main`; created the feature branch before edits.
 - Official overview/model/reasoning/pricing docs confirm `grok-4.7`, text+image input, 500K context, $2/$0.50/$6 per million input/cache-read/output tokens below 200K input, and low/medium/high/xhigh reasoning (default high, not disableable).
