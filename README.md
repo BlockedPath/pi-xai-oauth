@@ -223,7 +223,9 @@ On the pinned OAuth Responses route, requests default an absent `store` to `fals
 
 `store: false` disables server-side response storage, but it does **not** mean no local sensitive state. Complete encrypted reasoning items are stored in ordinary Pi session JSONL under Pi's normal permissions and retention. This package does not separately encrypt that file, copy reasoning into another cache, or protect it from the user or trusted local extensions.
 
-If xAI reports that encrypted reasoning is incompatible with the selected model, the rejected request is not retried automatically and the error remains fixed, redacted clean-session/turn guidance. A subsequent same-model turn omits the rejected encrypted reasoning chain while preserving visible conversation and tool-result history; switching targets retains the existing cross-model replay protection.
+If xAI reports that encrypted reasoning is incompatible with the selected model, the `xai-auth` stream retries once in the same turn without the rejected encrypted reasoning—but only if the final request contained replayed reasoning, no assistant content has been forwarded, and the request has not been cancelled. Recovery is silent on success; an unsuccessful retry returns the fixed, redacted clean-session/turn guidance without a third attempt. Cancellation and local validation failures retain their existing behavior. Requests without replayed reasoning and unrelated errors are not retried.
+
+The retry preserves visible conversation and tool-result history, session affinity, and the encrypted-output include policy. It uses a new request ID and repeats payload hooks and local entitlement/image guards; enabled vision routing may therefore make another description request. If fixed mismatch guidance is retained in history, the next same-model turn still omits the rejected reasoning chain. Successful turns resume normal eligible replay, and switching targets retains the existing cross-model replay protection. Direct Responses helpers do not automatically retry.
 
 ---
 

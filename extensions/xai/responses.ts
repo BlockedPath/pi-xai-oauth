@@ -106,16 +106,18 @@ function shouldOmitRejectedEncryptedReasoning(
   return false;
 }
 
+function isEncryptedReasoningItem(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const item = value as Record<string, unknown>;
+  return item.type === "reasoning" && "encrypted_content" in item;
+}
+
 function omitRejectedEncryptedReasoning(
   payload: Record<string, unknown>,
 ): Record<string, unknown> {
   if (!Array.isArray(payload.input)) return payload;
-  const input = payload.input.filter((value) => {
-    if (!value || typeof value !== "object" || Array.isArray(value))
-      return true;
-    const item = value as Record<string, unknown>;
-    return item.type !== "reasoning" || !("encrypted_content" in item);
-  });
+  const input = payload.input.filter((value) => !isEncryptedReasoningItem(value));
   return input.length === payload.input.length
     ? payload
     : { ...payload, input };
@@ -296,9 +298,12 @@ export async function createXaiResponse(
  * iteration and `result()`. Delegate load or stream failures are converted
  * into terminal error events with xAI provider metadata instead of escaping
  * as unstructured promise failures. Canonical and persisted delegate-tagged
- * same-model history are aligned only for internal conversion; after a fixed
- * encrypted-reasoning mismatch, the next same-model request omits rejected
- * encrypted reasoning while retaining visible and tool-result history.
+ * same-model history are aligned only for internal conversion. A classified
+ * encrypted-reasoning mismatch retries once without replayed reasoning, only
+ * before assistant content is forwarded and while not cancelled. Each attempt
+ * repeats payload hooks and local guards. A failed retry retains fixed guidance
+ * so the next same-model request also omits rejected reasoning, preserving
+ * visible and tool-result history.
  *
  * @param model xAI provider model selected by pi.
  * @param context Conversation messages and tool context to stream.
@@ -338,16 +343,6 @@ export function streamSimpleXaiResponses(
   const sessionId = options?.sessionId;
   const routingSessionId = sessionId || randomUUID();
   const selectedModelId = runtimeModel.id;
-  const requestHeaders = xaiProxyRequestHeaders(
-    selectedModelId,
-    credentialKind,
-    {
-      conversationId: routingSessionId,
-      requestId: randomUUID(),
-      sessionId: routingSessionId,
-    },
-    { streaming: true },
-  );
   // Pi's Responses converter replaces user/tool images with placeholders when
   // model.input lacks "image". Capture the exact enabled grant so a reset and
   // re-enable cannot authorize an already-started request under a new grant.
@@ -380,17 +375,11 @@ export function streamSimpleXaiResponses(
     model,
     selectedModelId,
   );
-  const omitRejectedReasoning = shouldOmitRejectedEncryptedReasoning(
+  let omitRejectedReasoning = shouldOmitRejectedEncryptedReasoning(
     context,
     model,
     selectedModelId,
   );
-  // The OAuth bearer comes only from options.apiKey. Required proxy metadata
-  // is merged last so callers cannot spoof authentication or attribution.
-  const headers = {
-    ...scrubXaiReservedHeaders(options?.headers),
-    ...requestHeaders,
-  };
   const routedSourceController = new AbortController();
   const transportSignal = AbortSignal.any([
     routedSourceController.signal,
@@ -410,6 +399,8 @@ export function streamSimpleXaiResponses(
 
   const stream = createForwardingAssistantStream();
   let grokNativeToolRoutes: GrokNativeToolRoutes = {};
+  let sentEncryptedReasoning = false;
+  let attemptPayloadReady = false;
   void (async () => {
     // Pi's generic OpenAI delegate does not expose fetch redirect controls.
     // Keep one URL-scoped guard installed only for the lifetime of active xAI
@@ -417,7 +408,7 @@ export function streamSimpleXaiResponses(
     // streams share the same guard until the last request completes.
     const releaseRedirectGuard = acquireXaiRedirectGuard(route.url);
     try {
-      const inner = streamSimpleOpenAIResponses(
+      const startAttempt = () => streamSimpleOpenAIResponses(
         openAIResponsesModel as Model<"openai-responses">,
         delegateContext,
         {
@@ -427,10 +418,18 @@ export function streamSimpleXaiResponses(
           // session_id/x-client-request-id affinity headers. The xAI payload
           // rewrite below still receives the stable session for cache keys.
           sessionId: undefined,
-          headers,
-          // A retry would reuse a once-validated payload after the current
-          // entitlement snapshot may have changed. Higher layers can retry by
-          // starting a fresh request that repeats every local guard.
+          // Rebuild protected metadata for each physical attempt, retaining
+          // conversation/session affinity but never reusing a request ID.
+          headers: {
+            ...scrubXaiReservedHeaders(options?.headers),
+            ...xaiProxyRequestHeaders(selectedModelId, credentialKind, {
+              conversationId: routingSessionId,
+              requestId: randomUUID(),
+              sessionId: routingSessionId,
+            }, { streaming: true }),
+          },
+          // Generic retries reuse a once-validated payload. Only the bounded
+          // mismatch recovery below may retry, repeating every local guard.
           maxRetries: 0,
           async onPayload(payload) {
             const canonicalInput = canonicalizeXaiResponsesPayload(payload);
@@ -526,18 +525,60 @@ export function streamSimpleXaiResponses(
               selectedModelId,
               exposedPayload,
             );
-            const finalPayload = await compactXaiInlineImages(exposedPayload);
+            const finalPayload = await compactXaiInlineImages(exposedPayload) as Record<string, unknown>;
             assertXaiRuntimeModelAcceptsPayload(selectedModelId, finalPayload);
+            transportSignal.throwIfAborted();
+            sentEncryptedReasoning = Array.isArray(finalPayload.input) &&
+              finalPayload.input.some(isEncryptedReasoningItem);
+            attemptPayloadReady = true;
             return finalPayload;
           },
         },
       );
-      for await (const event of inner as AsyncIterable<AssistantStreamEvent>) {
-        if (event.type === "done" || event.type === "error")
-          releaseRedirectGuard();
-        stream.push(
-          normalizeXaiStreamEvent(event, grokNativeToolRoutes, model),
-        );
+      for (let attempt = 0; attempt < 2; attempt++) {
+        grokNativeToolRoutes = {};
+        sentEncryptedReasoning = false;
+        attemptPayloadReady = false;
+        let pendingStart: AssistantStreamEvent | undefined;
+        let forwardedContent = false;
+        let retry = false;
+        const inner = startAttempt();
+        for await (const event of inner as AsyncIterable<AssistantStreamEvent>) {
+          let normalized = normalizeXaiStreamEvent(event, grokNativeToolRoutes, model);
+          if (normalized.type === "start") {
+            // Do not expose the rejected attempt's live partial or a duplicate
+            // start. Content events immediately flush the successful sequence.
+            pendingStart = normalized;
+            continue;
+          }
+          const terminal = normalized.type === "done" || normalized.type === "error";
+          const failed = normalized.type === "error" &&
+            normalized.reason !== "aborted" &&
+            normalized.error?.stopReason !== "aborted" &&
+            !transportSignal.aborted;
+          if (
+            attempt === 0 && failed && sentEncryptedReasoning && !forwardedContent &&
+            normalized.error?.errorMessage === XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE
+          ) {
+            omitRejectedReasoning = true;
+            retry = true;
+            break;
+          }
+          if (attempt === 1 && failed && attemptPayloadReady) {
+            normalized = {
+              ...normalized,
+              error: { ...normalized.error, errorMessage: XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE },
+            };
+          }
+          if (pendingStart) {
+            stream.push(pendingStart);
+            pendingStart = undefined;
+          }
+          if (terminal) releaseRedirectGuard();
+          else forwardedContent = true;
+          stream.push(normalized);
+        }
+        if (!retry) break;
       }
       releaseRedirectGuard();
       stream.end();
