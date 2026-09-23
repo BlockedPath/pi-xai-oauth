@@ -6,6 +6,16 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Changed
+
+- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0`, with exact packed test boundaries at 0.80.1 and 0.87.1. Pi 0.85.0 remains excluded. Both 0.87.0 and 0.87.1 passed candidate tests, loader checks, and typechecks.
+- Add real CLI checks for `pi --version`, bare `pi update`, and `pi update npm:pi-xai-oauth` to `npm test` and CI. Update commands use temporary settings, a version-response fixture, and a package-manager fixture to verify dispatch without network access or real installs.
+
+### Fixed
+
+- Bound browser OAuth discovery, JWKS, and token requests to 15 seconds and 64 KiB, including token refresh. Stalled requests stop even without caller cancellation, and transport failures remain redacted.
+- Report the actual redacted error when an encrypted-reasoning retry fails with an unrelated error. Preserve the rejected-reasoning marker in session history so later requests to the same model continue to omit that reasoning.
+
 ## 1.6.0 - 2026-09-21
 
 ### Added

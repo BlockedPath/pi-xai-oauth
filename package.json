@@ -23,11 +23,12 @@
   "scripts": {
     "scaffold": "node bin/setup.js --scaffold",
     "setup": "node bin/setup.js",
-    "test": "node scripts/verify-compatibility.js policy && npm run test:unit && npm run test:loader",
+    "test": "node scripts/verify-compatibility.js policy && npm run test:unit && npm run test:loader && npm run test:cli",
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:loader": "node scripts/verify-extension-loader.mjs",
+    "test:cli": "node scripts/verify-pi-cli.mjs",
     "typecheck": "tsc --noEmit",
     "compatibility:check": "node scripts/verify-compatibility.js all && node scripts/verify-github-package.js",
     "compatibility:min": "node scripts/run-compatibility-matrix.js minimum",
@@ -46,12 +47,12 @@
     "protobufjs": "^7.6.5"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": ">=0.80.1 <0.85.0 || >=0.85.1 <0.87.0",
-    "@earendil-works/pi-coding-agent": ">=0.80.1 <0.85.0 || >=0.85.1 <0.87.0"
+    "@earendil-works/pi-ai": ">=0.80.1 <0.85.0 || >=0.85.1 <0.88.0",
+    "@earendil-works/pi-coding-agent": ">=0.80.1 <0.85.0 || >=0.85.1 <0.88.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.86.1",
-    "@earendil-works/pi-coding-agent": "0.86.1",
+    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-coding-agent": "0.87.1",
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "5.0.0",
     "jiti": "^2.7.0",

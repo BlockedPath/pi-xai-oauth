@@ -13,10 +13,11 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Install / setup: `node bin/setup.js` or `npm run setup`
 - Install as pi extension: `pi install npm:pi-xai-oauth`
 - Explicit usage CSV export in Pi TUI/RPC: `/xai-usage csv` (normalized fields only, copyable output, no automatic file writes or status opt-in)
-- Full policy/unit/loader gate: `npm test`
+- Full policy/unit/loader/CLI gate: `npm test`
 - Focused Vitest suite: `npm run test:unit -- tests/oauth/browser-login.test.ts`
 - V8 coverage: `npm run test:coverage`
 - Real Pi loader smoke: `npm run test:loader`
+- Real Pi version and isolated update-dispatch smoke: `npm run test:cli`
 - Run TypeScript: `npm run typecheck` (production, tests, fixtures, config)
 - Verify Pi policy/package metadata: `npm run compatibility:check`
 - Verify exact packed Pi boundaries: `npm run compatibility:boundaries`
@@ -78,6 +79,7 @@ pi-xai-oauth/
 │       ├── constants.ts  # URLs, defaults, OAuth/catalog constants
 │       ├── models.ts     # Curated fallback/known metadata + compatibility helpers
 │       ├── oauth.ts      # Browser/device selection, PKCE login, refresh, callback helpers
+│       ├── oauth-http.ts # Bounded pinned browser OAuth JSON transport
 │       ├── device-auth.ts # Pinned device initiation + bounded cancellable polling
 │       ├── oidc.ts       # Pinned browser discovery/JWKS + ID-token validation
 │       ├── auth.ts       # Credential reuse + token resolution helpers
@@ -96,6 +98,7 @@ pi-xai-oauth/
 ├── vitest.config.mts         # Node isolation and measured V8 coverage floors
 ├── scripts/
 │   ├── verify-extension-loader.mjs # Small real Pi loader smoke
+│   ├── verify-pi-cli.mjs # Real version + isolated self/extension update dispatch
 │   ├── verify-compatibility.js # Policy/range/registry/pack/unsupported-peer checks
 │   ├── prepare-github-package.js # Exact scoped mirror staging for GitHub Packages
 │   ├── verify-github-package.js # Mirror name/registry/version/setup parity gate
@@ -179,6 +182,6 @@ This file should be updated whenever architecture, commands, or rules change.
 This repo is a **pi extension package (a library/CLI), not a standalone server**. There is nothing to "boot" — dependency install happens automatically via the startup update script (`npm ci`). Node engine note: the pi peer deps request Node `>=22.19.0` and the pod ships `22.14.0`, so `npm ci` prints `EBADENGINE` warnings; these are non-blocking — typecheck, tests, and extension load all pass.
 
 - Build / typecheck gate: `npm run typecheck` (`tsc --noEmit`). There is **no separate lint tool** configured; typecheck is the static gate.
-- Tests: `npm test` runs compatibility policy, focused Vitest regressions, and the small real Pi loader smoke. Use `npm run test:coverage` for V8 output and `npm run test:unit -- <path> -t <name>` for focus.
+- Tests: `npm test` runs compatibility policy, focused Vitest regressions, the real Pi loader, and isolated CLI version/update-dispatch checks. Use `npm run test:coverage` for V8 output and `npm run test:unit -- <path> -t <name>` for focus.
 - Running the "app": full end-to-end use (`pi`, `/login xai` and/or `/login xai-auth`, live Grok streaming) needs the external `pi` CLI, an interactive browser OAuth flow, and a real xAI/Grok account, so it is **not runnable headless** here. Offline behavior lives in focused `tests/` suites with isolated fixtures; `npm run test:loader` exercises the real Pi loader without live xAI access. Catalog fixtures live under `tests/fixtures/models-v2/`.
 - Any temporary demo script that imports deps must live inside the repo root (so it resolves `node_modules`), not `/tmp`.

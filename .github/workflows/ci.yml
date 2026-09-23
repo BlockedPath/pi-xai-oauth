@@ -45,6 +45,8 @@ jobs:
         run: NODE_OPTIONS=--unhandled-rejections=strict npm run test:coverage
       - name: Run real Pi extension-loader smoke
         run: NODE_OPTIONS=--unhandled-rejections=strict npm run test:loader
+      - name: Verify real Pi CLI version and isolated update dispatch
+        run: NODE_OPTIONS=--unhandled-rejections=strict npm run test:cli
       - name: Type-check production and test TypeScript
         run: npm run typecheck
       - name: Verify packed manifest and contents
