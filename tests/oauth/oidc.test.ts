@@ -25,6 +25,20 @@ describe("pinned OIDC discovery", () => {
     );
     expect(firstCall[1]).toMatchObject({ redirect: "error" });
   });
+  it("bounds the discovery response body", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ ...discovery(), padding: "x".repeat(70 * 1024) })));
+    await expect(discoverXaiOidc()).rejects.toThrow(/too large/);
+  });
+  it("times out a stalled discovery request without a caller signal", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(async () => new Promise<Response>(() => {})));
+    const result = Promise.race([
+      discoverXaiOidc().then(() => "resolved", () => "rejected"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("pending"), 15_001)),
+    ]);
+    await vi.advanceTimersByTimeAsync(15_001);
+    await expect(result).resolves.toBe("rejected");
+  });
   it.each([
     ["issuer", { issuer: "https://auth.x.ai/" }, /issuer did not match/],
     [
@@ -168,6 +182,9 @@ describe("ID token validation", () => {
   }
   it("accepts a valid ES256 nonce-bound token", async () => {
     await expect(validate(signIdToken({ nonce }))).resolves.toBeUndefined();
+  });
+  it("bounds the JWKS response body", async () => {
+    await expect(validate(signIdToken({ nonce }), [{ ...OIDC_PUBLIC_JWK, padding: "x".repeat(70 * 1024) }])).rejects.toThrow(/too large/);
   });
   it.each([
     ["issuer", { iss: "https://accounts.x.ai" }, /issuer did not match/],

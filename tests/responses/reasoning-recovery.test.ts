@@ -229,11 +229,89 @@ describe("encrypted reasoning stream recovery", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(inputTypes(requests[1])).not.toContain("reasoning");
-    expect(result.errorMessage).toBe(XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE);
+    if (status === 400) expect(result.errorMessage).toBe(XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE);
+    else expect(result.errorMessage).toContain(`status ${status}`);
     expect(result.stopReason).toBe("error");
     expect(events.map((event) => event.type)).toEqual(["error"]);
     expect(JSON.stringify(events)).not.toMatch(/FIRST_SECRET|RETRY_SECRET|encrypted_content/);
   });
+
+  it("reports an unrelated HTTP failure from the sanitized retry", async () => {
+    let requests = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      requests++;
+      return requests === 1
+        ? sse([failedEvent("invalid_request", "encrypted_content rejected")])
+        : jsonResponse({ error: { message: "PRIVATE_SERVICE_DETAIL" } }, 503);
+    }));
+
+    const result = await streamSimpleXaiResponses(
+      model("grok-4.6"), { messages: priorToolHistory("xai-responses") } as any, { apiKey: "token" },
+    ).result();
+
+    expect(requests).toBe(2);
+    expect(result.errorMessage).toContain("status 503");
+    expect(result.errorMessage).not.toBe(XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE);
+    expect(result.errorMessage).not.toContain("PRIVATE_SERVICE_DETAIL");
+  });
+
+  it.each(["xai-responses", "openai-responses"] as const)(
+    "remembers rejected reasoning across persisted %s service and catalog failures",
+    async (sourceApi) => {
+      const requests: any[] = [];
+      const responses = [
+        sse([failedEvent("invalid_request", "encrypted_content rejected")]),
+        jsonResponse({ error: { message: "PRIVATE_SERVICE_DETAIL" } }, 503),
+        jsonResponse({ error: { message: "PRIVATE_SERVICE_DETAIL" } }, 503),
+        sse([completedEvent("resp_recovered")]),
+      ];
+      const fetchMock = vi.fn(async (_url: any, init: RequestInit = {}) => {
+        requests.push(requestBody(init));
+        return responses.shift()!;
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      let history = priorToolHistory(sourceApi);
+
+      for (let turn = 0; turn < 3; turn++) {
+        const result = await streamSimpleXaiResponses(
+          model("grok-4.6"), { messages: history } as any, { apiKey: "token" },
+        ).result();
+        if (turn < 2) {
+          expect(result.errorMessage).toContain("status 503");
+          expect(JSON.stringify(result)).not.toContain("PRIVATE_SERVICE_DETAIL");
+          history = JSON.parse(JSON.stringify([
+            ...history,
+            { ...result, api: sourceApi },
+            { role: "user", content: "try again", timestamp: 5 + turn },
+          ]));
+          if (turn === 0) {
+            setXaiRuntimeModels([]);
+            const unavailable = await streamSimpleXaiResponses(
+              model("grok-4.6"), { messages: history } as any, { apiKey: "token" },
+            ).result();
+            expect(unavailable.errorMessage).toContain("not present in the authenticated model catalog");
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+            history = JSON.parse(JSON.stringify([
+              ...history,
+              { ...unavailable, api: sourceApi },
+              { role: "user", content: "try after catalog recovery", timestamp: 6 },
+            ]));
+            setXaiRuntimeModels(KNOWN_XAI_MODEL_METADATA);
+          }
+        } else {
+          expect(result).toMatchObject({ stopReason: "stop", responseId: "resp_recovered" });
+        }
+      }
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(inputTypes(requests[0])).toContain("reasoning");
+      for (const request of requests.slice(1)) {
+        expect(inputTypes(request)).not.toContain("reasoning");
+        expect(JSON.stringify(request.input)).toContain("visible tool output");
+        expect(JSON.stringify(request.input)).toContain("I will inspect it.");
+      }
+    },
+  );
 
   it.each(["text", "thinking", "toolcall"] as const)("does not retry after forwarding %s content", async (kind) => {
     const item = kind === "text"

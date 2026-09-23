@@ -159,7 +159,6 @@ describe("browser OAuth cancellation cleanup", () => {
 
       await expect(login).rejects.toThrow(/cancelled/i);
       await callbackDriver;
-      expect(stageSignal).toBe(controller.signal);
       expect(stageSignal?.aborted).toBe(true);
     },
   );
