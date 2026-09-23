@@ -16,7 +16,7 @@ import {
   type XaiDeviceAuthDependencies,
 } from "./device-auth";
 import { discoverXaiOidc, validateXaiIdToken, type XaiOidcDiscovery } from "./oidc";
-import { xaiOAuthFormHeaders } from "./wire";
+import { requestXaiOAuthJson } from "./oauth-http";
 
 type XaiTokenPayload = {
   access_token?: string;
@@ -342,25 +342,11 @@ async function exchangeXaiToken(
     throw new Error("Refusing to send xAI credentials to an untrusted token endpoint");
   }
 
-  const response = await fetch(tokenEndpoint, {
-    method: "POST",
-    headers: xaiOAuthFormHeaders(),
-    body: new URLSearchParams(body).toString(),
-    redirect: "error",
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error(`xAI token request failed with status ${response.status}`);
-  }
-  try {
-    const payload = (await response.json()) as unknown;
-    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
-      throw new Error("invalid payload");
-    }
-    return payload as XaiTokenPayload;
-  } catch {
+  const payload = await requestXaiOAuthJson({ kind: "token", form: body, signal });
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
     throw new Error("xAI token request returned invalid JSON");
   }
+  return payload as XaiTokenPayload;
 }
 
 function credentialsFromTokenPayload(

@@ -70,20 +70,17 @@ describe("OAuth refresh", () => {
     expect(headers[0].get("X-XAI-Token-Auth")).toBeNull();
   });
 
-  it("forwards Pi's concrete refresh abort signal to the token exchange", async () => {
+  it("propagates Pi's refresh cancellation to the token exchange", async () => {
     const controller = new AbortController();
-    const fetchMock = vi.fn(async (_url: any, init: RequestInit) => {
-      expect(init.signal).toBe(controller.signal);
-      return jsonResponse({
-        access_token: "signal-bound-access",
-        refresh_token: "signal-bound-refresh",
-        expires_in: 3600,
-      });
-    });
+    let requestSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn(async (_url: any, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      requestSignal = init.signal as AbortSignal;
+      requestSignal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    }));
     vi.stubGlobal("fetch", fetchMock);
 
     const oauth = createXaiOAuth({ getExistingCredentials: () => null });
-    await oauth.refreshToken(
+    const refresh = oauth.refreshToken(
       {
         access: "old",
         refresh: "old-refresh",
@@ -92,8 +89,11 @@ describe("OAuth refresh", () => {
       },
       controller.signal,
     );
+    controller.abort();
 
+    await expect(refresh).rejects.toThrow(/cancelled/);
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(requestSignal?.aborted).toBe(true);
   });
 
   it("rejects missing refresh and untrusted token endpoints", async () => {
@@ -128,6 +128,40 @@ describe("OAuth refresh", () => {
     }).catch((value) => value as Error);
     expect(error.message).toMatch(/status 400/);
     expect(error.message).not.toContain("TOKEN_SECRET");
+  });
+  it("bounds a successful token response body", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({
+      access_token: "access",
+      refresh_token: "refresh",
+      padding: "x".repeat(70 * 1024),
+    })));
+    await expect(refreshXaiCredentials({
+      access: "old",
+      refresh: "refresh",
+      expires: 1,
+      tokenEndpoint: XAI_OAUTH_TOKEN_URL,
+    })).rejects.toThrow(/too large/);
+  });
+
+  it("times out a stalled token body without waiting for cancellation cleanup", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn(() => new Promise<void>(() => {}));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"access_token":"PRIVATE_TOKEN'));
+      },
+      cancel,
+    }))));
+    const result = Promise.race([
+      refreshXaiCredentials({ access: "old", refresh: "refresh", expires: 1, tokenEndpoint: XAI_OAUTH_TOKEN_URL })
+        .then(() => "resolved", (error: Error) => error.message),
+      new Promise<string>((resolve) => setTimeout(() => resolve("pending"), 15_001)),
+    ]);
+
+    await vi.advanceTimersByTimeAsync(15_001);
+
+    await expect(result).resolves.toBe("xAI token request timed out");
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   it("returns unexpired credentials without a token request", async () => {

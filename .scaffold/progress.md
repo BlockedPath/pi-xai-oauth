@@ -1,5 +1,25 @@
 # Execution Progress — v1.6.0 release
 
+## Current work: OAuth and retry fixes with Pi 0.87.1
+
+**Branch:** `codex/fix-oauth-bounds-and-retry-error`
+
+- Reproduced five focused failures before implementation: oversized discovery, JWKS, and token JSON are accepted; stalled discovery has no package deadline; an unrelated retry HTTP 503 is reported as encrypted-reasoning mismatch.
+- Added shared 15-second/64-KiB browser OAuth transport with redacted failures and caller cancellation; removed retry error relabeling. Focused OAuth/reasoning suites pass 91 tests.
+- Resumed on 2026-09-23. Independent review found that a service error after the sanitized retry lost the next-turn reasoning protection. Reproduced both canonical and legacy API histories after JSON persistence; both tests fail because rejected reasoning returns to the payload. The fix stores recovery state separately from the visible error.
+- With the source fixes reverted, the 9 new and changed tests fail; with the fixes restored, they pass.
+- Initial validation passed: `npm test` (855 tests + loader), typecheck, `git diff --check`, package policy/mirror checks, and packed boundaries (Pi 0.80.1: 851 passed, 4 intentional skips; Pi 0.86.1: 854 passed, 1 Git-only skip; loaders/typechecks passed). Final gates will run after the history fix and stalled-token-body regression.
+- Delivery follows the invoked pstack bug-fix playbook. Origin cannot resolve this GitHub repository, so PR delivery uses `gh`.
+- Recovery now stores `xaiRejectedEncryptedReasoning: true` separately from the displayed error, retains legacy history detection, and carries the marker through repeated non-aborted failures. Both persisted-history regressions pass. The new stalled token-body test proves the 15-second deadline does not wait for cleanup.
+- Final verification passed: `npm test` (858 tests + real loader), typecheck, coverage (92.36% statements, 87.29% branches, 92.63% functions, 95.65% lines), package policy/registry/164-file pack/negative peers/mirror, and both packed boundaries. Pi 0.80.1 passed 854 tests with four expected skips; Pi 0.86.1 passed 857 with one Git-only skip. Both loaders and typechecks passed. Logs are `/tmp/pi-xai-oauth-bugfix-{test,coverage,package,boundaries}.log`.
+- Comment review accepted both changed public API JSDoc blocks, with no deletions or open constraints. Deslop review found no unrelated changes. Independent correctness review also identified an early catalog-missing error that could drop the marker. Both persisted-history tests reproduced that gap before the narrow early-return fix; all 35 recovery tests and typecheck pass afterward. Final OAuth/retry review has no open findings.
+- The user added Pi 0.87.1 and real `pi --version` / `pi update` checks to the scope. Read-only research is checking the upstream contract and isolation strategy while a clean packed 0.87.1 candidate runs. Final gates and PR delivery will include that requested work.
+- Both 0.87.0 and 0.87.1 clean packed candidates passed 857 tests with one Git-only skip, loader, and typecheck. Extended the final supported interval to `<0.88.0`, pinned dev/latest to 0.87.1, and retained the 0.80.1 minimum and 0.85.0 exclusion. The policy regression failed before the metadata change. Strict installation with CI's npm 11.6.2 succeeded.
+- A worker is implementing a real CLI smoke with a temporary home, agent settings, package-manager fixture, and fixed version-response fixture. It checks `pi --version`, bare `pi update`, and extension-specific update dispatch without real installs or network. `npm test`, CI, and the packed-file gate now require it.
+- Complete: `npm test` passed all 860 tests, the real loader, and the CLI smoke on Pi 0.87.1. Coverage passed at 92.37% statements, 87.30% branches, 92.63% functions, and 95.65% lines. Registry, 165-file pack, unsupported-peer diagnostics, and mirror parity passed.
+- Both final packed boundaries passed tests, loader, CLI smoke, and typecheck: Pi 0.80.1 had 856 passing tests with four expected skips; Pi 0.87.1 had 859 with one Git-only skip. Final logs are `/tmp/pi-xai-oauth-final-{test,coverage,package,boundaries}.log`.
+- Independent OAuth/retry, CLI/compatibility, and comment reviews have no remaining findings. All delegates stopped before commits; final diff and whitespace checks passed. Deliver through `gh` on the current feature branch, with regression tests before the fixes in commit history.
+
 **Active branch:** `release/v1.6.0`
 
 - PR #223 merged as `3b9388b`; local main was clean and synced. The user explicitly requested a version update and npm publication through GitHub Actions.

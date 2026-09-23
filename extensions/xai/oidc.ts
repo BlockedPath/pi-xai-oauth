@@ -2,13 +2,13 @@ import { createPublicKey, verify as verifySignature, webcrypto } from "crypto";
 import {
   XAI_OAUTH_AUTHORIZATION_URL,
   XAI_OAUTH_CLIENT_ID,
-  XAI_OAUTH_DISCOVERY_URL,
   XAI_OAUTH_ID_TOKEN_ALGORITHM,
   XAI_OAUTH_ISSUER,
   XAI_OAUTH_JWKS_URL,
   XAI_OAUTH_PKCE_METHOD,
   XAI_OAUTH_TOKEN_URL,
 } from "./constants";
+import { requestXaiOAuthJson } from "./oauth-http";
 
 const ID_TOKEN_CLOCK_SKEW_SECONDS = 60;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
@@ -55,19 +55,6 @@ type XaiJwk = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-async function readJsonResponse(response: Response, label: string): Promise<unknown> {
-  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-  if (contentType !== "application/json") {
-    throw new Error(`${label} did not return application/json`);
-  }
-
-  try {
-    return await response.json();
-  } catch {
-    throw new Error(`${label} returned invalid JSON`);
-  }
 }
 
 function requirePinnedMetadataValue(
@@ -120,15 +107,7 @@ export function validateXaiDiscovery(metadata: unknown): XaiOidcDiscovery {
 
 /** Fetch and validate xAI's pinned OpenID Provider metadata. */
 export async function discoverXaiOidc(signal?: AbortSignal): Promise<XaiOidcDiscovery> {
-  const response = await fetch(XAI_OAUTH_DISCOVERY_URL, {
-    headers: { Accept: "application/json" },
-    redirect: "error",
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error(`xAI OIDC discovery failed with status ${response.status}`);
-  }
-  return validateXaiDiscovery(await readJsonResponse(response, "xAI OIDC discovery"));
+  return validateXaiDiscovery(await requestXaiOAuthJson({ kind: "discovery", signal }));
 }
 
 function decodeJwtJson(segment: string, label: string): Record<string, unknown> {
@@ -157,16 +136,7 @@ async function fetchXaiJwks(discovery: XaiOidcDiscovery, signal?: AbortSignal): 
     throw new Error("xAI JWKS request was not bound to the pinned issuer");
   }
 
-  const response = await fetch(XAI_OAUTH_JWKS_URL, {
-    headers: { Accept: "application/json" },
-    redirect: "error",
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error(`xAI JWKS request failed with status ${response.status}`);
-  }
-
-  const document = await readJsonResponse(response, "xAI JWKS");
+  const document = await requestXaiOAuthJson({ kind: "jwks", signal });
   if (
     !isRecord(document) ||
     !Array.isArray(document.keys) ||

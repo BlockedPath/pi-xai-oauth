@@ -111,10 +111,18 @@ function shouldOmitRejectedEncryptedReasoning(
     return (
       isReplayCompatibleXaiMessage(message, model, selectedModelId) &&
       message.stopReason === "error" &&
-      message.errorMessage === XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE
+      (message.errorMessage === XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE ||
+        ("xaiRejectedEncryptedReasoning" in message &&
+          message.xaiRejectedEncryptedReasoning === true))
     );
   }
   return false;
+}
+
+function markRejectedEncryptedReasoning<T extends object>(
+  message: T,
+): T & { xaiRejectedEncryptedReasoning: true } {
+  return { ...message, xaiRejectedEncryptedReasoning: true };
 }
 
 function isEncryptedReasoningItem(value: unknown): boolean {
@@ -312,9 +320,10 @@ export async function createXaiResponse(
  * same-model history are aligned only for internal conversion. A classified
  * encrypted-reasoning mismatch retries once without replayed reasoning, only
  * before assistant content is forwarded and while not cancelled. Each attempt
- * repeats payload hooks and local guards. A failed retry retains fixed guidance
- * so the next same-model request also omits rejected reasoning, preserving
- * visible and tool-result history.
+ * repeats payload hooks and local guards. Non-aborted failures after a rejection
+ * retain a token-free marker alongside the actual sanitized error, so the next
+ * same-model request omits rejected reasoning while preserving visible and
+ * tool-result history.
  *
  * @param model xAI provider model selected by pi.
  * @param context Conversation messages and tool context to stream.
@@ -331,12 +340,16 @@ export function streamSimpleXaiResponses(
   const runtimeModel = getXaiRuntimeModel(model.id);
   if (!runtimeModel) {
     const stream = createForwardingAssistantStream();
-    const message = streamErrorMessage(
+    const rawMessage = streamErrorMessage(
       model,
       new Error(
         `xAI OAuth model ${model.id} is not present in the authenticated model catalog`,
       ),
     );
+    const message = !options?.signal?.aborted &&
+      shouldOmitRejectedEncryptedReasoning(context, model, model.id)
+      ? markRejectedEncryptedReasoning(rawMessage)
+      : rawMessage;
     stream.push({ type: "error", reason: "error", error: message });
     stream.end(message);
     return stream;
@@ -411,7 +424,6 @@ export function streamSimpleXaiResponses(
   const stream = createForwardingAssistantStream();
   let grokNativeToolRoutes: GrokNativeToolRoutes = {};
   let sentEncryptedReasoning = false;
-  let attemptPayloadReady = false;
   void (async () => {
     // Pi's generic OpenAI delegate does not expose fetch redirect controls.
     // Keep one URL-scoped guard installed only for the lifetime of active xAI
@@ -541,7 +553,6 @@ export function streamSimpleXaiResponses(
             transportSignal.throwIfAborted();
             sentEncryptedReasoning = Array.isArray(finalPayload.input) &&
               finalPayload.input.some(isEncryptedReasoningItem);
-            attemptPayloadReady = true;
             return finalPayload;
           },
         },
@@ -549,7 +560,6 @@ export function streamSimpleXaiResponses(
       for (let attempt = 0; attempt < 2; attempt++) {
         grokNativeToolRoutes = {};
         sentEncryptedReasoning = false;
-        attemptPayloadReady = false;
         let pendingStart: AssistantStreamEvent | undefined;
         let forwardedContent = false;
         let retry = false;
@@ -575,10 +585,13 @@ export function streamSimpleXaiResponses(
             retry = true;
             break;
           }
-          if (attempt === 1 && failed && attemptPayloadReady) {
+          if (
+            failed && omitRejectedReasoning && normalized.error &&
+            typeof normalized.error === "object"
+          ) {
             normalized = {
               ...normalized,
-              error: { ...normalized.error, errorMessage: XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE },
+              error: markRejectedEncryptedReasoning(normalized.error),
             };
           }
           if (pendingStart) {
@@ -605,7 +618,10 @@ export function streamSimpleXaiResponses(
               "xAI image input could not be safely resolved; no xAI request was sent",
             )
           : error;
-      const message = streamErrorMessage(model, safeError);
+      const rawMessage = streamErrorMessage(model, safeError);
+      const message = omitRejectedReasoning && !transportSignal.aborted
+        ? markRejectedEncryptedReasoning(rawMessage)
+        : rawMessage;
       stream.push({ type: "error", reason: "error", error: message });
       stream.end(message);
     } finally {
@@ -616,7 +632,10 @@ export function streamSimpleXaiResponses(
     // stream: an unobserved rejection would hang every consumer awaiting it.
     let message: ReturnType<typeof streamErrorMessage> | undefined;
     try {
-      message = streamErrorMessage(model, error);
+      const rawMessage = streamErrorMessage(model, error);
+      message = omitRejectedReasoning && !transportSignal.aborted
+        ? markRejectedEncryptedReasoning(rawMessage)
+        : rawMessage;
       stream.push({ type: "error", reason: "error", error: message });
     } catch {
       // The terminal fallback must not create another unobserved rejection.

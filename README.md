@@ -41,7 +41,7 @@ This package adds xAI's **account-specific OAuth model catalog** to pi, with **G
 
 > **Latest release:** `pi-xai-oauth` **1.6.0** adds entitlement-aware Grok 4.7 support, Pi 0.86.1 compatibility, copyable usage CSV, and same-turn encrypted-reasoning recovery. Grok 4.6 remains the setup/offline default. The canonical `pi-xai-oauth` package on npmjs and scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages come from the same validated GitHub Release. Setup treats both names as one extension and removes duplicate aliases before registration. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
 >
-> **Compatibility:** 1.6.0 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0 || >=0.85.1 <0.87.0`, with exact tested boundaries at 0.80.1 and 0.86.1. Pi 0.85.0 remains explicitly excluded; see [Pi Compatibility](#pi-compatibility).
+> **Development compatibility:** This checkout supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0`, with exact tested boundaries at 0.80.1 and 0.87.1. Published 1.6.0 retains its `<0.87.0` upper bound. Pi 0.85.0 remains explicitly excluded; see [Pi Compatibility](#pi-compatibility).
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and fix history.
 
@@ -115,6 +115,8 @@ The optional [`--scaffold`](#agent-scaffolding) command is separate: it performs
 
 - **Browser login (default):** starts a loopback callback listener, opens xAI authorization with PKCE S256, requires matching state for HTTP or pasted full-redirect callbacks, and verifies the fresh ID token against the pinned issuer/JWKS, ES256 policy, audience, expiry, and nonce.
 - **Device code login:** requests a challenge from the pinned first-party device endpoint, shows the verification URL and user code through pi's device UI, and polls the pinned token endpoint only after the server interval. It handles pending/slow-down, denial, expiry, cancellation, malformed responses, and a bounded timeout without displaying the opaque device code or token responses.
+
+Browser discovery, JWKS, and token requests, including refresh, each have a 15-second deadline and a 64-KiB response limit. The deadline covers response body reads and honors caller cancellation.
 
 Only a completed selected login returns access + refresh credentials for pi to persist. It then performs a bounded authenticated `GET https://cli-chat-proxy.grok.com/v1/models-v2`, filters unsafe/API-key-only entries, and immediately replaces the provider catalog. All OAuth-backed Responses traffic uses xAI's session-token proxy; proxy requests truthfully identify `pi-xai-oauth`, protect internally owned metadata from caller overrides, and include the required auth, client-mode, request, conversation, session, and model fields. Streaming requests explicitly negotiate server-sent events; direct Responses requests remain JSON.
 
@@ -206,18 +208,22 @@ Authenticate with `/login xai`. Use `/login xai-auth` only when you want this pa
 
 ## Pi Compatibility
 
-Version 1.6.0 uses the same bounded range for both Pi runtime peers:
+The current checkout uses the same bounded range for both Pi runtime peers:
 
 ```text
-@earendil-works/pi-ai:            >=0.80.1 <0.85.0 || >=0.85.1 <0.87.0
-@earendil-works/pi-coding-agent:  >=0.80.1 <0.85.0 || >=0.85.1 <0.87.0
+@earendil-works/pi-ai:            >=0.80.1 <0.85.0 || >=0.85.1 <0.88.0
+@earendil-works/pi-coding-agent:  >=0.80.1 <0.85.0 || >=0.85.1 <0.88.0
 ```
 
-The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **0.86.1**, the latest release inside the allowed line when this policy was reviewed. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
+The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **0.87.1**, the latest release inside the allowed line when this policy was reviewed. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
 
 Pi 0.86 moves provider system instructions and tool declarations into normalized transcript messages. The Responses adapter uses Pi's native normalizer when available, preserving system/tool deltas and reasoning-recovery behavior; older Pi versions retain their legacy top-level prompt/tools unchanged. Both 0.86.0 and 0.86.1 passed clean packed candidate validation before widening this range.
 
-Pi **0.85.0 is explicitly excluded** because its packaged SDK imports fail on a missing `@earendil-works/pi-server` dependency ([upstream issue #9132](https://github.com/earendil-works/pi/issues/9132)); Pi 0.85.1 fixes that packaging defect. The exclusive `<0.87.0` upper bound remains deliberate: Pi is pre-1.0, so a new minor line may contain breaking API or loader changes and must pass the packed compatibility suite before support is claimed. Strict npm peer resolution rejects older releases such as 0.79.10, the excluded 0.85.0 release, and the untested 0.87 line. Older `pi-xai-oauth` 1.5.2 releases retain their original `>=0.80.1 <0.85.0` peer range; upgrade to 1.6.0 for Pi 0.85.1/0.86 support.
+Pi 0.87.0 and 0.87.1 passed clean packed candidate tests, loader checks, and typechecks before widening this range. The package also checks the real `pi --version`, `pi update`, and `pi update npm:pi-xai-oauth` commands with an isolated updater fixture. The update checks verify command dispatch without installing packages or accessing the network.
+
+Pi **0.85.0 is explicitly excluded** because its packaged SDK imports fail on a missing `@earendil-works/pi-server` dependency ([upstream issue #9132](https://github.com/earendil-works/pi/issues/9132)); Pi 0.85.1 fixes that packaging defect. The exclusive `<0.88.0` upper bound remains deliberate. Pi is pre-1.0, so a new minor line may contain breaking API or loader changes and must pass the packed compatibility suite before support is claimed. Strict npm peer resolution rejects 0.79.10, the excluded 0.85.0 release, and the untested 0.88 line. Published `pi-xai-oauth` 1.6.0 retains its `<0.87.0` upper bound; Pi 0.87 support in this checkout is unreleased.
+
+Check your installed Pi version with `pi --version`. Bare `pi update` updates Pi itself. Use `pi update npm:pi-xai-oauth` to update this extension, or `pi update npm:@blockedpath/pi-xai-oauth` for the GitHub Packages mirror.
 
 Older `pi-xai-oauth` 1.2.4 builds supported Pi 0.79.8's then-current Responses guard. Current code uses the Pi 0.80 compat dispatcher after the 1.3.2 export migration and 1.3.3 loader-resolution fix, so that historical statement is not the current minimum.
 
@@ -229,9 +235,9 @@ On the pinned OAuth Responses route, requests default an absent `store` to `fals
 
 `store: false` disables server-side response storage, but it does **not** mean no local sensitive state. Complete encrypted reasoning items are stored in ordinary Pi session JSONL under Pi's normal permissions and retention. This package does not separately encrypt that file, copy reasoning into another cache, or protect it from the user or trusted local extensions.
 
-If xAI reports that encrypted reasoning is incompatible with the selected model, the `xai-auth` stream retries once in the same turn without the rejected encrypted reasoning—but only if the final request contained replayed reasoning, no assistant content has been forwarded, and the request has not been cancelled. Recovery is silent on success; an unsuccessful retry returns the fixed, redacted clean-session/turn guidance without a third attempt. Cancellation and local validation failures retain their existing behavior. Requests without replayed reasoning and unrelated errors are not retried.
+If xAI reports that encrypted reasoning is incompatible with the selected model, the `xai-auth` stream retries once in the same turn without the rejected encrypted reasoning. This requires replayed reasoning in the final request, no assistant content forwarded, and no cancellation. Recovery is silent on success. A failed retry returns its own redacted error, such as HTTP 503, without a third attempt. Another reasoning mismatch returns the fixed clean-session/turn guidance. Cancellation and local validation failures retain their existing behavior. Requests without replayed reasoning and unrelated errors are not retried.
 
-The retry preserves visible conversation and tool-result history, session affinity, and the encrypted-output include policy. It uses a new request ID and repeats payload hooks and local entitlement/image guards; enabled vision routing may therefore make another description request. If fixed mismatch guidance is retained in history, the next same-model turn still omits the rejected reasoning chain. Successful turns resume normal eligible replay, and switching targets retains the existing cross-model replay protection. Direct Responses helpers do not automatically retry.
+The retry preserves visible conversation and tool-result history, session affinity, and the encrypted-output include policy. It uses a new request ID and repeats payload hooks and local entitlement/image guards; enabled vision routing may therefore make another description request. Failed recovery retains a token-free marker in session history so later requests to the same model continue to omit the rejected reasoning. Older history with fixed mismatch guidance also retains this protection. Successful turns resume normal eligible replay, and switching targets retains the existing cross-model replay protection. Direct Responses helpers do not automatically retry.
 
 ---
 
@@ -908,7 +914,7 @@ cd pi-xai-oauth
 # Install deps
 npm install
 
-# Full deterministic gate: policy, focused Vitest suites, and real Pi loader smoke
+# Full deterministic gate: policy, Vitest suites, real Pi loader, and CLI smoke
 npm test
 
 # Focused development commands
@@ -921,6 +927,9 @@ npm run test:coverage
 
 # Run only the real Pi extension-loader integration smoke
 npm run test:loader
+
+# Check the real Pi version and isolated update dispatch
+npm run test:cli
 
 # Type-check production, tests, fixtures, and Vitest config with TypeScript 7
 npm run typecheck
@@ -994,6 +1003,7 @@ pi-xai-oauth/
 │       ├── media/            # Strict media parsing, compression, paths, and storage
 │       ├── models.ts         # Curated fallback/known metadata + compatibility helpers
 │       ├── oauth.ts          # Browser/device selection, PKCE login, refresh, callbacks
+│       ├── oauth-http.ts     # Bounded pinned browser OAuth JSON transport
 │       ├── oidc.ts           # Pinned browser discovery/JWKS + ID-token validation
 │       ├── payload.ts        # xAI Responses payload normalization
 │       ├── responses.ts      # xAI request + streaming helpers
@@ -1024,6 +1034,7 @@ pi-xai-oauth/
 │   ├── run-compatibility-matrix.js # Clean packed exact-version test/typecheck runner
 │   ├── verify-compatibility.js     # Range/lock/registry/pack/unsupported-peer checks
 │   ├── verify-extension-loader.mjs # Small real Pi loader integration smoke
+│   ├── verify-pi-cli.mjs # Real version + isolated self/extension update dispatch
 │   └── verify-github-package.js    # Scoped mirror metadata/content parity
 ├── .github/workflows/
 │   ├── ci.yml                # PR/main policy and exact Pi boundary matrix

@@ -261,6 +261,7 @@ function verifyPackedPackage() {
       "scripts/prepare-github-package.js",
       "scripts/verify-github-package.js",
       "scripts/verify-extension-loader.mjs",
+      "scripts/verify-pi-cli.mjs",
       "vitest.config.mts",
       "tsconfig.json",
       ...listGitVisibleFiles(path.join(repoRoot, "tests")),
