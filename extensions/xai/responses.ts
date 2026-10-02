@@ -37,6 +37,7 @@ import {
   prepareXaiDelegateContext,
   restoreXaiMessageIdentity,
   shouldOmitRejectedEncryptedReasoning,
+  toXaiDelegateContext,
 } from "./responses-delegate";
 import {
   assertXaiRuntimeModelAcceptsPayload,
@@ -210,10 +211,8 @@ export function streamSimpleXaiResponses(
       : {}),
     api: "openai-responses" as const,
   };
-  const delegateContext = prepareXaiDelegateContext(
-    context,
-    model,
-    selectedModelId,
+  const delegateContext = toXaiDelegateContext(
+    prepareXaiDelegateContext(context, model, selectedModelId),
   );
   const omitRejectedReasoning = shouldOmitRejectedEncryptedReasoning(
     context,

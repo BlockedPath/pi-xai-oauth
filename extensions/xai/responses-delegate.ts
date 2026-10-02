@@ -1,7 +1,34 @@
+import * as piAi from "@earendil-works/pi-ai";
 import type { Api, AssistantMessage, Context, Model } from "@earendil-works/pi-ai";
+import type { openAIResponsesApi } from "@earendil-works/pi-ai/compat";
 import { XAI_ENCRYPTED_CONTENT_MISMATCH_MESSAGE } from "./wire";
 
 const XAI_RESPONSES_DELEGATE_API = "openai-responses";
+
+/** Context accepted by Pi's Responses delegate: `Context` before Pi 0.86, branded `TranscriptContext` from 0.86. */
+export type XaiDelegateContext = Parameters<ReturnType<typeof openAIResponsesApi>["streamSimple"]>[1];
+
+/** Folds `Context.systemPrompt`/`tools` into a leading system message (Pi 0.86+ `normalizeContext`). */
+export type XaiContextNormalizer = (context: Context) => XaiDelegateContext;
+
+// Older Pi has no `normalizeContext`; its delegate still reads `systemPrompt`/`tools` directly.
+const piNormalizeContext = (piAi as unknown as { normalizeContext?: XaiContextNormalizer }).normalizeContext;
+
+/**
+ * Adapt a context for Pi's Responses delegate. Pi 0.86+ hands providers an already normalized
+ * transcript, which passes through unchanged; a raw `Context` from a direct caller has its
+ * `systemPrompt`/`tools` folded in so the delegate still sends them. A context that already
+ * starts with a system message is never normalized again, so no second system message is added.
+ */
+export function toXaiDelegateContext(
+  context: Context,
+  normalize: XaiContextNormalizer | undefined = piNormalizeContext,
+): XaiDelegateContext {
+  const hasShorthand = context.systemPrompt !== undefined || context.tools !== undefined;
+  const startsWithSystem = (context.messages[0] as { role?: string } | undefined)?.role === "system";
+  if (!normalize || !hasShorthand || startsWithSystem) return context as unknown as XaiDelegateContext;
+  return normalize(context);
+}
 
 function isReplayCompatibleXaiMessage(
   value: unknown,
