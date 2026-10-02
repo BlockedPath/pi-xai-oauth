@@ -11,7 +11,8 @@ export type XaiDelegateContext = Parameters<ReturnType<typeof openAIResponsesApi
 /** Folds `Context.systemPrompt`/`tools` into a leading system message (Pi 0.86+ `normalizeContext`). */
 export type XaiContextNormalizer = (context: Context) => XaiDelegateContext;
 
-// Older Pi has no `normalizeContext`; its delegate still reads `systemPrompt`/`tools` directly.
+// SAFETY: feature probe. Pi before 0.86 neither exports nor types `normalizeContext`, so the
+// lookup is `undefined` there; its delegate still reads `systemPrompt`/`tools` directly.
 const piNormalizeContext = (piAi as unknown as { normalizeContext?: XaiContextNormalizer }).normalizeContext;
 
 /**
@@ -27,6 +28,8 @@ export function toXaiDelegateContext(
 ): XaiDelegateContext {
   const hasShorthand = context.systemPrompt !== undefined || context.tools !== undefined;
   const startsWithSystem = (context.messages[0] as { role?: string } | undefined)?.role === "system";
+  // SAFETY: the `TranscriptContext` brand is type-only. This path is reached only on Pi before
+  // 0.86 (where the delegate type is `Context`) or for an already folded transcript.
   if (!normalize || !hasShorthand || startsWithSystem) return context as unknown as XaiDelegateContext;
   return normalize(context);
 }
