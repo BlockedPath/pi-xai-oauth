@@ -9,6 +9,7 @@ import {
   XAI_OAUTH_PKCE_METHOD,
   XAI_OAUTH_TOKEN_URL,
 } from "./constants";
+import { isRecord } from "./validate";
 
 const ID_TOKEN_CLOCK_SKEW_SECONDS = 60;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
@@ -52,10 +53,6 @@ type XaiJwk = {
   d?: unknown;
   key_ops?: unknown;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 async function readJsonResponse(response: Response, label: string): Promise<unknown> {
   const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();

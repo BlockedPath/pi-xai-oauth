@@ -18,6 +18,7 @@ import {
   XaiModelInputProvenance,
   type XaiCatalogModel,
 } from "./models";
+import { hasControlCharacter, objectValue, positiveInteger } from "./validate";
 import { xaiCatalogHeaders } from "./wire";
 
 const MAX_CATALOG_ENTRIES = 256;
@@ -98,12 +99,6 @@ export function defaultXaiCatalogCachePath(): string {
   return join(getAgentDir(), "cache", "pi-xai-oauth", "models-v2.json");
 }
 
-function objectValue(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
@@ -128,12 +123,6 @@ function firstValue(obj: Record<string, unknown>, meta: Record<string, unknown> 
   return undefined;
 }
 
-function positiveInteger(value: unknown, maximum: number): number | undefined {
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= maximum
-    ? value
-    : undefined;
-}
-
 function safeModelId(value: unknown): string | undefined {
   const id = nonEmptyString(value);
   if (!id || id.length > MAX_MODEL_ID_LENGTH || !MODEL_ID_PATTERN.test(id)) return undefined;
@@ -142,7 +131,7 @@ function safeModelId(value: unknown): string | undefined {
 
 function safeDisplayName(value: unknown, fallback: string): string | undefined {
   const name = nonEmptyString(value) ?? fallback;
-  if (name.length > MAX_MODEL_NAME_LENGTH || /[\u0000-\u001f\u007f]/.test(name)) return undefined;
+  if (name.length > MAX_MODEL_NAME_LENGTH || hasControlCharacter(name)) return undefined;
   return name;
 }
 

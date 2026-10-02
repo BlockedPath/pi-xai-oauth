@@ -21,6 +21,7 @@ import {
   XAI_OAUTH_SCOPE,
   XAI_OAUTH_TOKEN_URL,
 } from "./constants";
+import { hasControlCharacter, isRecord, positiveInteger } from "./validate";
 import { xaiOAuthFormHeaders, type XaiOAuthClientSurface } from "./wire";
 
 const MAX_DEVICE_CODE_LENGTH = 4096;
@@ -55,10 +56,6 @@ export interface XaiDeviceAuthDependencies {
   clientSurface?: XaiOAuthClientSurface;
 }
 
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function assertNotCancelled(signal?: AbortSignal): void {
   throwIfAborted(signal, () => new Error(CANCEL_MESSAGE));
 }
@@ -90,14 +87,8 @@ async function readBoundedJson(response: Response, label: string, signal?: Abort
 
 function boundedString(value: unknown, maximum: number): string | undefined {
   if (typeof value !== "string" || !value || value !== value.trim() || value.length > maximum) return undefined;
-  if (/[\u0000-\u001f\u007f]/.test(value)) return undefined;
+  if (hasControlCharacter(value)) return undefined;
   return value;
-}
-
-function positiveInteger(value: unknown, maximum: number): number | undefined {
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= maximum
-    ? value
-    : undefined;
 }
 
 function validateVerificationUri(value: unknown): string | undefined {

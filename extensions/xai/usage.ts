@@ -24,6 +24,7 @@ import {
   XAI_USAGE_TIMEOUT_MS,
 } from "./constants";
 import type { XaiCredential } from "./routing";
+import { hasControlCharacter, objectValue } from "./validate";
 import { xaiUsageHeaders } from "./wire";
 
 const XAI_USAGE_STATUS_KEY = "xai-usage";
@@ -92,12 +93,6 @@ interface JsonBudget {
   nodes: number;
 }
 
-function objectValue(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
 function assertBoundedJson(value: unknown, depth = 0, budget: JsonBudget = { nodes: 0 }): void {
   if (depth > XAI_USAGE_MAX_JSON_DEPTH || ++budget.nodes > XAI_USAGE_MAX_JSON_NODES) {
     throw new XaiUsageError("invalid", "xAI usage returned an over-complex response.");
@@ -121,7 +116,7 @@ function assertBoundedJson(value: unknown, depth = 0, budget: JsonBudget = { nod
 function boundedLabel(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const label = value.trim();
-  return label && label.length <= MAX_LABEL_LENGTH && !/[\u0000-\u001f\u007f]/.test(label)
+  return label && label.length <= MAX_LABEL_LENGTH && !hasControlCharacter(label)
     ? label
     : undefined;
 }
