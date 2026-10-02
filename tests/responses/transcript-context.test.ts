@@ -72,7 +72,7 @@ describe("toXaiDelegateContext", () => {
 
   it("passes through unchanged when Pi has no normalizeContext (before 0.86)", () => {
     const context = { systemPrompt: "p", messages: [user] } as any;
-    expect(toXaiDelegateContext(context, undefined)).toBe(context);
+    expect(toXaiDelegateContext(context, null)).toBe(context);
   });
 
   it("passes an already normalized transcript through without normalizing again", () => {

@@ -19,10 +19,11 @@ const piNormalizeContext = (piAi as unknown as { normalizeContext?: XaiContextNo
  * transcript, which passes through unchanged; a raw `Context` from a direct caller has its
  * `systemPrompt`/`tools` folded in so the delegate still sends them. A context that already
  * starts with a system message is never normalized again, so no second system message is added.
+ * Pass `null` as `normalize` to adapt as Pi before 0.86 would (no folding).
  */
 export function toXaiDelegateContext(
   context: Context,
-  normalize: XaiContextNormalizer | undefined = piNormalizeContext,
+  normalize: XaiContextNormalizer | null = piNormalizeContext ?? null,
 ): XaiDelegateContext {
   const hasShorthand = context.systemPrompt !== undefined || context.tools !== undefined;
   const startsWithSystem = (context.messages[0] as { role?: string } | undefined)?.role === "system";
