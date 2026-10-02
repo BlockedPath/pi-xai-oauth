@@ -1,35 +1,36 @@
-# Execution Progress — Issue #188
+# Execution Progress — Module refactor
 
-**Branch:** `release/v1.5.1`
+**Branch:** `feature/module-refactor` (from `main` @ f312a4d)
+**Coordination:** `.scaffold/refactor/` (PROTOCOL, survey, plan v2, advice/reviews, message log)
+**Agents (herdr workspace wK):** Claude `wK:p4` orchestrator/writer · Grok `wK:p5` advisor ·
+Pi/muse `wK:p1` per-commit bug checker → delegates the branch review to Codex `wK:p3` · Claude final review.
 
 ## Completed
 
-- [x] Confirmed the clean feature branch before edits.
-- [x] Read AGENTS.md, README.md, setup/entrypoint code, scaffold state, and the full issue (no comments were present).
-- [x] Read the Responses, payload, and wire implementations plus reasoning replay, routing, streaming, and payload tests.
-- [x] Inspected Pi/pi-ai 0.84.2's real OpenAI Responses conversion and `response.failed` stream seam.
-- [x] Established the working diagnosis: streamed failures lose HTTP status and are generically redacted; canonical `xai-responses` history is not replayed through the temporary `openai-responses` delegate identity, while persisted delegate-tagged history is.
-- [x] Added deterministic real stream-seam regressions and proved both pre-fix failures.
-- [x] Implemented bounded `response.failed` mismatch classification with fixed redacted guidance and no immediate retry.
-- [x] Aligned canonical and persisted delegate-tagged history at the conversion seam while retaining exact provider/model replay checks.
-- [x] Made the next same-model turn omit rejected encrypted reasoning only, preserving visible conversation/tool history and leaving unrelated failures unchanged.
-- [x] Passed 62 focused Responses tests across recovery, routing, replay, streaming, and payload suites.
-- [x] Passed local LSP diagnostics and `npm run typecheck`.
-- [x] Passed `npm test`: compatibility policy, 627 unit tests, and the real Pi loader smoke.
-- [x] Passed `npm run compatibility:check`, including packed-manifest and registry/mirror policy checks.
-- [x] Found and fixed a Pi 0.80.1 compatibility gap where the delegate does not retain `rawStopReason: failed`; the classifier remains bounded by `invalid_request` plus `encrypted_content`.
-- [x] Passed exact packed boundaries for Pi/pi-ai 0.80.1 and 0.84.2, including each packed package's tests, loader smoke, and typecheck.
-- [x] Ran a live Herdr smoke against the worktree-only extension with authenticated `xai-auth`: Grok 4.6 completed a tool turn and same-model continuation, Grok 4.5 completed the switched-model turn, and Grok 4.6 completed the switch-back turn without a Responses failure.
-- [x] Reviewed and committed the final delta, pushed the feature branch, and opened PR #190.
+- [x] Surveyed module boundaries; wrote protocol, survey, plan v1; Grok advised; plan v2 folded in.
+- [x] S1 46911c9 import-edge trims (vision-routing constant, provider id, wire re-export, messageFromError) — Pi PASS.
+- [x] S2 7fb7abf `validate.ts` for byte-identical validators (OIDC keeps strict content type) — Pi PASS.
+- [x] S3 cut — per-route fetch/error policy is not duplicated logic (Claude + Grok A1).
+- [x] S4 4c4702a `oauth-token.ts` + `oauth-browser.ts` — Pi PASS w/ plan nit (fixed).
+- [x] S5 25202fb `tools/grok-workspace-fs.ts`, `grok-grep.ts`, `grok-search-replace.ts` — Pi PASS.
+- [x] S6 db07d7c `redirect-guard.ts`, `assistant-stream.ts`, `responses-delegate.ts`, `responses-request.ts`; vision description error → constants — Pi PASS.
+- [x] S7 74cea95 `catalog-normalize.ts`, `catalog-cache.ts` — Pi PASS.
+- [x] S8 5e3645f `usage-parse.ts`, `usage-render.ts` — Pi PASS.
+- [x] S9 616aa78 `payload-images.ts`, `payload-tool-names.ts` — Pi PASS.
+- [x] S10 9515851 README tree, AGENTS.md map/flow, wire-protocol re-audit list.
+- [x] Every commit: `npm run typecheck` + `npm test` (54 files / 664 tests + loader smoke) green; madge: no cycles.
 
-- [x] Merged PR #190 to `main` as `8eaf274`.
-- [x] Prepared the v1.5.1 package/lock metadata, release changelog, and README release references.
-- [x] Passed `npm test` (664 tests), `npm run typecheck`, `npm run compatibility:check`, both exact Pi 0.80.1/0.84.2 packed boundaries, `npm pack --dry-run --json`, and `git diff --check` for v1.5.1.
-
-## In Progress
-
-- [ ] Publish v1.5.1 through the release PR and GitHub Release workflow.
+- [x] Pi reviewed S10 (PASS WITH NITS, fixed) and delegated the full-branch review to Codex: PASS, no findings.
+- [x] Exact packed Pi boundaries 0.80.1 and 0.84.2 pass on the final tree.
+- [x] Claude final review PASS (`refactor/final-claude.md`).
 
 ## Next
 
-Run all documented release gates, merge the release PR, publish GitHub Release `v1.5.1`, and monitor both registry publish steps.
+- User decision: push `feature/module-refactor` and open a PR.
+
+## Known / out of scope
+
+- `npm run compatibility:check` fails on `main` too: `@earendil-works/pi-ai` 0.84.4 is newer than the
+  policy's latest 0.84.2 and needs a deliberate compatibility review (separate task).
+- Deferred: custom-tools table-driven helper, moving `web_search`, path-containment dedupe across
+  grok-native/media, entrypoint duplicate blocks, commands.ts indentation, bounding unbounded `response.json()` reads.
