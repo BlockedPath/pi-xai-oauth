@@ -4,7 +4,7 @@ import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { XAI_MODELS } from "@earendil-works/pi-ai/providers/xai.models";
 import { describe, expect, it } from "vitest";
-import { normalizeXaiCatalogPayload } from "../../extensions/xai/catalog";
+import { normalizeXaiCatalogPayload } from "../../extensions/xai/catalog-normalize";
 import {
   KNOWN_XAI_MODEL_METADATA,
   type XaiCatalogModel,

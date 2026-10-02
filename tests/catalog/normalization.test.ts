@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeXaiCatalogPayload,
   XaiCatalogValidationError,
-} from "../../extensions/xai/catalog";
+} from "../../extensions/xai/catalog-normalize";
 import { XaiModelInputProvenance } from "../../extensions/xai/models";
 
 const fixture = async (name: string) =>

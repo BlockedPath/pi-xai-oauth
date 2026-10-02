@@ -3,10 +3,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchXaiModelCatalog,
-  normalizeXaiCatalogPayload,
   selectXaiModelCatalog,
-  XaiCatalogCancelledError,
 } from "../../extensions/xai/catalog";
+import { XaiCatalogCancelledError } from "../../extensions/xai/catalog-cache";
+import { normalizeXaiCatalogPayload } from "../../extensions/xai/catalog-normalize";
 import {
   XAI_CLI_MODELS_URL,
   XAI_CLIENT_IDENTIFIER,
