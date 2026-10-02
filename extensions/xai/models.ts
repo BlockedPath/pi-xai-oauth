@@ -30,14 +30,6 @@ export type XaiCatalogModel = {
 };
 
 /**
- * Curated metadata for known xAI models.
- *
- * This table enriches models that the authenticated catalog actually returns
- * (and their known aliases after entitlement expansion). It is not the provider
- * advertisement and must never be unioned wholesale into a successful entitlement
- * response.
- */
-/**
  * Models whose Pi `minimal` level is sent as xAI `low`. This only shapes the wire
  * effort once catalog evidence lists `low`; it never decides which models are advertised.
  */
@@ -48,6 +40,14 @@ export const XAI_MINIMAL_AS_LOW_MODEL_IDS: ReadonlySet<string> = new Set([
   "grok-4.7-build-fast",
 ]);
 
+/**
+ * Curated metadata for known xAI models.
+ *
+ * This table enriches models that the authenticated catalog actually returns
+ * (and their known aliases after entitlement expansion). It is not the provider
+ * advertisement and must never be unioned wholesale into a successful entitlement
+ * response.
+ */
 export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
   {
     id: "grok-4.5",
@@ -115,37 +115,6 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
     // No model-specific output maximum is published; use the existing Responses
     // default when an authenticated completion limit is absent.
     maxTokens: 131_072,
-    thinkingLevelMap: {
-      off: null,
-      minimal: "low",
-      low: "low",
-      medium: "medium",
-      high: "high",
-      xhigh: "xhigh",
-      // Omit `max` for Pi 0.80.1 compatibility; the level remains unsupported.
-    },
-  },
-  {
-    // Grok Build-only slug that authenticated catalogs name "Grok 4.7 Fast". xAI documents
-    // it as the same Grok 4.7 model on faster infrastructure and publishes its rate card;
-    // image input was confirmed live on an entitled account. Context, output and effort
-    // figures below are not separately published for Fast (see README source notes).
-    id: "grok-4.7-build-fast",
-    name: "Grok 4.7 Fast",
-    apiBackend: "responses",
-    reasoning: true,
-    input: ["text", "image"],
-    inputProvenance: XaiModelInputProvenance.Known,
-    // https://docs.x.ai/developers/pricing — Grok 4.7 Fast rate card, <200k prompt.
-    cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
-    // Grok 4.7's documented window via the same-model identity. Normalization always uses
-    // the authenticated `context_window` instead (it is required for every catalog entry).
-    contextWindow: 500_000,
-    // Package policy, not an xAI figure: the same Responses default this package applies
-    // to Grok 4.7 when no authenticated completion limit is present (xAI publishes no
-    // numeric limit and describes Grok 4.7 as having no text output limit).
-    maxTokens: 131_072,
-    // Fallback only when the authenticated entry omits reasoning efforts; mirrors Grok 4.7.
     thinkingLevelMap: {
       off: null,
       minimal: "low",
@@ -241,6 +210,35 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
 ];
 
 const KNOWN_MODEL_MAP = new Map(KNOWN_XAI_MODEL_METADATA.map((model) => [model.id, model]));
+
+/**
+ * Partial known metadata for a catalog-only slug. It fills only documented gaps in an
+ * authenticated catalog entry; context window, reasoning, and thinking levels always
+ * come from the catalog itself.
+ */
+export type XaiKnownModelOverlay = Pick<
+  XaiCatalogModel,
+  "id" | "input" | "inputProvenance" | "cost" | "maxTokens"
+>;
+
+export const KNOWN_XAI_MODEL_OVERLAYS: readonly XaiKnownModelOverlay[] = [
+  {
+    // Grok Build-only slug that authenticated catalogs name "Grok 4.7 Fast". xAI documents
+    // it as the same Grok 4.7 model on faster infrastructure (https://docs.x.ai/developers/pricing),
+    // and image input was confirmed live on an entitled account (README source notes).
+    id: "grok-4.7-build-fast",
+    input: ["text", "image"],
+    inputProvenance: XaiModelInputProvenance.Known,
+    // https://docs.x.ai/developers/pricing — Grok 4.7 Fast rate card, <200k prompt.
+    cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+    // Package policy, not an xAI figure: the same Responses default this package applies
+    // to Grok 4.7 when no authenticated completion limit is present (xAI publishes no
+    // numeric limit and describes Grok 4.7 as having no text output limit).
+    maxTokens: 131_072,
+  },
+];
+
+const KNOWN_OVERLAY_MAP = new Map(KNOWN_XAI_MODEL_OVERLAYS.map((overlay) => [overlay.id, overlay]));
 
 /**
  * Known OAuth model aliases mapped to the canonical catalog id they currently
@@ -381,6 +379,11 @@ export function defaultXaiRuntimeModelId(): string | undefined {
 /** Return curated metadata for a known model without advertising it. */
 export function knownXaiModelMetadata(modelId: string): XaiCatalogModel | undefined {
   return KNOWN_MODEL_MAP.get(normalizedXaiModelId(modelId));
+}
+
+/** Return partial catalog-only enrichment for a model ID, if one is documented. */
+export function knownXaiModelOverlay(modelId: string): XaiKnownModelOverlay | undefined {
+  return KNOWN_OVERLAY_MAP.get(normalizedXaiModelId(modelId));
 }
 
 /**

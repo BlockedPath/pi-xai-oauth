@@ -9,6 +9,8 @@ import {
   KNOWN_XAI_MODEL_METADATA,
   type XaiCatalogModel,
   XAI_MINIMAL_AS_LOW_MODEL_IDS,
+  knownXaiModelMetadata,
+  knownXaiModelOverlay,
 } from "../../extensions/xai/models";
 
 /**
@@ -124,9 +126,8 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     }
   });
 
-  it.each(["grok-4.6", "grok-4.7", "grok-4.7-build-fast"])("documents %s known levels including xhigh", (modelId) => {
-    // Grok 4.6 has authenticated evidence; Grok 4.7 has official public docs, and
-    // xAI documents Grok 4.7 Fast as the same model.
+  it.each(["grok-4.6", "grok-4.7"])("documents %s known levels including xhigh", (modelId) => {
+    // Grok 4.6 has authenticated evidence; Grok 4.7 has official public docs.
     // Both keep Pi's `minimal` → xAI `low` mapping used for Grok 4.5.
     expect(supportedLevels(known(modelId))).toEqual([
       "minimal",
@@ -169,7 +170,11 @@ describe("minimal → low compatibility policy", () => {
     const knownAliases = KNOWN_XAI_MODEL_METADATA
       .filter(({ thinkingLevelMap }) => thinkingLevelMap?.minimal === "low")
       .map(({ id }) => id);
-    for (const id of XAI_MINIMAL_AS_LOW_MODEL_IDS) expect(knownAliases).toContain(id);
+    for (const id of XAI_MINIMAL_AS_LOW_MODEL_IDS) {
+      // Catalog-only overlays carry no level map; their levels come only from the catalog.
+      if (knownXaiModelOverlay(id)) expect(knownXaiModelMetadata(id)).toBeUndefined();
+      else expect(knownAliases).toContain(id);
+    }
     // Pre-existing exception: Grok 4.3 aliases minimal only in known metadata; its
     // authenticated efforts decide when the catalog lists them. Any new drift fails here.
     expect(knownAliases.filter((id) => !XAI_MINIMAL_AS_LOW_MODEL_IDS.has(id))).toEqual(["grok-4.3"]);

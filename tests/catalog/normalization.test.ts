@@ -5,6 +5,8 @@ import {
   normalizeXaiCatalogPayload,
   XaiCatalogValidationError,
 } from "../../extensions/xai/catalog";
+import { decodeCachedXaiCatalogModels } from "../../extensions/xai/catalog/model-codec";
+import { XAI_MODEL_CATALOG_CACHE_SCHEMA } from "../../extensions/xai/constants";
 import { XaiModelInputProvenance } from "../../extensions/xai/models";
 
 const fixture = async (name: string) =>
@@ -71,9 +73,9 @@ describe("catalog normalization", () => {
     expect(normalizeXaiCatalogPayload({ data: [] })).toEqual([]);
   });
 
-  it("enriches entitled Grok 4.7 Fast with its own rate card and Grok 4.7 capabilities", () => {
+  it("enriches entitled Grok 4.7 Fast with only its documented overlay", () => {
     // The authenticated Grok Build catalog names this slug "Grok 4.7 Fast" and omits
-    // modality and completion-limit evidence; known metadata fills only those gaps.
+    // modality and completion-limit evidence; the overlay fills only those gaps.
     const entry = {
       model: "grok-4.7-build-fast",
       name: "Grok 4.7 Fast",
@@ -95,6 +97,13 @@ describe("catalog normalization", () => {
       maxTokens: 131_072,
       thinkingLevelMap: { minimal: "low", xhigh: "xhigh" },
     });
+    // Reasoning and levels come only from the catalog: without effort evidence, none is claimed.
+    const { supports_reasoning_effort: _supports, reasoning_efforts: _efforts, ...bare } = entry;
+    const [unreasoned] = normalizeXaiCatalogPayload({ data: [bare] });
+    expect(unreasoned).toMatchObject({ reasoning: false, thinkingLevelMap: { off: "none" } });
+    expect(unreasoned.cost).toEqual({ input: 4, output: 12, cacheRead: 1, cacheWrite: 0 });
+    // A cached overlay-enriched entry round-trips through cache validation.
+    expect(decodeCachedXaiCatalogModels([fast], XAI_MODEL_CATALOG_CACHE_SCHEMA)).toEqual([fast]);
     const [denied] = normalizeXaiCatalogPayload({ data: [{ ...entry, acceptsImages: false }] });
     expect(denied).toMatchObject({
       input: ["text"],
