@@ -1,5 +1,7 @@
 import {
   knownXaiModelMetadata,
+  knownXaiModelOverlay,
+  XAI_MINIMAL_AS_LOW_MODEL_IDS,
   XaiModelInputProvenance,
   type XaiCatalogModel,
 } from "../models";
@@ -97,7 +99,7 @@ function parseInputModalities(value: unknown): XaiInputModality[] | undefined {
 function resolveCatalogModelInput(
   obj: Record<string, unknown>,
   meta: Record<string, unknown> | undefined,
-  known: XaiCatalogModel | undefined,
+  known: Pick<XaiCatalogModel, "input"> | undefined,
 ): Pick<XaiCatalogModel, "input" | "inputProvenance"> {
   const candidates: Array<{
     source: Record<string, unknown> | undefined;
@@ -178,10 +180,7 @@ function thinkingLevelMap(levels: ThinkingLevel[], modelId: string): XaiCatalogM
   }
   // Preserve pi-xai-oauth's Grok 4.x compatibility: pi's minimal level is sent
   // as xAI low when low is in the authenticated catalog.
-  if (
-    (modelId === "grok-4.5" || modelId === "grok-4.6" || modelId === "grok-4.7") &&
-    map.low === "low"
-  ) {
+  if (XAI_MINIMAL_AS_LOW_MODEL_IDS.has(modelId) && map.low === "low") {
     map.minimal = "low";
   }
   return map;
@@ -234,7 +233,9 @@ function normalizeCatalogEntry(value: unknown): EntryResult {
   if (!name) return { kind: "malformed" };
 
   const known = knownXaiModelMetadata(normalizedId);
-  const input = resolveCatalogModelInput(obj, meta, known);
+  // A catalog-only overlay may fill input, cost, and output policy, never reasoning.
+  const enrichment = known ?? knownXaiModelOverlay(normalizedId);
+  const input = resolveCatalogModelInput(obj, meta, enrichment);
   const supportsReasoningEffort = booleanValue(
     firstValue(obj, meta, ["supportsReasoningEffort", "supports_reasoning_effort"]),
   );
@@ -276,10 +277,10 @@ function normalizeCatalogEntry(value: unknown): EntryResult {
       apiBackend: "responses",
       reasoning,
       ...input,
-      cost: known ? { ...known.cost } : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      cost: enrichment ? { ...enrichment.cost } : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow,
       maxTokens: Math.min(
-        suppliedMaxTokens ?? known?.maxTokens ?? DEFAULT_UNKNOWN_MAX_TOKENS,
+        suppliedMaxTokens ?? enrichment?.maxTokens ?? DEFAULT_UNKNOWN_MAX_TOKENS,
         contextWindow,
       ),
       ...(levelMap ? { thinkingLevelMap: levelMap } : {}),
@@ -361,7 +362,8 @@ function validateCachedModel(value: unknown, schemaVersion: number): XaiCatalogM
     map = normalized;
   }
 
-  const known = knownXaiModelMetadata(id);
+  // Cached input provenance is checked against full known metadata or a catalog-only overlay.
+  const known = knownXaiModelMetadata(id) ?? knownXaiModelOverlay(id);
   let input: XaiInputModality[];
   let inputProvenance: XaiModelInputProvenance;
   if (schemaVersion === 1) {

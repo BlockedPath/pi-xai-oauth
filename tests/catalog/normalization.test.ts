@@ -5,6 +5,8 @@ import {
   normalizeXaiCatalogPayload,
   XaiCatalogValidationError,
 } from "../../extensions/xai/catalog";
+import { decodeCachedXaiCatalogModels } from "../../extensions/xai/catalog/model-codec";
+import { XAI_MODEL_CATALOG_CACHE_SCHEMA } from "../../extensions/xai/constants";
 import { XaiModelInputProvenance } from "../../extensions/xai/models";
 
 const fixture = async (name: string) =>
@@ -69,6 +71,56 @@ describe("catalog normalization", () => {
       thinkingLevelMap: { off: "none" },
     });
     expect(normalizeXaiCatalogPayload({ data: [] })).toEqual([]);
+  });
+
+  it("enriches entitled Grok 4.7 Fast with only its documented overlay", () => {
+    // The authenticated Grok Build catalog names this slug "Grok 4.7 Fast" and omits
+    // modality and completion-limit evidence; the overlay fills only those gaps.
+    const entry = {
+      model: "grok-4.7-build-fast",
+      name: "Grok 4.7 Fast",
+      api_backend: "responses",
+      context_window: 256_000,
+      supports_reasoning_effort: true,
+      reasoning_efforts: ["low", "medium", "high", "xhigh"],
+    };
+    const [fast] = normalizeXaiCatalogPayload({ data: [entry] });
+    expect(fast).toMatchObject({
+      id: "grok-4.7-build-fast",
+      name: "Grok 4.7 Fast",
+      input: ["text", "image"],
+      inputProvenance: XaiModelInputProvenance.Known,
+      cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+      // The authenticated context window stays authoritative over known metadata.
+      contextWindow: 256_000,
+      // Package policy shared with Grok 4.7 when no authenticated limit is present.
+      maxTokens: 131_072,
+      thinkingLevelMap: { minimal: "low", xhigh: "xhigh" },
+    });
+    // Reasoning and levels come only from the catalog: without effort evidence, none is claimed.
+    const { supports_reasoning_effort: _supports, reasoning_efforts: _efforts, ...bare } = entry;
+    const [unreasoned] = normalizeXaiCatalogPayload({ data: [bare] });
+    expect(unreasoned).toMatchObject({ reasoning: false, thinkingLevelMap: { off: "none" } });
+    expect(unreasoned.cost).toEqual({ input: 4, output: 12, cacheRead: 1, cacheWrite: 0 });
+    // A support flag without an effort list follows the generic catalog rule shared by
+    // every model (low/medium/high, plus minimal → low), exactly as for Grok 4.7.
+    const flagOnly = { ...bare, supports_reasoning_effort: true };
+    const [fastFlag] = normalizeXaiCatalogPayload({ data: [flagOnly] });
+    const [grok47Flag] = normalizeXaiCatalogPayload({ data: [{ ...flagOnly, model: "grok-4.7", name: "Grok 4.7" }] });
+    expect(fastFlag.thinkingLevelMap).toEqual(grok47Flag.thinkingLevelMap);
+    expect(fastFlag.thinkingLevelMap).toMatchObject({ minimal: "low", low: "low", medium: "medium", high: "high", xhigh: null });
+    // A cached overlay-enriched entry round-trips through cache validation.
+    expect(decodeCachedXaiCatalogModels([fast], XAI_MODEL_CATALOG_CACHE_SCHEMA)).toEqual([fast]);
+    const [denied] = normalizeXaiCatalogPayload({ data: [{ ...entry, acceptsImages: false }] });
+    expect(denied).toMatchObject({
+      input: ["text"],
+      inputProvenance: XaiModelInputProvenance.AuthenticatedAcceptsImages,
+    });
+    // Known metadata never advertises Fast without its own catalog entry.
+    const plain = normalizeXaiCatalogPayload({
+      data: [{ model: "grok-4.7", api_backend: "responses", context_window: 500_000 }],
+    });
+    expect(plain.map(({ id }) => id)).toEqual(["grok-4.7"]);
   });
 
   it("keeps Grok 4.7 when its advertised completion limit exceeds its context", async () => {

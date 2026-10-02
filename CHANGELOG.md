@@ -6,6 +6,10 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Added
+
+- Added a partial known-metadata overlay for `grok-4.7-build-fast` ("Grok 4.7 Fast"), which entitled Grok Build catalogs list without modality or completion-limit evidence. It now gets text+image input (confirmed live), its published Fast rates ($4/$1/$12 per million input/cached-input/output tokens below 200K prompt tokens), and the same 131,072-token package default output used for Grok 4.7 when no authenticated limit is present, instead of conservative text-only defaults with a 16,384-token cap. Context window, reasoning, and thinking levels stay catalog-derived under the same rules as every catalog model; Pi `minimal` is sent as xAI `low` whenever that evidence yields `low`. The output default is package policy, not an xAI figure. xAI documents Grok 4.7 Fast as the same Grok 4.7 model on faster infrastructure. It is still advertised only when an account's authenticated catalog lists it.
+
 ## 1.6.1 - 2026-10-02
 
 ### Changed

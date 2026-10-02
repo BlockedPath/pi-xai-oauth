@@ -30,6 +30,18 @@ export type XaiCatalogModel = {
 };
 
 /**
+ * Models whose Pi `minimal` level is sent as xAI `low` whenever their authenticated catalog
+ * evidence yields `low` (an explicit effort list, or the low/medium/high mapping of a bare
+ * reasoning-support flag). It only shapes the wire effort; it never decides advertisement.
+ */
+export const XAI_MINIMAL_AS_LOW_MODEL_IDS: ReadonlySet<string> = new Set([
+  "grok-4.5",
+  "grok-4.6",
+  "grok-4.7",
+  "grok-4.7-build-fast",
+]);
+
+/**
  * Curated metadata for known xAI models.
  *
  * This table enriches models that the authenticated catalog actually returns
@@ -201,6 +213,35 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
 const KNOWN_MODEL_MAP = new Map(KNOWN_XAI_MODEL_METADATA.map((model) => [model.id, model]));
 
 /**
+ * Partial known metadata for a catalog-only slug. It fills only documented gaps in an
+ * authenticated catalog entry; context window, reasoning, and thinking levels always
+ * come from the catalog itself.
+ */
+export type XaiKnownModelOverlay = Pick<
+  XaiCatalogModel,
+  "id" | "input" | "inputProvenance" | "cost" | "maxTokens"
+>;
+
+export const KNOWN_XAI_MODEL_OVERLAYS: readonly XaiKnownModelOverlay[] = [
+  {
+    // Grok Build-only slug that authenticated catalogs name "Grok 4.7 Fast". xAI documents
+    // it as the same Grok 4.7 model on faster infrastructure (https://docs.x.ai/developers/pricing),
+    // and image input was confirmed live on an entitled account (README source notes).
+    id: "grok-4.7-build-fast",
+    input: ["text", "image"],
+    inputProvenance: XaiModelInputProvenance.Known,
+    // https://docs.x.ai/developers/pricing — Grok 4.7 Fast rate card, <200k prompt.
+    cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+    // Package policy, not an xAI figure: the same Responses default this package applies
+    // to Grok 4.7 when no authenticated completion limit is present (xAI publishes no
+    // numeric limit and describes Grok 4.7 as having no text output limit).
+    maxTokens: 131_072,
+  },
+];
+
+const KNOWN_OVERLAY_MAP = new Map(KNOWN_XAI_MODEL_OVERLAYS.map((overlay) => [overlay.id, overlay]));
+
+/**
  * Known OAuth model aliases mapped to the canonical catalog id they currently
  * resolve to on xAI's session Responses proxy / public model registry.
  *
@@ -339,6 +380,11 @@ export function defaultXaiRuntimeModelId(): string | undefined {
 /** Return curated metadata for a known model without advertising it. */
 export function knownXaiModelMetadata(modelId: string): XaiCatalogModel | undefined {
   return KNOWN_MODEL_MAP.get(normalizedXaiModelId(modelId));
+}
+
+/** Return partial catalog-only enrichment for a model ID, if one is documented. */
+export function knownXaiModelOverlay(modelId: string): XaiKnownModelOverlay | undefined {
+  return KNOWN_OVERLAY_MAP.get(normalizedXaiModelId(modelId));
 }
 
 /**
