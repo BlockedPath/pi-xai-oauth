@@ -10,6 +10,7 @@ const path = require("path");
 const policy = require("../compatibility/pi-versions.json");
 const sourceManifest = require("../package.json");
 const repoRoot = path.resolve(__dirname, "..");
+const { npmCommand } = require("./npm-command.js");
 const {
   GITHUB_PACKAGE_NAME,
   GITHUB_REGISTRY,
@@ -30,7 +31,8 @@ function packPackage(packagePath, destination, canonical = false) {
   const args = canonical
     ? ["pack", "--json", "--pack-destination", destination]
     : ["pack", packagePath, "--json", "--pack-destination", destination];
-  const output = execFileSync("npm", args, {
+  const invocation = npmCommand(args);
+  const output = execFileSync(invocation.command, invocation.args, {
     cwd: repoRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],

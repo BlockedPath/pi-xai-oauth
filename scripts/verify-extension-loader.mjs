@@ -8,10 +8,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const previousHome = process.env.HOME;
+const previousUserProfile = process.env.USERPROFILE;
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 const home = await mkdtemp(join(tmpdir(), "pi-xai-loader-"));
 try {
 	process.env.HOME = home;
+	process.env.USERPROFILE = home;
 	process.env.PI_CODING_AGENT_DIR = join(home, ".pi", "agent");
 	const packageMain = fileURLToPath(
 		import.meta.resolve("@earendil-works/pi-coding-agent"),
@@ -112,6 +114,8 @@ try {
 } finally {
 	if (previousHome === undefined) delete process.env.HOME;
 	else process.env.HOME = previousHome;
+	if (previousUserProfile === undefined) delete process.env.USERPROFILE;
+	else process.env.USERPROFILE = previousUserProfile;
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 	await rm(home, { recursive: true, force: true });

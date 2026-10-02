@@ -9,11 +9,11 @@ import {
 import { XAI_NETWORK_TOOL_NAMES } from "../../extensions/xai/tools/model-scope";
 import { createExtensionHarness } from "../fixtures/extension-api";
 import { TEST_MODEL } from "../fixtures/models";
-import { createTempDir } from "../fixtures/temp";
+import { createTempDir, stubHome } from "../fixtures/temp";
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-provider-");
-  vi.stubEnv("HOME", temp.path);
+  stubHome(temp.path);
 });
 afterEach(async () => {
   setXaiRuntimeModels(CURATED_FALLBACK_MODELS);

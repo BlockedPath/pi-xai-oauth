@@ -11,7 +11,7 @@ import {
   setXaiRuntimeModels,
 } from "../../extensions/xai/models";
 import { TEST_MODEL } from "../fixtures/models";
-import { createTempDir } from "../fixtures/temp";
+import { createTempDir, stubHome } from "../fixtures/temp";
 
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 
@@ -98,7 +98,7 @@ function modelsFromStoreIfNewerThanLocal(
 
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-registry-");
-  vi.stubEnv("HOME", temp.path);
+  stubHome(temp.path);
 });
 
 afterEach(async () => {

@@ -7,14 +7,14 @@ import {
   XaiModelInputProvenance,
 } from "../../extensions/xai/models";
 import { createExtensionHarness } from "../fixtures/extension-api";
-import { createTempDir } from "../fixtures/temp";
+import { createTempDir, stubHome } from "../fixtures/temp";
 import { discovery, OIDC_PUBLIC_JWK, signIdToken } from "../fixtures/oauth";
 import { jsonResponse } from "../fixtures/http";
 import grok47Limits from "../fixtures/models-v2/grok-4.7-limits.json";
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-lifecycle-");
-  vi.stubEnv("HOME", temp.path);
+  stubHome(temp.path);
 });
 afterEach(async () => {
   setXaiRuntimeModels(CURATED_FALLBACK_MODELS);

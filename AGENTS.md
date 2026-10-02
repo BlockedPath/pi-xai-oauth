@@ -141,7 +141,7 @@ Start any task by reading:
 - Keep usage redirects, timeouts, response bytes, JSON complexity, history counts, and numeric ranges bounded; redact every usage error
 - Clear optional usage status on model, provider, account, and session changes, and never refresh it for non-xAI models
 - Keep compatibility policy/registry/pack/resolver verification in plain Node; behavior tests use focused Vitest suites
-- Isolate fetch, timers, environment, temp HOME/filesystem, module state, runtime models, credentials, and active-tool registries per test
+- Isolate fetch, timers, environment, temporary HOME and USERPROFILE/filesystem, module state, runtime models, credentials, and active-tool registries per test
 - Keep real callback tests sequential with real timers and guaranteed listener cleanup
 - Use strict peer resolution for supported versions; `--force` is allowed only in isolated negative fixtures that assert npm peer warnings
 

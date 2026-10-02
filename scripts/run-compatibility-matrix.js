@@ -5,6 +5,7 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { npmCommand } = require("./npm-command.js");
 
 const repoRoot = path.resolve(__dirname, "..");
 const policy = JSON.parse(
@@ -17,7 +18,8 @@ function run(command, args, options = {}) {
   const env = { ...process.env, ...options.env };
   delete env.npm_config_allow_scripts;
   delete env.NPM_CONFIG_ALLOW_SCRIPTS;
-  const result = spawnSync(command, args, {
+  const invocation = command === "npm" ? npmCommand(args, { env }) : { command, args };
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: options.cwd || repoRoot,
     encoding: "utf8",
     env,
@@ -26,7 +28,7 @@ function run(command, args, options = {}) {
   });
   if (result.status !== 0) {
     if (options.capture) process.stderr.write(`${result.stdout || ""}${result.stderr || ""}`);
-    throw new Error(`${printable} failed with exit ${result.status}`);
+    throw new Error(`${printable} failed ${result.error ? `to start: ${result.error.message}` : `with exit ${result.status}`}`);
   }
   return result;
 }

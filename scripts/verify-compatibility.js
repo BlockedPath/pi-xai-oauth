@@ -5,6 +5,7 @@ const { execFileSync, spawnSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { npmCommand } = require("./npm-command.js");
 
 const repoRoot = path.resolve(__dirname, "..");
 const policyPath = path.join(repoRoot, "compatibility", "pi-versions.json");
@@ -112,12 +113,16 @@ function run(command, args, options = {}) {
   const env = { ...process.env, ...options.env };
   delete env.npm_config_allow_scripts;
   delete env.NPM_CONFIG_ALLOW_SCRIPTS;
-  const result = spawnSync(command, args, {
+  const invocation = command === "npm" ? npmCommand(args, { env }) : { command, args };
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: options.cwd || repoRoot,
     encoding: "utf8",
     env,
     maxBuffer: 20 * 1024 * 1024,
   });
+  if (result.error) {
+    throw new Error(`${command} ${args.join(" ")} failed to start: ${result.error.message}`);
+  }
   if (options.expectFailure) {
     assert.notStrictEqual(result.status, 0, `${command} ${args.join(" ")} unexpectedly succeeded`);
   } else if (result.status !== 0) {
@@ -193,11 +198,7 @@ function verifyPolicy() {
 }
 
 function registryVersions(packageName) {
-  const output = execFileSync(
-    "npm",
-    ["view", `${packageName}@${policy.peerRange}`, "version", "--json"],
-    { cwd: repoRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
-  );
+  const { stdout: output } = run("npm", ["view", `${packageName}@${policy.peerRange}`, "version", "--json"]);
   const parsed = parseJson(output, `${packageName} registry response`);
   return (Array.isArray(parsed) ? parsed : [parsed]).filter((version) => typeof version === "string");
 }
@@ -262,6 +263,7 @@ function verifyPackedPackage() {
       "scripts/verify-github-package.js",
       "scripts/verify-extension-loader.mjs",
       "scripts/verify-pi-cli.mjs",
+      "scripts/npm-command.js",
       "vitest.config.mts",
       "tsconfig.json",
       ...listGitVisibleFiles(path.join(repoRoot, "tests")),

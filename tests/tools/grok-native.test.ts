@@ -21,7 +21,7 @@ import { setXaiNetworkToolActive } from "../../extensions/xai/tools/model-scope"
 import { createExtensionHarness, toolExecutionContext } from "../fixtures/extension-api";
 import { authContext, BUILTIN_XAI_TEST_MODEL, TEST_MODEL } from "../fixtures/models";
 import { jsonResponse, requestBody } from "../fixtures/http";
-import { createTempDir } from "../fixtures/temp";
+import { createTempDir, stubHome } from "../fixtures/temp";
 
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 let h: ReturnType<typeof createExtensionHarness>;
@@ -867,7 +867,7 @@ describe("Grok-native tools", () => {
   });
 
   it("keeps web_search local when credentials are missing and redacts transport errors", async () => {
-    vi.stubEnv("HOME", temp.path);
+    stubHome(temp.path);
     const model = { ...TEST_MODEL, id: "grok-4.5" };
     expect(
       setXaiNetworkToolActive(

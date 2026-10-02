@@ -1,21 +1,14 @@
-# Release Plan — v1.6.0
+# Pi 1.0.0 Compatibility Plan
 
-**Branch:** `release/v1.6.0`
-**Base:** merged `main` at `3b9388b` (PR #223)
+Branch: `feature/pi-1-support`; base: `main` at `f8f28e4`.
 
-## Authorization and scope
+The user requested Pi 1.0.0 support and tests, with parallel subagents authorized. Preserve existing supported releases and the Pi 0.85.0 exclusion. Do not claim untested pre-1.0 releases, publish, merge, or make live xAI requests.
 
-The user requested a version update and npm publication through GitHub Actions. Use a minor release, 1.6.0, for the additive Grok 4.7 and usage CSV features accumulated since published 1.5.2. Include the already-merged catalog visibility, transcript compatibility, and reasoning recovery fixes. Keep Grok 4.6 defaults and the validated Pi range unchanged.
+1. Parallel research: upstream API review (`pi_api_review`) and Windows test diagnosis (`windows_diagnosis`).
+2. Chain review: reviewer validates scope before implementation (`plan_review`).
+3. Root owns compatibility policy, exact package/lock metadata, policy tests, README/CHANGELOG, and scaffold progress.
+4. Delegate Windows script/test fixes after diagnosis, with disjoint ownership.
+5. Validate Pi 1.0.0 candidate, full tests/typecheck/package checks, and clean packed boundaries at 0.80.1 and 1.0.0. Preserve strict negative peer-resolution fixtures.
+6. Final reviewer checks diff and validation; report local changes and any remaining limitations.
 
-Use the existing `.github/workflows/publish.yml`: a published GitHub Release triggers validation, canonical npm publication through trusted publishing, and the exact scoped GitHub Packages mirror. Do not publish locally, change credentials, upload user screenshots, or make live xAI requests.
-
-## Steps
-
-1. [x] Verify clean synced main, latest published 1.5.2, available v1.6.0 name, and release-triggered publishing contract.
-2. [x] Bump package/lock versions to 1.6.0 and finalize changelog/README release references without runtime/dependency changes.
-3. [x] Run tests, typecheck, policy/package/mirror checks, and both clean packed Pi boundaries; inspect release diff.
-4. [ ] Commit/push release branch, open a release PR, require successful CI/review triage, and merge into main.
-5. [ ] Tag the verified main release commit and publish GitHub Release v1.6.0 to trigger Actions.
-6. [ ] Monitor the exact publish run, verify npm latest/version/provenance and scoped mirror publication, and sync local main.
-
-GitHub PR/release and Actions records are the authoritative delivery receipts. Record validation and any blockers in progress.md.
+All six steps completed. Full tests, typecheck, compatibility/mirror/negative-peer checks and both exact packed boundaries passed; final reviewer found no actionable issues. Leave changes local on the feature branch for user review.

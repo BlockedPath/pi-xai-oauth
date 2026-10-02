@@ -8,11 +8,12 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ### Changed
 
-- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0`, with exact packed test boundaries at 0.80.1 and 0.87.1. Pi 0.85.0 remains excluded. Both 0.87.0 and 0.87.1 passed candidate tests, loader checks, and typechecks.
+- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.1.0`, with exact packed test boundaries at 0.80.1 and 1.0.0. Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 0.87.0, 0.87.1, and 1.0.0 passed candidate tests, loader checks, and typechecks; CLI version/update dispatch is also checked.
 - Add real CLI checks for `pi --version`, bare `pi update`, and `pi update npm:pi-xai-oauth` to `npm test` and CI. Update commands use temporary settings, a version-response fixture, and a package-manager fixture to verify dispatch without network access or real installs.
 
 ### Fixed
 
+- Fix Grok-native search/replace on Windows by truncating only after opening and validating the file handle. Make compatibility commands portable and isolate both HOME and USERPROFILE in tests and loader smoke; Unix permission checks remain active on Unix.
 - Bound browser OAuth discovery, JWKS, and token requests to 15 seconds and 64 KiB, including token refresh. Stalled requests stop even without caller cancellation, and transport failures remain redacted.
 - Report the actual redacted error when an encrypted-reasoning retry fails with an unrelated error. Preserve the rejected-reasoning marker in session history so later requests to the same model continue to omit that reasoning.
 

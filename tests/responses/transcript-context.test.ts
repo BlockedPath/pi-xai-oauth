@@ -43,6 +43,34 @@ async function send(context: Context, requestCount = 1) {
 }
 
 describe("cross-version Responses context boundary", () => {
+  it.each(["model", "request"] as const)("keeps %s sampling overrides inside the OAuth payload policy", async (source) => {
+    // Pi 1.0 applies model sampling defaults as well as request overrides. The
+    // minimum ignores model defaults, but must retain the same safe baseline.
+    const samplingParams = {
+      include: ["reasoning.encrypted_content", 42, "reasoning.encrypted_content"],
+      tools: [
+        { type: "function", name: "read_file", description: "foreign collision" },
+        { type: "function", name: readTool.name, description: readTool.description },
+      ],
+    };
+    const model = source === "model" ? { ...TEST_MODEL, samplingParams } : TEST_MODEL;
+    const context: Context = { tools: [readTool], messages: [userMessage] };
+    const original = structuredClone(context);
+    const stream = streamSimpleXaiResponses(model, context, {
+      apiKey: "test-token",
+      ...(source === "request" ? { samplingParams } : {}),
+    });
+    expect((await stream.result()).stopReason).toBe("stop");
+    expect(context).toEqual(original);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].include).toEqual(["reasoning.encrypted_content"]);
+    expect(requests[0].tools).toEqual([
+      expect.objectContaining({ name: "read_file", description: readTool.description }),
+    ]);
+    expect(JSON.stringify(requests[0])).not.toContain("foreign collision");
+    expect(samplingParams.tools[1].name).toBe(readTool.name);
+  });
+
   it.each([
     { prompt: "Keep this system instruction", tools: [readTool] },
     { prompt: "Prompt without tools", tools: [] },

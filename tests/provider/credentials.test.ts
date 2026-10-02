@@ -19,7 +19,7 @@ import {
   CURATED_FALLBACK_MODELS,
   setXaiRuntimeModels,
 } from "../../extensions/xai/models";
-import { createTempDir } from "../fixtures/temp";
+import { createTempDir, stubHome } from "../fixtures/temp";
 import { BUILTIN_XAI_TEST_MODEL, TEST_MODEL } from "../fixtures/models";
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 
@@ -111,7 +111,7 @@ async function realBoundaryRegistry(initialCredential: any) {
 
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-auth-");
-  vi.stubEnv("HOME", temp.path);
+  stubHome(temp.path);
   // No assertion in this suite depends on a real catalog fetch. Fail fast instead of
   // hanging if Pi ever reintroduces an implicitly network-enabled refresh.
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
