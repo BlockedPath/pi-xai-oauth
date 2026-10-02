@@ -34,3 +34,11 @@ Pi/muse `wK:p1` per-commit bug checker → delegates the branch review to Codex 
   policy's latest 0.84.2 and needs a deliberate compatibility review (separate task).
 - Deferred: custom-tools table-driven helper, moving `web_search`, path-containment dedupe across
   grok-native/media, entrypoint duplicate blocks, commands.ts indentation, bounding unbounded `response.json()` reads.
+
+## Pi 1.0 compatibility — `feature/pi-1.0-compat` (stacked on PR #229)
+
+- [x] Candidate matrix 0.84.3–1.0.0 (`pi10/matrix.md`); Grok research (`pi10/research-grok.md`); plan (`pi10/plan.md`).
+- [x] C1 transcript-context adapter (+ follow-ups), C2 Grok 4.3 levels + parity drift, C3 policy/deps/docs (`<1.1.0`, latest 1.0.0).
+- [x] Pi per-commit review → Codex review (FAIL → fixed → PASS) → Claude final PASS (`pi10/final-claude.md`).
+- [x] Live smoke on the user's Pi 1.0.0 (`pi10/smoke.md`).
+- [ ] User decision: push `feature/pi-1.0-compat` and open a PR stacked on #229.
