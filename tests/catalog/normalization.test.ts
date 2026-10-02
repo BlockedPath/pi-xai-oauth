@@ -91,6 +91,7 @@ describe("catalog normalization", () => {
       cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
       // The authenticated context window stays authoritative over known metadata.
       contextWindow: 256_000,
+      // Package policy shared with Grok 4.7 when no authenticated limit is present.
       maxTokens: 131_072,
       thinkingLevelMap: { minimal: "low", xhigh: "xhigh" },
     });

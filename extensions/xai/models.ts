@@ -37,6 +37,17 @@ export type XaiCatalogModel = {
  * advertisement and must never be unioned wholesale into a successful entitlement
  * response.
  */
+/**
+ * Models whose Pi `minimal` level is sent as xAI `low`. This only shapes the wire
+ * effort once catalog evidence lists `low`; it never decides which models are advertised.
+ */
+export const XAI_MINIMAL_AS_LOW_MODEL_IDS: ReadonlySet<string> = new Set([
+  "grok-4.5",
+  "grok-4.6",
+  "grok-4.7",
+  "grok-4.7-build-fast",
+]);
+
 export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
   {
     id: "grok-4.5",
@@ -115,9 +126,10 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
     },
   },
   {
-    // Grok Build-only slug that authenticated catalogs name "Grok 4.7 Fast". xAI
-    // documents it as the same Grok 4.7 model on faster infrastructure, so it shares
-    // Grok 4.7's capabilities; image input was also confirmed live on an entitled account.
+    // Grok Build-only slug that authenticated catalogs name "Grok 4.7 Fast". xAI documents
+    // it as the same Grok 4.7 model on faster infrastructure and publishes its rate card;
+    // image input was confirmed live on an entitled account. Context, output and effort
+    // figures below are not separately published for Fast (see README source notes).
     id: "grok-4.7-build-fast",
     name: "Grok 4.7 Fast",
     apiBackend: "responses",
@@ -126,9 +138,14 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
     inputProvenance: XaiModelInputProvenance.Known,
     // https://docs.x.ai/developers/pricing — Grok 4.7 Fast rate card, <200k prompt.
     cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+    // Grok 4.7's documented window via the same-model identity. Normalization always uses
+    // the authenticated `context_window` instead (it is required for every catalog entry).
     contextWindow: 500_000,
-    // Same Responses default as Grok 4.7 when no authenticated completion limit is present.
+    // Package policy, not an xAI figure: the same Responses default this package applies
+    // to Grok 4.7 when no authenticated completion limit is present (xAI publishes no
+    // numeric limit and describes Grok 4.7 as having no text output limit).
     maxTokens: 131_072,
+    // Fallback only when the authenticated entry omits reasoning efforts; mirrors Grok 4.7.
     thinkingLevelMap: {
       off: null,
       minimal: "low",

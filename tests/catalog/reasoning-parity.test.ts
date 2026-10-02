@@ -8,6 +8,7 @@ import { normalizeXaiCatalogPayload } from "../../extensions/xai/catalog";
 import {
   KNOWN_XAI_MODEL_METADATA,
   type XaiCatalogModel,
+  XAI_MINIMAL_AS_LOW_MODEL_IDS,
 } from "../../extensions/xai/models";
 
 /**
@@ -158,6 +159,20 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
         ],
       }),
     ).toEqual([]);
+  });
+});
+
+describe("minimal → low compatibility policy", () => {
+  it("keeps known metadata and authenticated normalization on one model set", () => {
+    // Every model the catalog codec aliases must alias minimal onto low in known
+    // metadata too, so the two paths cannot disagree for it.
+    const knownAliases = KNOWN_XAI_MODEL_METADATA
+      .filter(({ thinkingLevelMap }) => thinkingLevelMap?.minimal === "low")
+      .map(({ id }) => id);
+    for (const id of XAI_MINIMAL_AS_LOW_MODEL_IDS) expect(knownAliases).toContain(id);
+    // Pre-existing exception: Grok 4.3 aliases minimal only in known metadata; its
+    // authenticated efforts decide when the catalog lists them. Any new drift fails here.
+    expect(knownAliases.filter((id) => !XAI_MINIMAL_AS_LOW_MODEL_IDS.has(id))).toEqual(["grok-4.3"]);
   });
 });
 
