@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   grepArgsForLocalSearch,
@@ -148,7 +149,8 @@ describe("Grok-native argument normalization", () => {
   });
 
   it("keeps local grep inside the workspace", () => {
-    expect(safeWorkspacePath("/tmp/work", "src/a.ts")).toBe("/tmp/work/src/a.ts");
+    const workspace = resolve("/tmp/work");
+    expect(safeWorkspacePath(workspace, "src/a.ts")).toBe(resolve(workspace, "src/a.ts"));
     expect(() => safeWorkspacePath("/tmp/work", "../secret")).toThrow(/outside the workspace/);
   });
 });

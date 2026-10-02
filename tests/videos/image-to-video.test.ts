@@ -107,7 +107,7 @@ describe("xAI image-to-video", () => {
     expect(request.mock.calls[0][0].headers).not.toHaveProperty("Authorization");
     expect(output).toMatchObject({ mimeType: "video/mp4", duration: 10, resolution: "720p", byteLength: 41 });
     expect(output.path).not.toContain("private-session-id");
-    expect((await stat(output.path)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect((await stat(output.path)).mode & 0o777).toBe(0o600);
     await temp.cleanup();
   });
 

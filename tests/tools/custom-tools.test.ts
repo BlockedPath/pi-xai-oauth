@@ -18,11 +18,11 @@ import { createExtensionHarness } from "../fixtures/extension-api";
 import { authContext, TEST_MODEL } from "../fixtures/models";
 import { jsonResponse, requestBody } from "../fixtures/http";
 import { tinyPngBytes } from "../fixtures/images";
-import { createTempDir } from "../fixtures/temp";
+import { createTempDir, stubHome } from "../fixtures/temp";
 let h: ReturnType<typeof createExtensionHarness>;
 let requests: Array<{ url: string; init: RequestInit; body: any }>;
 beforeEach(() => {
-  vi.stubEnv("HOME", `/tmp/pi-xai-no-auth-${crypto.randomUUID()}`);
+  stubHome(`/tmp/pi-xai-no-auth-${crypto.randomUUID()}`);
   h = createExtensionHarness();
   registerCustomXaiTools(h.api);
   setXaiRuntimeModels(KNOWN_XAI_MODEL_METADATA);

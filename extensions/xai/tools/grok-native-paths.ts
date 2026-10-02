@@ -156,11 +156,13 @@ export async function writeContainedTextFile(
   try {
     handle = await openUnfollowedFile(
       absolutePath,
-      constants.O_WRONLY | constants.O_TRUNC,
+      constants.O_WRONLY,
     );
     const info = await handle.stat();
     if (!info.isFile()) throw new Error(`Not a file: ${requestedPath}`);
     throwIfAborted(signal);
+    // Windows rejects O_TRUNC without O_CREAT; truncate only the checked handle.
+    await handle.truncate(0);
     await handle.writeFile(content, "utf8");
   } finally {
     await handle?.close().catch(() => undefined);

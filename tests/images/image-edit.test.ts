@@ -222,7 +222,7 @@ describe("bounded xAI image-edit execution", () => {
       expect(requests[0].body).not.toHaveProperty("images");
       expect(requests[0].body).not.toHaveProperty("aspect_ratio");
       expect(output).toMatchObject({ mimeType: "image/png", width: 1, height: 1, byteLength: png.length });
-      expect((await lstat(output.path)).mode & 0o777).toBe(0o600);
+      if (process.platform !== "win32") expect((await lstat(output.path)).mode & 0o777).toBe(0o600);
     },
   );
 

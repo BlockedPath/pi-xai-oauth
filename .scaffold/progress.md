@@ -203,3 +203,18 @@
 ## Next
 
 Publish v1.5.2 through the GitHub Release workflow (`publish.yml`).
+
+## Pi 1.0.0 support — 2026-10-02
+- Created feature/pi-1-support from clean synced main f8f28e4. Parallel API review, Windows test diagnosis, and pre-implementation review started. Support is unchanged pending candidate review; no publishing or live xAI requests in scope.
+
+- Plan review approved separate >=1.0.0 <1.1.0 interval, preserving old bounds and exclusions; added 0.88.0/0.99.0 strict negative fixtures. Pi API review found no removed used interfaces.
+- Updated policy, exact manifest pins and policy tests; strict dependency install running. Windows script/test and contained-write fixes delegated to disjoint owners. Validation claims in docs remain pending until all gates pass.
+
+- Windows native replacement fix opens the existing file, validates it, then truncates the checked handle; 27 native tests pass. HOME/USERPROFILE fixture fixes passed 172 focused tests. Two new real delegate sampling-policy regressions pass.
+- Direct Node registry, package/mirror, loader and strict negative peer checks passed; typecheck passed. Full suite and clean packed 0.80.1/1.0.0 boundaries are running.
+
+- FINAL VALIDATION PASSED: root npm test (869 passed, 11 Windows/platform skips), typecheck, compatibility:check (policy/registry/163-file pack/exact mirror/strict negative installs at 0.79.10, 0.85.0, 0.88.0, 0.99.0, 1.1.0).
+- Clean packed boundaries PASSED: requested/resolved Pi 0.80.1 and 1.0.0, each full npm test, real loader, isolated CLI update dispatch, and typecheck. Minimum: 865 passed/14 skipped; latest counts in temporary validation log.
+- Final reviewer found no actionable issues. Git diff whitespace check passed. Windows-specific skips preserve Unix assertions/tests for Ubuntu CI; Linux/live-account end-to-end not run in this session.
+- Implementation complete on feature/pi-1-support; changes remain local and uncommitted. No publication, merge, or live xAI requests performed.
+- Delivery authorized: user requested commit and push of the validated feature/pi-1-support changes. Required pre-commit gates are confirmed passed.

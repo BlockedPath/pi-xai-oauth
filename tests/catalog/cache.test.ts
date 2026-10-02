@@ -90,7 +90,7 @@ describe("catalog cache selection", () => {
     });
     expect(selection.source).toBe("fresh-cache");
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect((await stat(path)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
     expect((await selectXaiModelCatalog({ cachePath: path, now })).source).toBe(
       "curated-fallback",
     );
@@ -282,7 +282,7 @@ describe("catalog cache selection", () => {
     expect(JSON.parse(text).models.map((model: any) => model.id)).toEqual([
       "grok-composer-2.5-fast",
     ]);
-    expect((await stat(path)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
   });
 
   it("forces discovery when credentials changed after a fresh cache", async () => {

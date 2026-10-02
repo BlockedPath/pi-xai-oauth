@@ -7,14 +7,14 @@ import {
   setXaiRuntimeModels,
 } from "../../extensions/xai/models";
 import { createExtensionHarness } from "../fixtures/extension-api";
-import { createTempDir } from "../fixtures/temp";
+import { createTempDir, stubHome } from "../fixtures/temp";
 import { discovery, OIDC_PUBLIC_JWK, signIdToken } from "../fixtures/oauth";
 import { headerValue, jsonResponse } from "../fixtures/http";
 import { TEST_MODEL } from "../fixtures/models";
 let temp: Awaited<ReturnType<typeof createTempDir>>;
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-race-");
-  vi.stubEnv("HOME", temp.path);
+  stubHome(temp.path);
   const auth = join(temp.path, ".pi/agent/auth.json");
   await mkdir(join(auth, ".."), { recursive: true });
   await writeFile(

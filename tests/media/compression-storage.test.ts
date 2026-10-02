@@ -149,8 +149,8 @@ describe("atomic session image storage", () => {
     const second = await saveVerifiedOutputImage(image(), { outputRoot, sessionRoot });
     expect(first.path).not.toBe(second.path);
     expect(first.path).toMatch(/\.png$/);
-    expect((await lstat(outputRoot)).mode & 0o777).toBe(0o700);
-    expect((await lstat(first.path)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect((await lstat(outputRoot)).mode & 0o777).toBe(0o700);
+    if (process.platform !== "win32") expect((await lstat(first.path)).mode & 0o777).toBe(0o600);
     expect(await readdir(outputRoot)).toHaveLength(2);
     expect((await readdir(outputRoot)).some((name) => name.endsWith(".tmp"))).toBe(false);
   });
