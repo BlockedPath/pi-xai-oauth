@@ -81,7 +81,11 @@ export function createForwardingAssistantStream() {
   };
 }
 
-/** Build a terminal assistant error message carrying the xAI model identity and a safe error text. */
+/**
+ * Build a terminal assistant error message carrying the xAI model identity. Only delegate
+ * `OpenAI API error` text is rewritten to the safe transport message; callers must pass an
+ * already-safe error for anything else.
+ */
 export function streamErrorMessage(model: Model<Api>, error: unknown) {
   return {
     role: "assistant",

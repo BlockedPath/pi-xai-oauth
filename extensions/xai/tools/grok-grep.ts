@@ -5,7 +5,7 @@ import { grepArgsForLocalSearch, safeWorkspacePath } from "./grok-native-args";
 import {
   MAX_GROK_NATIVE_TEXT_FILE_BYTES,
   physicalWorkspaceSearchPath,
-  throwIfAborted,
+  throwIfOperationAborted,
 } from "./grok-workspace-fs";
 
 export const DEFAULT_GROK_GREP_LIMIT = 200;
@@ -163,7 +163,7 @@ function matchesFileType(filePath: string, type: string | undefined): boolean {
 }
 
 function checkGrepBudget(signal: AbortSignal | undefined, deadline: number): void {
-  throwIfAborted(signal);
+  throwIfOperationAborted(signal);
   if (Date.now() > deadline) throw new Error("grep timed out after 20 seconds");
 }
 

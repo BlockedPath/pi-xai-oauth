@@ -38,7 +38,7 @@ import { buildExactSearchReplaceContent } from "./grok-search-replace";
 import {
   containedWorkspacePath,
   readContainedTextFile,
-  throwIfAborted,
+  throwIfOperationAborted,
   toWorkspaceToolPath,
 } from "./grok-workspace-fs";
 import { activeXaiModel, isXaiNetworkToolActive } from "./model-scope";
@@ -171,9 +171,9 @@ async function executeSearchReplace(
     operations: {
       mkdir: () => Promise.resolve(),
       async writeFile(queuedPath, _queuedContent) {
-        throwIfAborted(signal);
+        throwIfOperationAborted(signal);
         const rawContent = await readContainedTextFile(queuedPath, normalized.path, signal);
-        throwIfAborted(signal);
+        throwIfOperationAborted(signal);
         const replacementContent = buildExactSearchReplaceContent(
           rawContent,
           oldText,
@@ -181,7 +181,7 @@ async function executeSearchReplace(
           normalized.replaceAll,
           normalized.path,
         );
-        throwIfAborted(signal);
+        throwIfOperationAborted(signal);
         await writeFileUtf8(queuedPath, replacementContent, "utf8");
       },
     },
@@ -221,9 +221,9 @@ async function executeReadFile(
     path: toolPath,
   };
   if (prepared.offset !== undefined && prepared.offset < 0) {
-    throwIfAborted(signal);
+    throwIfOperationAborted(signal);
     const content = await readContainedTextFile(absolutePath, prepared.target_file, signal);
-    throwIfAborted(signal);
+    throwIfOperationAborted(signal);
     const readableFields = content.split("\n").length;
     const totalFields = readableFields
       + (content.length > 0 && !content.endsWith("\n") ? 1 : 0);

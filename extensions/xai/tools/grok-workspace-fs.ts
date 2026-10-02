@@ -8,7 +8,7 @@ import { safeWorkspacePath } from "./grok-native-args";
 export const MAX_GROK_NATIVE_TEXT_FILE_BYTES = 5_000_000;
 
 /** Throw the Grok-native adapters' "Operation aborted" error when the signal is aborted. */
-export function throwIfAborted(signal: AbortSignal | undefined) {
+export function throwIfOperationAborted(signal: AbortSignal | undefined) {
   assertNotAborted(signal, () => new Error("Operation aborted"));
 }
 
@@ -88,7 +88,7 @@ export async function readContainedTextFile(
   requestedPath: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  throwIfAborted(signal);
+  throwIfOperationAborted(signal);
   const noFollow = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
   const nonBlock = typeof constants.O_NONBLOCK === "number" ? constants.O_NONBLOCK : 0;
   let handle: Awaited<ReturnType<typeof open>> | undefined;
@@ -105,7 +105,7 @@ export async function readContainedTextFile(
     const chunks: Buffer[] = [];
     let totalBytes = 0;
     while (totalBytes <= MAX_GROK_NATIVE_TEXT_FILE_BYTES) {
-      throwIfAborted(signal);
+      throwIfOperationAborted(signal);
       const chunk = Buffer.allocUnsafe(
         Math.min(64 * 1024, MAX_GROK_NATIVE_TEXT_FILE_BYTES + 1 - totalBytes),
       );
@@ -119,7 +119,7 @@ export async function readContainedTextFile(
         `Refusing to read more than ${MAX_GROK_NATIVE_TEXT_FILE_BYTES} bytes from ${requestedPath}`,
       );
     }
-    throwIfAborted(signal);
+    throwIfOperationAborted(signal);
     return Buffer.concat(chunks, totalBytes).toString("utf8");
   } finally {
     await handle?.close().catch(() => undefined);

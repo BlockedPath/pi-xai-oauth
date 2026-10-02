@@ -5,7 +5,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Return the value as a plain record, or `undefined` for null, arrays, and primitives. */
+/** Return any non-array object as a record, or `undefined` for null, arrays, and primitives. */
 export function objectValue(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)

@@ -21,7 +21,7 @@ import {
   xaiProxyRequestHeaders,
 } from "./wire";
 
-/** Fixed error raised when a payload hook tries to change the selected model. */
+/** Fixed error raised when a final payload is not an object or names a different model. */
 export const SAFE_PAYLOAD_MODEL_ERROR =
   "xAI OAuth payload hooks cannot change the selected model; no xAI request was sent";
 
@@ -72,7 +72,7 @@ export async function postXaiJson(
   return response.json();
 }
 
-/** Pin the selected model on a Responses payload, rejecting hooks that changed it. */
+/** Pin the selected model on a Responses payload, rejecting non-object payloads and changed models. */
 export function pinXaiPayloadModel(modelId: string, payload: unknown): void {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error(SAFE_PAYLOAD_MODEL_ERROR);

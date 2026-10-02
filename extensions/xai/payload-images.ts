@@ -271,7 +271,11 @@ export function omitConsumedXaiResponsesVisionImages(
   return changed ? { ...payload, input: rewritten } : payload;
 }
 
-/** Replay image-bearing tool outputs as text plus a following user image message, as xAI requires. */
+/**
+ * Normalize input image parts, optionally omit already-consumed vision images, and replay
+ * image-bearing tool outputs as text plus a following user image message, because xAI rejects
+ * images inside `function_call_output.output`.
+ */
 export function normalizeXaiResponsesInput(
   input: unknown[],
   model: Model<Api>,

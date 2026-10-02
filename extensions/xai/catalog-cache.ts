@@ -63,7 +63,10 @@ async function writeInvalidationMarker(cachePath: string, now: number): Promise<
   await chmod(markerPath, 0o600);
 }
 
-/** Read and validate the cache, returning `undefined` for any missing, invalidated, stale, or untrusted entry. */
+/**
+ * Read and validate the cache, returning `undefined` for any missing, invalidated, stale, or
+ * untrusted entry. Also tightens the cache file (0600) and directory (0700) permissions.
+ */
 export async function readCache(cachePath: string, now: number): Promise<CacheRecord | undefined> {
   try {
     if (await hasInvalidationMarker(cachePath)) return undefined;
