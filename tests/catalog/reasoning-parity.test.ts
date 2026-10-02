@@ -214,6 +214,25 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
     expect(supportedLevels(extended)).not.toContain("max");
   });
 
+  it("advertises an entitled grok-4.7 with exactly the catalog's efforts", () => {
+    // xai-auth keeps no known metadata for Grok 4.7: authenticated /models-v2
+    // evidence alone decides its levels, and minimal is not aliased (4.5/4.6 only).
+    const [grok47] = normalizeXaiCatalogPayload({
+      data: [
+        {
+          model: "grok-4.7",
+          api_backend: "responses",
+          context_window: 256_000,
+          supports_reasoning_effort: true,
+          reasoning_efforts: ["low", "medium", "high", "xhigh"],
+        },
+      ],
+    });
+    expect(grok47).toMatchObject({ id: "grok-4.7", apiBackend: "responses", reasoning: true });
+    expect(supportedLevels(grok47)).toEqual(["low", "medium", "high", "xhigh"]);
+    expect(KNOWN_XAI_MODEL_METADATA.map(({ id }) => id)).not.toContain("grok-4.7");
+  });
+
   it("maps authenticated grok-4.6 efforts including xhigh and minimal→low", () => {
     const [grok46] = normalizeXaiCatalogPayload({
       data: [

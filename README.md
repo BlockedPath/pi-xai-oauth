@@ -426,10 +426,10 @@ Setup seeds Pi's built-in `xai` provider when no provider is configured, so the 
 | ------- | ---------------- | ------------ | ----- |
 | `grok-4.6` | follows Pi's generated catalog when present | `minimal` / `low` / `medium` / `high` / `xhigh` | **Intentional.** `xai-auth` maps Pi's `minimal` onto xAI's `low`, and advertises `xhigh` when `/models-v2` lists it. |
 | `grok-4.5` | `low` / `medium` / `high` | `minimal` / `low` / `medium` / `high` | **Intentional.** `xai-auth` maps Pi's `minimal` onto xAI's `low`, so `/think minimal` and `/think low` send the same `reasoning_effort: "low"` request. Selecting `minimal` never sends an effort xAI did not advertise. |
-| `grok-4.3` | `off` / `minimal` / `low` / `medium` / `high` | same | Identical on both paths. |
-| `grok-build-0.1` | available | **never advertised** | API-key-only model; it is excluded from `xai-auth` regardless of what a catalog response contains. |
+| `grok-4.3` | `off` / `low` / `medium` / `high` on Pi 0.84.4+; older lines without an explicit map also list `minimal` | `off` / `low` / `medium` / `high` | Matches xAI's Grok 4.3 efforts and Pi's current built-in catalog. A saved `minimal` clamps to `low`, the value previously sent. |
+| `grok-build-0.1` | available only before Pi 0.85 | **never advertised** | API-key-only model; it is excluded from `xai-auth` regardless of what a catalog response contains. |
 
-Authenticated evidence always wins on the `xai-auth` path. If `/models-v2` reports `supports_reasoning_effort: false`, the model drops to `off` only even when known metadata lists `low`/`medium`/`high`. Levels absent from `reasoning_efforts` stay hidden, and Pi clamps a request for a hidden level down to the nearest advertised one. `xhigh` appears when the catalog names xAI's `xhigh` or `max` effort; Pi's own `max` level is never advertised for Grok.
+Authenticated evidence always wins on the `xai-auth` path. If `/models-v2` reports `supports_reasoning_effort: false`, the model drops to `off` only even when known metadata lists `low`/`medium`/`high`. Levels absent from `reasoning_efforts` stay hidden, and Pi clamps a request for a hidden level to the nearest advertised one, trying higher levels first (so `minimal` becomes `low`). `xhigh` appears when the catalog names xAI's `xhigh` or `max` effort; Pi's own `max` level is never advertised for Grok.
 
 ### Grok 4.6 source notes
 
@@ -813,7 +813,7 @@ pi update npm:pi-xai-oauth
 
 This pulls the latest version from npm and updates your installed extension.
 
-Version 1.5.1 requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.2. It preserves Pi 0.84.2 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall the checkout:
+The published 1.5.1 release requires aligned Pi runtime packages in `>=0.80.1 <0.85.0`, with exact packed-package validation at 0.80.1 and 0.84.2; the next release widens support to `>=0.80.1 <1.1.0`, validated at 0.80.1 and 1.0.0 (see the Unreleased notes in [CHANGELOG.md](CHANGELOG.md)). It preserves Pi 0.84.2 OAuth refresh and model-catalog lifecycle compatibility while publishing identical release contents to npmjs as `pi-xai-oauth` and GitHub Packages as `@blockedpath/pi-xai-oauth`. See [CHANGELOG.md](CHANGELOG.md) for the complete release notes. Update the registry distribution you installed; if you are testing a local checkout instead, reinstall the checkout:
 
 ```bash
 pi remove npm:pi-xai-oauth && pi install .
