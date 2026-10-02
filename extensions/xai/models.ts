@@ -95,9 +95,12 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
     cost: { input: 1.25, output: 2.5, cacheRead: 0.2, cacheWrite: 0 },
     contextWindow: 1_000_000,
     maxTokens: 131_072,
+    // xAI's Grok 4.3 efforts are none/low/medium/high. Pi 0.84.4+ ships the same
+    // set for its built-in grok-4.3, so `minimal` is denied rather than aliased;
+    // a saved `minimal` clamps forward to `low`, the value previously sent.
     thinkingLevelMap: {
       off: "none",
-      minimal: "low",
+      minimal: null,
       low: "low",
       medium: "medium",
       high: "high",

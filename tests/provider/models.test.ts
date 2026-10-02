@@ -104,7 +104,7 @@ describe("model compatibility metadata", () => {
       inputProvenance: XaiModelInputProvenance.AuthenticatedAcceptsImages,
       // Keep the authenticated entitlement source's conservative context bound.
       contextWindow: entitled.contextWindow,
-      thinkingLevelMap: { off: "none", minimal: "low", low: "low", medium: "medium", high: "high" },
+      thinkingLevelMap: { off: "none", minimal: null, low: "low", medium: "medium", high: "high" },
     });
 
     setXaiRuntimeModels(expanded);

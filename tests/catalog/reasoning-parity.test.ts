@@ -49,17 +49,27 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     // still ships grok-3 / grok-code-fast-1 and has no grok-4.5, while 0.81+
     // drops the legacy entries. Assert the invariants that must hold on every
     // supported boundary rather than one line's exact membership.
+    // Pi 0.85.0 removed the API-key-only grok-build-0.1 and 0.87.1 added
+    // grok-4.7, so neither is asserted here.
     const ids = Object.keys(XAI_MODELS);
     expect(ids).toContain("grok-4.3");
-    expect(ids).toContain("grok-build-0.1");
     // Package-owned entitlement models never appear in Pi's API-key catalog.
     expect(ids).not.toContain("grok-build");
     expect(ids).not.toContain("grok-composer-2.5-fast");
   });
 
-  it("keeps grok-4.3 levels identical across both providers", () => {
-    expect(supportedLevels(known("grok-4.3"))).toEqual(
-      getSupportedThinkingLevels(XAI_MODELS["grok-4.3"]),
+  it("keeps grok-4.3 levels on xAI's effort set across both providers", () => {
+    const xaiLevels = ["off", "low", "medium", "high"];
+    expect(supportedLevels(known("grok-4.3"))).toEqual(xaiLevels);
+    expect(known("grok-4.3").thinkingLevelMap?.minimal).toBeNull();
+    // Pi 0.84.4+ ships an explicit built-in grok-4.3 map with the same set.
+    // Earlier built-in rows had no map, so Pi's missing-key rule also listed
+    // `minimal`, which xAI does not implement for Grok 4.3.
+    const builtIn43 = builtIn("grok-4.3")!;
+    expect(getSupportedThinkingLevels(builtIn43)).toEqual(
+      builtIn43.thinkingLevelMap
+        ? xaiLevels
+        : ["off", "minimal", "low", "medium", "high"],
     );
   });
 
@@ -117,7 +127,8 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
   });
 
   it("never advertises the API-key-only built-in grok-build-0.1 through xai-auth", () => {
-    expect(XAI_MODELS["grok-build-0.1"]).toBeDefined();
+    // Built-in Pi lists grok-build-0.1 only before 0.85.0; xai-auth must never
+    // advertise it on any supported line.
     expect(KNOWN_XAI_MODEL_METADATA.map(({ id }) => id)).not.toContain(
       "grok-build-0.1",
     );
