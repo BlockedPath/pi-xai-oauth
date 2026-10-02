@@ -6,6 +6,18 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Added
+
+- Supported Pi 1.0: aligned Pi peers widen to `>=0.80.1 <1.1.0`, development metadata and the lockfile pin exactly 1.0.0, and the packed compatibility matrix now runs 0.80.1 and 1.0.0. Every release from 0.84.3 through 1.0.0 was evaluated as a packed candidate.
+
+### Fixed
+
+- Kept the system prompt and tool declarations on Pi 0.86 and later when a raw `Context` reaches the xAI Responses stream directly. Pi 0.86 moved provider inputs to a normalized `TranscriptContext`; Pi's own normalized transcripts pass through unchanged, and Pi 0.80–0.85 behavior is unchanged.
+
+### Changed
+
+- Grok 4.3 known metadata no longer offers Pi's `minimal` thinking level, matching xAI's none/low/medium/high efforts and Pi's built-in Grok 4.3. A saved `minimal` clamps to `low`, the value previously sent. Authenticated `/models-v2` evidence still decides the advertised levels.
+
 ## 1.5.1 - 2026-08-21
 
 ### Fixed

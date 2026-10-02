@@ -38,7 +38,7 @@ This package adds xAI's **account-specific OAuth model catalog** to pi, with **G
 
 > **Latest release:** `pi-xai-oauth` **1.5.1** recovers same-model turns after streamed encrypted-reasoning mismatches while keeping rejected reasoning and upstream details redacted. It publishes the canonical `pi-xai-oauth` package on npmjs and a scoped `@blockedpath/pi-xai-oauth` mirror on GitHub Packages from the same validated GitHub Release. Setup treats both registry names as one extension and removes duplicate aliases before they can register conflicting tools. Existing npmjs installs should run `pi update npm:pi-xai-oauth`; GitHub Packages installs should run `pi update npm:@blockedpath/pi-xai-oauth`.
 >
-> **Compatibility:** 1.5.1 supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <0.85.0`. The exact tested boundaries are 0.80.1 and 0.84.2.
+> **Compatibility:** supports aligned `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions `>=0.80.1 <1.1.0`, including Pi 1.0. The exact tested boundaries are 0.80.1 and 1.0.0.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and fix history.
 
@@ -205,13 +205,13 @@ Authenticate with `/login xai`. Use `/login xai-auth` only when you want this pa
 Both Pi runtime peers use the same bounded range:
 
 ```text
-@earendil-works/pi-ai:            >=0.80.1 <0.85.0
-@earendil-works/pi-coding-agent:  >=0.80.1 <0.85.0
+@earendil-works/pi-ai:            >=0.80.1 <1.1.0
+@earendil-works/pi-coding-agent:  >=0.80.1 <1.1.0
 ```
 
-The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **0.84.2**, the latest release inside the allowed line when this policy was reviewed. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
+The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **1.0.0**, the latest release inside the allowed line when this policy was reviewed. Pi 0.86 changed provider stream inputs to a normalized `TranscriptContext` that carries the system prompt and tool declarations in a leading system message; this package passes Pi's normalized transcript through unchanged, folds a raw `Context` from a direct caller through Pi's `normalizeContext()` when it exists, and leaves contexts unchanged on earlier lines, whose Responses converter still reads `systemPrompt` and `tools`. Pi 0.85 removed the API-key-only `grok-build-0.1` from its built-in xAI catalog and 0.87 added `grok-4.7`; `xai-auth` keeps advertising only the models its authenticated catalog entitles. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
 
-The exclusive `<0.85.0` upper bound is deliberate. Pi is pre-1.0, so a new minor line may contain breaking API or loader changes; this project does not claim support until that line passes the packed compatibility suite. npm therefore reports a peer-resolution warning or error during installation for older releases such as 0.79.10 and for the untested 0.85 line, rather than allowing a later runtime loader failure.
+The exclusive `<1.1.0` upper bound is deliberate. A new Pi minor line may still change extension, provider, or loader contracts (the 0.85–1.0 lines did), so this project does not claim support until that line passes the packed compatibility suite. npm therefore reports a peer-resolution warning or error during installation for older releases such as 0.79.10 and for the untested 1.1 line, rather than allowing a later runtime loader failure.
 
 Older `pi-xai-oauth` 1.2.4 builds supported Pi 0.79.8's then-current Responses guard. Current code uses the Pi 0.80 compat dispatcher after the 1.3.2 export migration and 1.3.3 loader-resolution fix, so that historical statement is not the current minimum.
 
@@ -1031,7 +1031,7 @@ When a new Pi patch appears inside the current range:
 3. If it passes, update `latest`, both exact Pi dev dependencies, and the lockfile together.
 4. Run `npm run compatibility:check` and `npm run compatibility:boundaries`, then record the result in CHANGELOG.
 
-For a new pre-1.0 minor line, keep the existing upper bound while running the candidate command. Widen the upper bound only after both Pi packages at that exact release pass the packed tests/typecheck and independent review. If raising the minimum, move the older sentinel to the immediately previous published release and document the support break. Never widen based only on Dependabot, typecheck, or a lockfile refresh.
+For a new minor line, keep the existing upper bound while running the candidate command. Widen the upper bound only after both Pi packages at that exact release pass the packed tests/typecheck and independent review. If raising the minimum, move the older sentinel to the immediately previous published release and document the support break. Never widen based only on Dependabot, typecheck, or a lockfile refresh.
 
 Before publishing, first bump `package.json` and `package-lock.json` together and finalize CHANGELOG. Then validate the exact release tree:
 
