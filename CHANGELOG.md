@@ -6,6 +6,8 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.6.1 - 2026-10-02
+
 ### Changed
 
 - Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.1.0`, with exact packed test boundaries at 0.80.1 and 1.0.0. Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 0.87.0, 0.87.1, and 1.0.0 passed candidate tests, loader checks, and typechecks; CLI version/update dispatch is also checked.
