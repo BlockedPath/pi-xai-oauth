@@ -17,7 +17,7 @@ import {
   type XaiToolCompatibleProviderId,
 } from "./constants";
 import { getXaiRuntimeModels } from "./models";
-import { ensureFreshXaiCredentials } from "./oauth";
+import { ensureFreshXaiCredentials } from "./oauth-token";
 import type { XaiCredential } from "./routing";
 
 function readPiStoredCredential(providerId: string, authPath: string): any {

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import packageMetadata from "../../package.json";
+import { createXaiOAuth } from "../../extensions/xai/oauth";
 import {
-  createXaiOAuth,
   ensureFreshXaiCredentials,
   refreshXaiCredentials,
-} from "../../extensions/xai/oauth";
+} from "../../extensions/xai/oauth-token";
 import { XAI_OAUTH_TOKEN_URL } from "../../extensions/xai/constants";
 import { jsonResponse } from "../fixtures/http";
 import { XAI_USER_AGENT } from "../../extensions/xai/constants";
