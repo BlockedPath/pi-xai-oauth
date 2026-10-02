@@ -6,7 +6,7 @@
 
 pi-xai-oauth is a pi-package that registers the optional xAI OAuth provider (`xai-auth`) and the authenticated account's OAuth-visible Grok model catalog, with Grok 4.6 as the curated offline fallback. Opt-in network tools and `/xai-usage` also work with Pi's built-in `xai` SuperGrok/X Premium chat provider; setup seeds `defaultProvider: xai` only when unset and never overwrites an existing provider choice.
 
-Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `extensions/xai/catalog.ts` → provider registration in `extensions/xai-oauth.ts` → browser PKCE or bounded device authorization in `extensions/xai/oauth.ts` / `extensions/xai/device-auth.ts` → pinned browser OIDC/JWKS validation in `extensions/xai/oidc.ts` → streaming via xAI API helpers in `extensions/xai/responses.ts`; explicit revision-pinned subscription usage lives in `extensions/xai/usage.ts`.
+Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `extensions/xai/catalog.ts` → provider registration in `extensions/xai-oauth.ts` → browser PKCE or bounded device authorization in `extensions/xai/oauth.ts` (with `oauth-browser.ts` / `oauth-token.ts`) / `extensions/xai/device-auth.ts` → pinned browser OIDC/JWKS validation in `extensions/xai/oidc.ts` → streaming via `extensions/xai/responses.ts` and one-shot requests via `extensions/xai/responses-request.ts`; explicit revision-pinned subscription usage lives in `extensions/xai/usage.ts`.
 
 ## Key Commands (Exact, Copy-Paste Ready)
 
@@ -70,21 +70,34 @@ pi-xai-oauth/
 ├── extensions/
 │   ├── xai-oauth.ts      # Thin entrypoint: provider registration + tool orchestration
 │   └── xai/              # Focused implementation modules
-│       ├── catalog.ts    # Authenticated catalog normalization + atomic token-free cache
+│       ├── catalog.ts    # Authenticated catalog fetch + selection policy
+│       ├── catalog-normalize.ts # /models-v2 + cached-model normalization/validation
+│       ├── catalog-cache.ts # Atomic token-free cache, write queue, rollback, tombstone
 │       ├── constants.ts  # URLs, defaults, OAuth/catalog constants
 │       ├── models.ts     # Curated fallback/known metadata + compatibility helpers
-│       ├── oauth.ts      # Browser/device selection, PKCE login, refresh, callback helpers
+│       ├── oauth.ts      # Browser/device selection + OAuth provider factory
+│       ├── oauth-browser.ts # PKCE, loopback callback server, authorize URL, paste parsing
+│       ├── oauth-token.ts # Pinned token exchange, refresh, credential shaping
 │       ├── device-auth.ts # Pinned device initiation + bounded cancellable polling
 │       ├── oidc.ts       # Pinned browser discovery/JWKS + ID-token validation
 │       ├── auth.ts       # Credential reuse + token resolution helpers
-│       ├── payload.ts    # Responses payload normalization
-│       ├── responses.ts  # xAI request/stream helpers
+│       ├── payload.ts    # Responses payload canonicalization, OAuth policy, rewrite
+│       ├── payload-images.ts # Image parts, tool-image replay, consumed-image omission
+│       ├── payload-tool-names.ts # Grok-native public/private tool-name mapping
+│       ├── responses.ts  # Streaming Responses provider + stream-event normalization
+│       ├── responses-request.ts # One-shot postXaiJson / createXaiResponse
+│       ├── responses-delegate.ts # Delegate identity mapping + rejected-reasoning repair
+│       ├── assistant-stream.ts # Forwarding assistant event stream
+│       ├── redirect-guard.ts # URL-scoped global fetch redirect guard
 │       ├── routing.ts    # Credential-aware Responses/Images endpoint routing
 │       ├── wire.ts       # Route-aware headers, scrubbing, identity, safe errors
+│       ├── validate.ts   # Shared record/integer/control-character validators
 │       ├── image-edit.ts # Bounded pinned image-edit orchestration
 │       ├── media/        # Reusable strict media/path/compression/storage primitives
-│       ├── usage.ts      # Explicit bounded identity-first subscription usage command/status
-│       └── tools/        # Custom xAI tools + collision-free Grok-native adapters
+│       ├── usage.ts      # Explicit bounded identity-first usage transport/command/status
+│       ├── usage-parse.ts # Bounded usage/identity parsing + XaiUsageError
+│       ├── usage-render.ts # Usage command and footer rendering
+│       └── tools/        # Custom xAI tools + Grok-native adapters (grok-native, -grep, -workspace-fs, -search-replace)
 ├── compatibility/
 │   ├── pi-versions.json # Peer range plus exact minimum/latest matrix policy
 │   └── grok-build-wire-protocol.md # Pinned xAI route/header review procedure

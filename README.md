@@ -950,9 +950,12 @@ pi-xai-oauth/
 │   ├── xai-oauth.ts          # Thin provider/tools entrypoint
 │   └── xai/                  # Focused xAI domain modules
 │       ├── abort.ts          # Shared AbortSignal and timeout helpers
+│       ├── assistant-stream.ts # Forwarding assistant event stream + safe stream errors
 │       ├── auth.ts           # Pi/Grok CLI credential reuse + token resolution
 │       ├── bounded-body.ts   # Deadline- and size-bounded response reads
-│       ├── catalog.ts        # Authenticated /models-v2 normalization + atomic LKG cache
+│       ├── catalog.ts        # Authenticated /models-v2 fetch + catalog selection policy
+│       ├── catalog-cache.ts  # Atomic token-free last-known-good cache + write queue
+│       ├── catalog-normalize.ts # /models-v2 and cached-model normalization/validation
 │       ├── constants.ts      # URLs, OAuth constants, catalog bounds, defaults
 │       ├── device-auth.ts    # Pinned device initiation + bounded cancellable polling
 │       ├── image-edit.ts     # Bounded image-edit orchestration
@@ -960,14 +963,24 @@ pi-xai-oauth/
 │       ├── images.ts         # Image-input normalization + inline transport budgets
 │       ├── media/            # Strict media parsing, compression, paths, and storage
 │       ├── models.ts         # Curated fallback/known metadata + compatibility helpers
-│       ├── oauth.ts          # Browser/device selection, PKCE login, refresh, callbacks
+│       ├── oauth.ts          # Login-method selection + OAuth provider factory
+│       ├── oauth-browser.ts  # PKCE pair, loopback callback server, authorize URL, paste parsing
+│       ├── oauth-token.ts    # Pinned token exchange, refresh, credential shaping
 │       ├── oidc.ts           # Pinned browser discovery/JWKS + ID-token validation
-│       ├── payload.ts        # xAI Responses payload normalization
-│       ├── responses.ts      # xAI request + streaming helpers
+│       ├── payload.ts        # Responses payload canonicalization, OAuth policy, rewrite
+│       ├── payload-images.ts # Image-part normalization, tool-image replay, consumed-image omission
+│       ├── payload-tool-names.ts # Grok-native public/private tool-name mapping
+│       ├── redirect-guard.ts # URL-scoped global fetch redirect guard for streams
+│       ├── responses.ts      # Streaming Responses provider + stream-event normalization
+│       ├── responses-delegate.ts # Delegate identity mapping + rejected-reasoning repair
+│       ├── responses-request.ts # One-shot postXaiJson / createXaiResponse
 │       ├── routing.ts        # Credential-aware Responses and Images endpoints
 │       ├── text.ts           # Responses text and safe error/status extraction
 │       ├── tools/            # /xai-tools, custom tools, and Grok-native adapters
-│       ├── usage.ts          # Explicit bounded /xai-usage command + status
+│       ├── usage.ts          # Explicit bounded /xai-usage transport, command + status
+│       ├── usage-parse.ts    # Bounded usage/identity parsing + XaiUsageError
+│       ├── usage-render.ts   # Usage command and footer rendering
+│       ├── validate.ts       # Shared record/integer/control-character validators
 │       ├── video-download.ts # DNS/IP-pinned MP4 download
 │       ├── vision-routing.ts # Opt-in routing for text-only entitlements
 │       └── wire.ts           # Route-aware headers, scrubbing, identity, safe errors

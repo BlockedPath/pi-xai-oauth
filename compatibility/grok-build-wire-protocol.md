@@ -117,7 +117,7 @@ Pi's delegated SSE error shape does not preserve an HTTP status for failures tha
    ```
 
 3. Reclassify every changed header as internally required, route-specific, streaming-only, affinity, optional attribution, or unsupported. Trace where upstream values originate; do not assume the sampler generates IDs it only forwards.
-4. Re-audit `extensions/xai/constants.ts`, `routing.ts`, `wire.ts`, `responses.ts`, `catalog.ts`, `usage.ts`, `oauth.ts`, and `device-auth.ts`. Preserve pinned origins unless a separate security review explicitly changes them.
+4. Re-audit `extensions/xai/constants.ts`, `routing.ts`, `wire.ts`, `responses.ts`, `responses-request.ts`, `redirect-guard.ts`, `catalog.ts`, `usage.ts`, `oauth.ts`, `oauth-browser.ts`, `oauth-token.ts`, and `device-auth.ts`. Preserve pinned origins unless a separate security review explicitly changes them.
 5. Update the reviewed revision and this matrix only after request-shape/privacy tests cover the new behavior.
 6. Run:
 
