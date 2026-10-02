@@ -17,16 +17,20 @@ import { getXaiRuntimeModel } from "./models";
 import {
   applyXaiOAuthResponsesPolicy,
   canonicalizeXaiResponsesPayload,
-  exposeGrokNativeToolNames,
-  internalizeGrokNativeToolCalls,
-  omitConsumedXaiResponsesVisionImages,
   rewriteXaiResponsesPayload,
-  type GrokNativeToolRoutes,
   XAI_PAYLOAD_CANONICALIZATION_ERROR,
-  xaiPayloadGrokNativeToolRoutes,
+} from "./payload";
+import {
+  omitConsumedXaiResponsesVisionImages,
   xaiResponsesPayloadContainsImage,
   xaiResponsesPayloadContainsLocalImageReference,
-} from "./payload";
+} from "./payload-images";
+import {
+  exposeGrokNativeToolNames,
+  internalizeGrokNativeToolCalls,
+  type GrokNativeToolRoutes,
+  xaiPayloadGrokNativeToolRoutes,
+} from "./payload-tool-names";
 import { acquireRedirectGuard } from "./redirect-guard";
 import {
   omitRejectedEncryptedReasoning,

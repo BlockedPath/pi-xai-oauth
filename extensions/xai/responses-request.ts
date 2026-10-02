@@ -12,8 +12,8 @@ import {
   applyXaiOAuthResponsesPolicy,
   canonicalizeXaiResponsesPayload,
   rewriteXaiResponsesPayload,
-  xaiResponsesPayloadContainsImage,
 } from "./payload";
+import { xaiResponsesPayloadContainsImage } from "./payload-images";
 import { resolveXaiRoute, type XaiCredential } from "./routing";
 import {
   xaiHttpErrorFromResponse,

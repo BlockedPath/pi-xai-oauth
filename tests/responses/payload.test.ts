@@ -9,16 +9,20 @@ import {
   XAI_GROK_NATIVE_WEB_SEARCH_NAME,
 } from "../../extensions/xai/constants";
 import {
-  HISTORICAL_USER_IMAGE_PLACEHOLDER,
   applyXaiOAuthResponsesPolicy,
   canonicalizeXaiResponsesPayload,
+  rewriteXaiResponsesPayload,
+  XAI_PAYLOAD_CANONICALIZATION_ERROR,
+} from "../../extensions/xai/payload";
+import {
+  HISTORICAL_USER_IMAGE_PLACEHOLDER,
+  xaiResponsesPayloadContainsImage,
+} from "../../extensions/xai/payload-images";
+import {
   exposeGrokNativeToolNames,
   internalizeGrokNativeToolCalls,
-  rewriteXaiResponsesPayload,
   xaiPayloadGrokNativeToolRoutes,
-  XAI_PAYLOAD_CANONICALIZATION_ERROR,
-  xaiResponsesPayloadContainsImage,
-} from "../../extensions/xai/payload";
+} from "../../extensions/xai/payload-tool-names";
 import {
   CURATED_FALLBACK_MODELS,
   KNOWN_XAI_MODEL_METADATA,

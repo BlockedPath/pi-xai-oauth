@@ -8,10 +8,8 @@ import {
   normalizedXaiModelId,
   type XaiCatalogModel,
 } from "./models";
-import {
-  canonicalizeXaiResponsesPayload,
-  xaiResponsesPayloadContainsImage,
-} from "./payload";
+import { canonicalizeXaiResponsesPayload } from "./payload";
+import { xaiResponsesPayloadContainsImage } from "./payload-images";
 
 export const XAI_VISION_ROUTING_INVALIDATED_ERROR =
   "xAI vision routing authorization changed during image analysis; the source request was not sent";
