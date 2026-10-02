@@ -71,6 +71,41 @@ describe("catalog normalization", () => {
     expect(normalizeXaiCatalogPayload({ data: [] })).toEqual([]);
   });
 
+  it("enriches entitled Grok 4.7 Fast with its own rate card and Grok 4.7 capabilities", () => {
+    // The authenticated Grok Build catalog names this slug "Grok 4.7 Fast" and omits
+    // modality and completion-limit evidence; known metadata fills only those gaps.
+    const entry = {
+      model: "grok-4.7-build-fast",
+      name: "Grok 4.7 Fast",
+      api_backend: "responses",
+      context_window: 256_000,
+      supports_reasoning_effort: true,
+      reasoning_efforts: ["low", "medium", "high", "xhigh"],
+    };
+    const [fast] = normalizeXaiCatalogPayload({ data: [entry] });
+    expect(fast).toMatchObject({
+      id: "grok-4.7-build-fast",
+      name: "Grok 4.7 Fast",
+      input: ["text", "image"],
+      inputProvenance: XaiModelInputProvenance.Known,
+      cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+      // The authenticated context window stays authoritative over known metadata.
+      contextWindow: 256_000,
+      maxTokens: 131_072,
+      thinkingLevelMap: { minimal: "low", xhigh: "xhigh" },
+    });
+    const [denied] = normalizeXaiCatalogPayload({ data: [{ ...entry, acceptsImages: false }] });
+    expect(denied).toMatchObject({
+      input: ["text"],
+      inputProvenance: XaiModelInputProvenance.AuthenticatedAcceptsImages,
+    });
+    // Known metadata never advertises Fast without its own catalog entry.
+    const plain = normalizeXaiCatalogPayload({
+      data: [{ model: "grok-4.7", api_backend: "responses", context_window: 500_000 }],
+    });
+    expect(plain.map(({ id }) => id)).toEqual(["grok-4.7"]);
+  });
+
   it("keeps Grok 4.7 when its advertised completion limit exceeds its context", async () => {
     // Allowlisted metadata from the observed catalog shape, never a raw response.
     const models = normalizeXaiCatalogPayload(await fixture("grok-4.7-limits.json"));

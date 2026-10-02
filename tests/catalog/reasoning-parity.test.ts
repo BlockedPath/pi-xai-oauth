@@ -123,8 +123,9 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     }
   });
 
-  it.each(["grok-4.6", "grok-4.7"])("documents %s known levels including xhigh", (modelId) => {
-    // Grok 4.6 has authenticated evidence; Grok 4.7 has official public docs.
+  it.each(["grok-4.6", "grok-4.7", "grok-4.7-build-fast"])("documents %s known levels including xhigh", (modelId) => {
+    // Grok 4.6 has authenticated evidence; Grok 4.7 has official public docs, and
+    // xAI documents Grok 4.7 Fast as the same model.
     // Both keep Pi's `minimal` → xAI `low` mapping used for Grok 4.5.
     expect(supportedLevels(known(modelId))).toEqual([
       "minimal",
@@ -226,7 +227,7 @@ describe("authenticated reasoning evidence bounds advertised levels", () => {
     expect(supportedLevels(extended)).not.toContain("max");
   });
 
-  it.each(["grok-4.6", "grok-4.7"])("maps authenticated %s efforts including xhigh and minimal→low", (modelId) => {
+  it.each(["grok-4.6", "grok-4.7", "grok-4.7-build-fast"])("maps authenticated %s efforts including xhigh and minimal→low", (modelId) => {
     const [model] = normalizeXaiCatalogPayload({
       data: [
         {

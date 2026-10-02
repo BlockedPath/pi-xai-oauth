@@ -115,6 +115,31 @@ export const KNOWN_XAI_MODEL_METADATA: readonly XaiCatalogModel[] = [
     },
   },
   {
+    // Grok Build-only slug that authenticated catalogs name "Grok 4.7 Fast". xAI
+    // documents it as the same Grok 4.7 model on faster infrastructure, so it shares
+    // Grok 4.7's capabilities; image input was also confirmed live on an entitled account.
+    id: "grok-4.7-build-fast",
+    name: "Grok 4.7 Fast",
+    apiBackend: "responses",
+    reasoning: true,
+    input: ["text", "image"],
+    inputProvenance: XaiModelInputProvenance.Known,
+    // https://docs.x.ai/developers/pricing — Grok 4.7 Fast rate card, <200k prompt.
+    cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+    contextWindow: 500_000,
+    // Same Responses default as Grok 4.7 when no authenticated completion limit is present.
+    maxTokens: 131_072,
+    thinkingLevelMap: {
+      off: null,
+      minimal: "low",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+      // Omit `max` for Pi 0.80.1 compatibility; the level remains unsupported.
+    },
+  },
+  {
     id: "grok-4.3",
     name: "Grok 4.3",
     apiBackend: "responses",
