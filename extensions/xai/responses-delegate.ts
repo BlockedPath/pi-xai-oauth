@@ -16,10 +16,11 @@ export type XaiContextNormalizer = (context: Context) => XaiDelegateContext;
 const piNormalizeContext = (piAi as unknown as { normalizeContext?: XaiContextNormalizer }).normalizeContext;
 
 /**
- * Adapt a context for Pi's Responses delegate. Pi 0.86+ hands providers an already normalized
- * transcript, which passes through unchanged; a raw `Context` from a direct caller has its
- * `systemPrompt`/`tools` folded in so the delegate still sends them. A context that already
- * starts with a system message is never normalized again, so no second system message is added.
+ * Adapt a context for Pi's Responses delegate the way Pi's public `streamSimple` does. Pi 0.86+
+ * hands providers an already normalized transcript (`{ messages }`), which passes through
+ * unchanged. A raw `Context` with `systemPrompt`/`tools` is folded through `normalizeContext`,
+ * including when it also carries system messages: Pi then replays them into one prompt and tool
+ * set, so neither the shorthand nor the existing system messages are dropped.
  * Pass `null` as `normalize` to adapt as Pi before 0.86 would (no folding).
  */
 export function toXaiDelegateContext(
@@ -27,10 +28,9 @@ export function toXaiDelegateContext(
   normalize: XaiContextNormalizer | null = piNormalizeContext ?? null,
 ): XaiDelegateContext {
   const hasShorthand = context.systemPrompt !== undefined || context.tools !== undefined;
-  const startsWithSystem = (context.messages[0] as { role?: string } | undefined)?.role === "system";
   // SAFETY: the `TranscriptContext` brand is type-only. This path is reached only on Pi before
   // 0.86 (where the delegate type is `Context`) or for an already folded transcript.
-  if (!normalize || !hasShorthand || startsWithSystem) return context as unknown as XaiDelegateContext;
+  if (!normalize || !hasShorthand) return context as unknown as XaiDelegateContext;
   return normalize(context);
 }
 

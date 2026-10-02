@@ -1,3 +1,4 @@
+import * as piAi from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CURATED_FALLBACK_MODELS,
@@ -61,6 +62,38 @@ describe("delegate transcript context", () => {
     expect(request!.body.instructions).toContain("Answer tersely.");
     expect((request!.body.tools ?? []).map((tool: any) => tool.name)).toContain("lookup_order");
   });
+
+  it("keeps a hybrid context's shorthand prompt and tools on every supported Pi", async () => {
+    const stream = streamSimpleXaiResponses(
+      streamModel(),
+      {
+        systemPrompt: "Shorthand prompt.",
+        messages: [
+          { role: "system", content: "Leading system note.", timestamp: 0 },
+          { role: "user", content: "hello", timestamp: Date.now() },
+        ],
+        tools: [
+          {
+            name: "lookup_order",
+            description: "Look up an order by id",
+            parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+          },
+        ],
+      } as any,
+      { apiKey: "oauth-token", sessionId: "hybrid-session" } as any,
+    );
+    await stream.result();
+
+    const request = requests.find(({ url }) => url.endsWith("/responses"));
+    expect(request).toBeDefined();
+    expect(request!.body.instructions).toContain("Shorthand prompt.");
+    expect((request!.body.tools ?? []).map((tool: any) => tool.name)).toContain("lookup_order");
+    // Pi 0.86+ replays both system sources into one prompt; earlier delegates read only
+    // the shorthand fields and have no system-message role.
+    if (typeof (piAi as unknown as Record<string, unknown>).normalizeContext === "function") {
+      expect(request!.body.instructions).toContain("Leading system note.");
+    }
+  });
 });
 
 describe("toXaiDelegateContext", () => {
@@ -81,10 +114,10 @@ describe("toXaiDelegateContext", () => {
     expect(normalize).not.toHaveBeenCalled();
   });
 
-  it("does not prepend a second system message to a transcript that starts with one", () => {
+  it("folds a hybrid context like Pi's public streamSimple instead of dropping its shorthand", () => {
     const context = { systemPrompt: "p", messages: [{ role: "system", content: "s" }, user] } as any;
-    expect(toXaiDelegateContext(context, normalize)).toBe(context);
-    expect(normalize).not.toHaveBeenCalled();
+    expect(toXaiDelegateContext(context, normalize)).toBe(folded);
+    expect(normalize).toHaveBeenCalledWith(context);
   });
 
   it("folds a raw Context's systemPrompt or tools when normalizeContext exists", () => {
