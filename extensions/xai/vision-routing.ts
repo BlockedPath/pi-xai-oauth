@@ -1,5 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { XAI_PROVIDER_ID } from "./constants";
+import { XAI_PROVIDER_ID, XAI_VISION_DESCRIPTION_ERROR } from "./constants";
 import { normalizeXaiImageInput } from "./images";
 import {
   cloneXaiCatalogModels,
@@ -15,8 +15,6 @@ import {
 
 export const XAI_VISION_ROUTING_INVALIDATED_ERROR =
   "xAI vision routing authorization changed during image analysis; the source request was not sent";
-export const XAI_VISION_DESCRIPTION_ERROR =
-  "xAI vision routing did not return a usable bounded description; the source request was not sent";
 export const XAI_VISION_PAYLOAD_ERROR =
   "xAI vision routing could not safely convert the image payload to text; the source request was not sent";
 

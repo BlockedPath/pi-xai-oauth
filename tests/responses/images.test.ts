@@ -8,9 +8,9 @@ import {
   XaiModelInputProvenance,
 } from "../../extensions/xai/models";
 import {
-  createXaiResponse,
   streamSimpleXaiResponses,
 } from "../../extensions/xai/responses";
+import { createXaiResponse } from "../../extensions/xai/responses-request";
 import { XAI_PAYLOAD_CANONICALIZATION_ERROR } from "../../extensions/xai/payload";
 import { jsonResponse, requestBody } from "../fixtures/http";
 import { TEST_MODEL } from "../fixtures/models";

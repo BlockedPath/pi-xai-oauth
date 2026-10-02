@@ -12,11 +12,11 @@ import {
   setXaiRuntimeModels,
 } from "../../extensions/xai/models";
 import { resolveXaiClientMode } from "../../extensions/xai/wire";
+import { streamSimpleXaiResponses } from "../../extensions/xai/responses";
 import {
   createXaiResponse,
   postXaiJson,
-  streamSimpleXaiResponses,
-} from "../../extensions/xai/responses";
+} from "../../extensions/xai/responses-request";
 import { headerValue, jsonResponse, requestBody } from "../fixtures/http";
 import { TEST_MODEL } from "../fixtures/models";
 

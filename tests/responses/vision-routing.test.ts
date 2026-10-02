@@ -9,7 +9,8 @@ import {
   XaiModelInputProvenance,
   type XaiCatalogModel,
 } from "../../extensions/xai/models";
-import { createXaiResponse, streamSimpleXaiResponses } from "../../extensions/xai/responses";
+import { streamSimpleXaiResponses } from "../../extensions/xai/responses";
+import { createXaiResponse } from "../../extensions/xai/responses-request";
 import {
   createXaiVisionRoutingController,
   XAI_VISION_ROUTING_INVALIDATED_ERROR,

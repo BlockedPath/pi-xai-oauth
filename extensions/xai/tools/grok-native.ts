@@ -17,7 +17,7 @@ import {
   XAI_GROK_NATIVE_WEB_SEARCH_NAME,
   XAI_PROVIDER_ID,
 } from "../constants";
-import { createXaiResponse } from "../responses";
+import { createXaiResponse } from "../responses-request";
 import { extractStrictResponsesText, messageFromError, statusFromError } from "../text";
 import { xaiToolError } from "./common";
 import { DEFAULT_GROK_GREP_LIMIT, runLocalGrep } from "./grok-grep";

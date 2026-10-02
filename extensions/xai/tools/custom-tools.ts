@@ -18,7 +18,7 @@ import {
 } from "../media/constants";
 import { normalizeXaiImageInput } from "../images";
 import { defaultXaiRuntimeModelId, grokSupportsReasoningEffort, normalizedXaiModelId } from "../models";
-import { createXaiResponse, postXaiJson } from "../responses";
+import { createXaiResponse, postXaiJson } from "../responses-request";
 import { resolveXaiRoute } from "../routing";
 import { extractResponsesText, messageFromError, statusFromError } from "../text";
 import { XAI_IMAGE_REFERENCE_SCHEMA, xaiTextInput, xaiToolError } from "./common";
