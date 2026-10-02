@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { parseXaiUsage, parseXaiUserId } from "../../extensions/xai/usage-parse";
 import {
-  parseXaiUsage,
-  parseXaiUserId,
   renderXaiUsage,
   renderXaiUsageStatus,
-} from "../../extensions/xai/usage";
+} from "../../extensions/xai/usage-render";
 import newCredits from "../fixtures/usage/credits-new.json";
 import legacyCredits from "../fixtures/usage/credits-legacy.json";
 import identity from "../fixtures/usage/identity.json";

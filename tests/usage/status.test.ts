@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  registerXaiUsage,
-  type XaiUsageSnapshot,
-} from "../../extensions/xai/usage";
+import { registerXaiUsage } from "../../extensions/xai/usage";
+import type { XaiUsageSnapshot } from "../../extensions/xai/usage-parse";
 import { commandContext, createExtensionHarness } from "../fixtures/extension-api";
 import { BUILTIN_XAI_TEST_MODEL, TEST_MODEL } from "../fixtures/models";
 

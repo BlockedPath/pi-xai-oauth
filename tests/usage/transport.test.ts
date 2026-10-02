@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  fetchXaiUsage,
-  XaiUsageError,
-} from "../../extensions/xai/usage";
+import { fetchXaiUsage } from "../../extensions/xai/usage";
+import { XaiUsageError } from "../../extensions/xai/usage-parse";
 import { XAI_CLI_BILLING_URL, XAI_CLI_USER_URL } from "../../extensions/xai/constants";
 import { headerValue, jsonResponse } from "../fixtures/http";
 import newCredits from "../fixtures/usage/credits-new.json";
