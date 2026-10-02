@@ -30,8 +30,9 @@ export type XaiCatalogModel = {
 };
 
 /**
- * Models whose Pi `minimal` level is sent as xAI `low`. This only shapes the wire
- * effort once catalog evidence lists `low`; it never decides which models are advertised.
+ * Models whose Pi `minimal` level is sent as xAI `low` whenever their authenticated catalog
+ * evidence yields `low` (an explicit effort list, or the low/medium/high mapping of a bare
+ * reasoning-support flag). It only shapes the wire effort; it never decides advertisement.
  */
 export const XAI_MINIMAL_AS_LOW_MODEL_IDS: ReadonlySet<string> = new Set([
   "grok-4.5",
