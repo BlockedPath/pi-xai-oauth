@@ -102,6 +102,13 @@ describe("catalog normalization", () => {
     const [unreasoned] = normalizeXaiCatalogPayload({ data: [bare] });
     expect(unreasoned).toMatchObject({ reasoning: false, thinkingLevelMap: { off: "none" } });
     expect(unreasoned.cost).toEqual({ input: 4, output: 12, cacheRead: 1, cacheWrite: 0 });
+    // A support flag without an effort list follows the generic catalog rule shared by
+    // every model (low/medium/high, plus minimal → low), exactly as for Grok 4.7.
+    const flagOnly = { ...bare, supports_reasoning_effort: true };
+    const [fastFlag] = normalizeXaiCatalogPayload({ data: [flagOnly] });
+    const [grok47Flag] = normalizeXaiCatalogPayload({ data: [{ ...flagOnly, model: "grok-4.7", name: "Grok 4.7" }] });
+    expect(fastFlag.thinkingLevelMap).toEqual(grok47Flag.thinkingLevelMap);
+    expect(fastFlag.thinkingLevelMap).toMatchObject({ minimal: "low", low: "low", medium: "medium", high: "high", xhigh: null });
     // A cached overlay-enriched entry round-trips through cache validation.
     expect(decodeCachedXaiCatalogModels([fast], XAI_MODEL_CATALOG_CACHE_SCHEMA)).toEqual([fast]);
     const [denied] = normalizeXaiCatalogPayload({ data: [{ ...entry, acceptsImages: false }] });
