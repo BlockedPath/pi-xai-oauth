@@ -16,6 +16,7 @@ import {
   type XaiDeviceAuthDependencies,
 } from "./device-auth";
 import { discoverXaiOidc, validateXaiIdToken, type XaiOidcDiscovery } from "./oidc";
+import { messageFromError } from "./text";
 import { xaiOAuthFormHeaders } from "./wire";
 
 type XaiTokenPayload = {
@@ -95,10 +96,6 @@ function loginMethodOptions(environment: XaiLoginEnvironment | undefined) {
         : `Device code login (recommended for ${recommendation})`,
     },
   ];
-}
-
-function messageFromError(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
 }
 
 function assertLoginNotCancelled(signal?: AbortSignal): void {

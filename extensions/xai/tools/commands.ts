@@ -3,11 +3,9 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import {
   XAI_GROK_NATIVE_WEB_SEARCH_DISPATCH_NAME,
   XAI_GROK_NATIVE_WEB_SEARCH_NAME,
-} from "../constants";
-import {
   XAI_VISION_ROUTING_NAME,
-  type XaiVisionRoutingController,
-} from "../vision-routing";
+} from "../constants";
+import type { XaiVisionRoutingController } from "../vision-routing";
 import {
   activeXaiModel,
   isXaiNetworkToolActive,

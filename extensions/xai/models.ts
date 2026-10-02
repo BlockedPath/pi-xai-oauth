@@ -1,12 +1,6 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { DEFAULT_XAI_MODEL, XAI_PROVIDER_ID } from "./constants";
 import { resolveXaiRoute, type XaiCredentialKind } from "./routing";
-export {
-  resolveXaiClientMode,
-  xaiProxyRequestHeaders,
-  type XaiClientMode,
-  type XaiProxyRequestMetadata,
-} from "./wire";
 
 /** Bounded evidence used to derive one normalized model input capability. */
 export enum XaiModelInputProvenance {

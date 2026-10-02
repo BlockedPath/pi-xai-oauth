@@ -1,4 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
+import { XAI_PROVIDER_ID } from "./constants";
 import { normalizeXaiImageInput } from "./images";
 import {
   cloneXaiCatalogModels,
@@ -12,7 +13,6 @@ import {
   xaiResponsesPayloadContainsImage,
 } from "./payload";
 
-export const XAI_VISION_ROUTING_NAME = "vision-routing";
 export const XAI_VISION_ROUTING_INVALIDATED_ERROR =
   "xAI vision routing authorization changed during image analysis; the source request was not sent";
 export const XAI_VISION_DESCRIPTION_ERROR =
@@ -91,7 +91,7 @@ export function createXaiVisionRoutingController(): XaiVisionRoutingController {
   };
 
   const eligibility = (model?: Model<Api>): XaiVisionRoutingStatus => {
-    if (!model || model.provider !== "xai-auth") {
+    if (!model || model.provider !== XAI_PROVIDER_ID) {
       return { state: "unavailable", reason: "Select an xAI/Grok model first." };
     }
     const source = exactModel(models, model.id);

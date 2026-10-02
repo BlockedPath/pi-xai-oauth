@@ -113,6 +113,9 @@ export const XAI_GROK_NATIVE_WEB_SEARCH_NAME = "web_search";
 /** Private pi dispatch name used to avoid collisions with other `web_search` extensions. */
 export const XAI_GROK_NATIVE_WEB_SEARCH_DISPATCH_NAME = "xai_grok_web_search";
 
+/** User-facing name of the opt-in vision-routing feature. */
+export const XAI_VISION_ROUTING_NAME = "vision-routing";
+
 /** All public Grok-native model-facing tool names, including opt-in web search. */
 export const XAI_GROK_NATIVE_TOOL_NAMES = Object.values(
   XAI_GROK_NATIVE_TOOL_NAME_MAP,

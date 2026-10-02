@@ -9,9 +9,9 @@ import {
 import {
   CURATED_FALLBACK_MODELS,
   KNOWN_XAI_MODEL_METADATA,
-  resolveXaiClientMode,
   setXaiRuntimeModels,
 } from "../../extensions/xai/models";
+import { resolveXaiClientMode } from "../../extensions/xai/wire";
 import {
   createXaiResponse,
   postXaiJson,

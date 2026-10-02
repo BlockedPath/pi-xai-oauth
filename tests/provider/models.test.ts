@@ -9,12 +9,14 @@ import {
   knownXaiModelMetadata,
   normalizedXaiModelId,
   resolveXaiCanonicalModelId,
-  resolveXaiClientMode,
   setXaiRuntimeModels,
   XaiModelInputProvenance,
-  xaiProxyRequestHeaders,
 } from "../../extensions/xai/models";
-import { xaiCatalogHeaders } from "../../extensions/xai/wire";
+import {
+  resolveXaiClientMode,
+  xaiCatalogHeaders,
+  xaiProxyRequestHeaders,
+} from "../../extensions/xai/wire";
 
 afterEach(() => setXaiRuntimeModels(CURATED_FALLBACK_MODELS));
 describe("model compatibility metadata", () => {
