@@ -54,9 +54,9 @@
     "@earendil-works/pi-ai": "1.0.0",
     "@earendil-works/pi-coding-agent": "1.0.0",
     "@types/node": "^26.0.0",
-    "@vitest/coverage-v8": "5.0.0",
+    "@vitest/coverage-v8": "5.0.2",
     "jiti": "^2.7.0",
     "typescript": "^7.0.2",
-    "vitest": "5.0.0"
+    "vitest": "5.0.2"
   }
 }
