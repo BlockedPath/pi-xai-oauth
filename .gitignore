@@ -14,7 +14,9 @@ coverage/
 auth.json
 CLAUDE.md
 *.local
-.agents/
+.agents/*
+!.agents/setup
+.amp/portals/*
 .claude/
 skills-lock.json
 docs/diagrams/
