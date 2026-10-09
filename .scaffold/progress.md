@@ -1,3 +1,11 @@
+# Execution Progress — v1.7.1 release
+
+**Branch:** `release/v1.7.1` (from `main` @ b6c7523)
+
+- [x] PR #238 merged as `b6c7523`: dictation and talk transcripts were inserted before Pi's `showExtensionCustom` close restored the pre-overlay draft, erasing them. Handlers now await the overlay promise before inserting; TUI test mocks restore the draft like Pi and failed on the old code.
+- [x] Version 1.7.1 in package.json and lockfile; CHANGELOG 1.7.1 Fixed entry; README release banner, compatibility, and updating sections. No dependency or peer-range changes.
+- [ ] After merge: publish a GitHub Release tagged `v1.7.1` on main; `publish.yml` runs only on `release: published`.
+
 # Execution Progress — v1.7.0 release with Pi 1.1 support
 
 **Branch:** `feature/pi-1.1-release-1.7.0` (from `main` @ 5d60258)
