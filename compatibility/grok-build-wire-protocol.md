@@ -17,6 +17,8 @@ Pinned source starting points:
 - [Responses defaults and dispatch](https://github.com/xai-org/grok-build/blob/b189869b7755d2b482969acf6c92da3ecfeffd36/crates/codegen/xai-grok-sampler/src/client.rs#L1081-L1160)
 - [Subscription billing structures and handler](https://github.com/xai-org/grok-build/blob/b189869b7755d2b482969acf6c92da3ecfeffd36/crates/codegen/xai-grok-shell/src/extensions/billing.rs#L1-L288)
 
+Grok voice evidence comes from Grok Build's `xai-grok-voice` crate and the pager's voice auth bridge ([`crates/codegen/xai-grok-pager/src/voice/auth.rs`](https://github.com/xai-org/grok-build/blob/2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8/crates/codegen/xai-grok-pager/src/voice/auth.rs) at `2bdd1d6`): the voice API at `api.x.ai` accepts an xAI API key or an xAI OAuth2 token and attributes OAuth usage per user, using the same side-call bearer as the Imagine tools. Grok Build streams dictation over `wss://api.x.ai/v1/stt`; this package uses the request/response form of the same route for a finished clip, which is the shape Grok Build's clip route and xAI's public SDKs use, so no WebSocket client or Authorization-capable WebSocket dependency is needed. The text-to-speech and batch speech-to-text request fields follow xAI's public Voice API as implemented by `@ai-sdk/xai`.
+
 The upstream sampler posts paths relative to a configured base URL. That does not authorize this package to accept caller-, model-, or catalog-provided origins. The endpoint policy below remains pinned in source.
 
 ## Identity and version policy
@@ -51,6 +53,8 @@ All listed headers are internally owned. Caller/model headers are scrubbed case-
 | OAuth or API-key image generation | `https://api.x.ai/v1/images/generations` | Bearer, JSON accept/content, truthful User-Agent, redirect rejection | No CLI-proxy metadata |
 | OAuth or API-key video create | `https://api.x.ai/v1/videos/generations` | Bearer, JSON accept/content, truthful User-Agent, 60-second timeout, bounded response, redirect rejection | No CLI-proxy metadata or retries |
 | OAuth or API-key video status | `https://api.x.ai/v1/videos/<validated-request-id>` | Bearer, JSON accept, truthful User-Agent, fixed 5-second polling, per-request/cumulative bounds | No content type, CLI-proxy metadata, caller URL, or unvalidated path input |
+| OAuth or API-key text to speech | `https://api.x.ai/v1/tts` | Bearer, JSON content type, `Accept: */*`, truthful User-Agent, 120-second timeout, 32 MiB audio bound with MP3/WAV byte verification, redirect rejection | No CLI-proxy metadata or retries; no response-body reflection |
+| OAuth or API-key speech to text | `https://api.x.ai/v1/stt` | Bearer, multipart body with fetch-derived boundary, JSON accept, truthful User-Agent, 240-second timeout, 20 MiB byte-verified upload, 1 MiB JSON response bound, redirect rejection | No CLI-proxy metadata, retries, or caller-supplied Content-Type; transcript control characters stripped |
 | Temporary video download | Authenticated status response's validated HTTPS URL | No-auth GET, resolve-once public DNS/IP pinning, TLS hostname verification, redirect rejection, MP4 MIME/evidence, 256 MiB streamed bound | No bearer, cookie, proxy, caller, or xAI affinity headers; URL/query never reflected |
 
 ### Header classification

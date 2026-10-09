@@ -5,6 +5,8 @@ import {
   XAI_IMAGES_EDITS_URL,
   XAI_IMAGES_GENERATIONS_URL,
   XAI_RESPONSES_URL,
+  XAI_STT_URL,
+  XAI_TTS_URL,
   XAI_VIDEOS_GENERATIONS_URL,
   XAI_VIDEOS_STATUS_PREFIX,
 } from "./constants";
@@ -23,7 +25,9 @@ export type XaiRequestKind =
   | "image-generation"
   | "image-edit"
   | "video-generation-create"
-  | "video-generation-status";
+  | "video-generation-status"
+  | "text-to-speech"
+  | "speech-to-text";
 
 export interface XaiRoute {
   baseUrl: string;
@@ -39,6 +43,10 @@ const XAI_ROUTES: Record<XaiCredentialKind, Record<XaiRequestKind, XaiRoute>> = 
     "image-edit": { baseUrl: XAI_API_BASE_URL, url: XAI_IMAGES_EDITS_URL },
     "video-generation-create": { baseUrl: XAI_API_BASE_URL, url: XAI_VIDEOS_GENERATIONS_URL },
     "video-generation-status": { baseUrl: XAI_API_BASE_URL, url: XAI_VIDEOS_STATUS_PREFIX },
+    // Grok Build's voice client sends both OAuth and BYOK bearers to api.x.ai;
+    // the voice API attributes OAuth usage per user.
+    "text-to-speech": { baseUrl: XAI_API_BASE_URL, url: XAI_TTS_URL },
+    "speech-to-text": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_URL },
   },
   "api-key": {
     responses: { baseUrl: XAI_API_BASE_URL, url: XAI_RESPONSES_URL },
@@ -46,6 +54,8 @@ const XAI_ROUTES: Record<XaiCredentialKind, Record<XaiRequestKind, XaiRoute>> = 
     "image-edit": { baseUrl: XAI_API_BASE_URL, url: XAI_IMAGES_EDITS_URL },
     "video-generation-create": { baseUrl: XAI_API_BASE_URL, url: XAI_VIDEOS_GENERATIONS_URL },
     "video-generation-status": { baseUrl: XAI_API_BASE_URL, url: XAI_VIDEOS_STATUS_PREFIX },
+    "text-to-speech": { baseUrl: XAI_API_BASE_URL, url: XAI_TTS_URL },
+    "speech-to-text": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_URL },
   },
 };
 

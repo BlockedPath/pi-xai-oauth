@@ -284,7 +284,7 @@ describe("/xai-tools command", () => {
     });
     await h.commands.get("xai-tools").handler("", ctx);
     // Page movement uses the ten-row viewport across the full tool catalog.
-    expect(selected[0]).toMatch(/xai_x_search/);
+    expect(selected[0]).toMatch(/xai_deep_research/);
     expect(selected[1]).toMatch(/\[ \] xai_edit_image/);
     expect(selected[2]).toMatch(/\[x\] xai_edit_image/);
     expect(closed).toBe(true);
@@ -333,7 +333,7 @@ describe("/xai-tools command", () => {
     });
 
     await h.commands.get("xai-tools").handler("", ctx);
-    expect(afterPageUp).toMatch(/xai_x_search/);
+    expect(afterPageUp).toMatch(/xai_deep_research/);
     expect(afterPageDown).toMatch(/xai_generate_text/);
   });
 

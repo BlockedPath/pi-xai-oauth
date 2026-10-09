@@ -213,6 +213,39 @@ export function xaiDirectMediaJsonHeaders(
   return xaiJsonPostHeaders(authToken);
 }
 
+/**
+ * Build the exact protected header contract for a direct text-to-speech POST.
+ *
+ * The JSON request returns binary audio, so it accepts any response type like
+ * the reference voice clients; the caller verifies the audio bytes instead.
+ */
+export function xaiDirectSpeechHeaders(
+  authToken: string,
+): Record<string, string> {
+  return {
+    Accept: "*/*",
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${authToken}`,
+    "User-Agent": XAI_USER_AGENT,
+  };
+}
+
+/**
+ * Build protected headers for a direct multipart speech-to-text POST.
+ *
+ * Content-Type is deliberately omitted so fetch derives the multipart
+ * boundary from the FormData body.
+ */
+export function xaiDirectMultipartHeaders(
+  authToken: string,
+): Record<string, string> {
+  return {
+    Accept: "application/json",
+    Authorization: `Bearer ${authToken}`,
+    "User-Agent": XAI_USER_AGENT,
+  };
+}
+
 /** Build protected JSON GET headers for direct public media status requests. */
 export function xaiDirectMediaJsonGetHeaders(
   authToken: string,

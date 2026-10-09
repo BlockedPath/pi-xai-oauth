@@ -82,6 +82,11 @@ export function videoOutputRoot(sessionManager: ReadonlySessionLocation): string
   return sessionOutputRoot(sessionManager, "videos");
 }
 
+/** Derive a package-owned, session-specific generated-speech output directory. */
+export function audioOutputRoot(sessionManager: ReadonlySessionLocation): string {
+  return sessionOutputRoot(sessionManager, "audio");
+}
+
 /** Atomically save a verified image to controlled session storage with 0700/0600 modes. */
 export interface PrivateOutputWriter {
   write(chunk: Uint8Array): Promise<void>;

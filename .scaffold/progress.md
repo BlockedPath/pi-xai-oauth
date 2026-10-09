@@ -1,22 +1,24 @@
-# Execution Progress — v1.6.1 release
+# Execution Progress — Grok voice
 
-**Branch:** `release/v1.6.1` (from `main` @ 7cf8059)
+**Branch:** `feature/grok-voice` (from `main` @ 1aa4676)
 
 ## Completed
 
-- [x] Confirmed `main` was current with `origin/main` and no release-relevant PR was open.
-- [x] Live smoke of `main` on Pi 1.0.0 (only this extension loaded, `xai-auth`): plain turn, `read_file` tool turn, same-model continue, switch to Grok 4.7, and Grok 4.3 `--thinking minimal` all passed.
-- [x] Bumped `package.json` and both root lockfile version fields to 1.6.1; no dependency or runtime changes.
-- [x] Dated the Unreleased changelog as 1.6.1 (2026-10-02) and updated the README release, compatibility, and updating guidance.
+- [x] Researched evidence: Grok Build `xai-grok-voice` (streaming STT at `api.x.ai/v1/stt`, OAuth + API-key bearers accepted, Linux recorder walk, 20 MiB clip cap, 25-language catalog) and `@ai-sdk/xai` 5.0.20 (TTS `POST /v1/tts` JSON, batch STT `POST /v1/stt` multipart, voices eve/ara/rex/sal/leo).
+- [x] Shared primitives: pinned TTS/STT routes, voice header contracts, `readBoundedResponseBytes` (shared streaming core with the text reader), generic `readBoundedWorkspaceFile` (image reader delegates with identical messages), session `audio/` output root.
+- [x] `extensions/xai/voice/`: audio sniffing/WAV/silence, TTS client with byte verification and private storage, STT client and workspace-file transcription, system recorder walk, `/xai-voice` + Ctrl+Space/F8 dictation (TUI overlay, RPC select, session language, reset on session start/shutdown).
+- [x] Opt-in `xai_text_to_speech` and `xai_transcribe_audio` tools in `/xai-tools`.
+- [x] Tests: `tests/voice/*` (audio, speech, transcription, recorder incl. real subprocess, dictation), `tests/tools/custom-tools-voice.test.ts`, updated registration/routing/commands/custom-tools tables, loader smoke asserts tools/command/shortcuts.
+- [x] `npm test` (69 files / 1004 tests + loader + CLI), `npm run typecheck`, coverage above all floors, pack and GitHub-mirror checks.
+- [x] README, CHANGELOG (Unreleased), AGENTS.md, wire-protocol matrix.
 
-## In Progress
+## Notes
 
-- [ ] Release PR: run `npm test`, `npm run typecheck`, `npm run compatibility:check`, `npm run compatibility:boundaries`, `npm pack --dry-run`, `git diff --check`.
-
-## Next
-
-After CI and merge, publish GitHub Release `v1.6.1` on the merged `main` commit; `publish.yml` validates and publishes npmjs `pi-xai-oauth` and the GitHub Packages mirror `@blockedpath/pi-xai-oauth`.
+- `node scripts/verify-compatibility.js registry` fails on `main` too: Pi 1.0.4 is published inside the supported range while `policy.latest` is 1.0.0. Reviewing and adopting 1.0.4 is a separate compatibility task.
+- Local npm 10.9.4 crashes in arborist (`edgesOut`) during the packed boundary install; run boundaries with CI's npm 11.6.2 via `npm_execpath`.
+- Live microphone capture and live xAI voice requests were not exercised (no audio device or credentials in the container).
 
 ## Follow-ups
 
-- Known metadata for `grok-4.7-build-fast` (entitled accounts currently get conservative defaults: 16.4K max output, text-only).
+- Optional streaming STT (`wss://api.x.ai/v1/stt`) for live partial transcripts would need an Authorization-capable WebSocket client.
+- Optional read-aloud of assistant replies via TTS plus a local audio player.

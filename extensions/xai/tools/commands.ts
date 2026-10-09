@@ -32,6 +32,8 @@ const NETWORK_TOOL_OPTIONS: readonly NetworkToolOption[] = [
   { name: "xai_generate_image", category: "image", costRisk: "per image", summary: "generate 1-4 images" },
   { name: "xai_edit_image", category: "image", costRisk: "Imagine usage", summary: "edit 1-3 local image references" },
   { name: "xai_image_to_video", category: "video", costRisk: "high; long-running", summary: "animate one local image; remote job survives local cancellation" },
+  { name: "xai_text_to_speech", category: "voice", costRisk: "per character", summary: "speak text with a Grok voice; saves audio to session storage" },
+  { name: "xai_transcribe_audio", category: "voice", costRisk: "audio usage", summary: "transcribe one local audio file with Grok speech-to-text" },
   { name: "xai_analyze_image", category: "vision", costRisk: "token usage", summary: "analyze an image with Grok" },
   { name: "xai_critique", category: "reasoning", costRisk: "token usage", summary: "separate high-reasoning critique" },
   {

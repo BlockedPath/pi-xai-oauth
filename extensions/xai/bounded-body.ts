@@ -57,31 +57,18 @@ export interface BoundedResponseTextOptions {
 }
 
 /**
- * Read a response body as text under a hard byte bound, cancelling the reader
- * on overflow, cancellation, and transport failure.
+ * Stream a present response body under a hard byte bound, handing each chunk
+ * to `consume`. The reader is cancelled on overflow, cancellation, and
+ * transport failure, and its lock and abort listener are always released.
  */
-export async function readBoundedResponseText(
-  response: Response,
-  options: BoundedResponseTextOptions,
-): Promise<string> {
+async function streamBoundedBody(
+  body: ReadableStream<Uint8Array>,
+  options: Pick<BoundedResponseTextOptions, "maxBytes" | "overflowError" | "signal">,
+  abortError: () => unknown,
+  consume: (chunk: Uint8Array) => void,
+): Promise<number> {
   const { maxBytes, overflowError, signal } = options;
-  const abortError = options.abortError ?? (() => signal?.reason ?? cancellationError());
-
-  if (options.checkDeclaredLength !== false && exceedsDeclaredLength(response, maxBytes)) {
-    void response.body?.cancel().catch(() => undefined);
-    throw overflowError();
-  }
-  if (!response.body) {
-    if (options.emptyBody === "empty") return "";
-    const text = await response.text();
-    if (Buffer.byteLength(text, "utf8") > maxBytes) throw overflowError();
-    return text;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = options.strictUtf8 ? new TextDecoder("utf-8", { fatal: true }) : undefined;
-  const chunks: Uint8Array[] = [];
-  let text = "";
+  const reader = body.getReader();
   let total = 0;
   let rejectOnAbort: ((reason: unknown) => void) | undefined;
   const aborted = new Promise<never>((_resolve, reject) => {
@@ -107,12 +94,9 @@ export async function readBoundedResponseText(
       if (!value) continue;
       total += value.byteLength;
       if (total > maxBytes) throw overflowError();
-      if (decoder) text += decoder.decode(value, { stream: true });
-      else chunks.push(value);
+      consume(value);
     }
-    return decoder
-      ? text + decoder.decode()
-      : Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total).toString("utf8");
+    return total;
   } catch (error) {
     cancelReader(reader);
     throw error;
@@ -120,6 +104,64 @@ export async function readBoundedResponseText(
     signal?.removeEventListener("abort", onAbort);
     releaseReader(reader);
   }
+}
+
+/**
+ * Read a response body as text under a hard byte bound, cancelling the reader
+ * on overflow, cancellation, and transport failure.
+ */
+export async function readBoundedResponseText(
+  response: Response,
+  options: BoundedResponseTextOptions,
+): Promise<string> {
+  const { maxBytes, overflowError, signal } = options;
+  const abortError = options.abortError ?? (() => signal?.reason ?? cancellationError());
+
+  if (options.checkDeclaredLength !== false && exceedsDeclaredLength(response, maxBytes)) {
+    void response.body?.cancel().catch(() => undefined);
+    throw overflowError();
+  }
+  if (!response.body) {
+    if (options.emptyBody === "empty") return "";
+    const text = await response.text();
+    if (Buffer.byteLength(text, "utf8") > maxBytes) throw overflowError();
+    return text;
+  }
+
+  const decoder = options.strictUtf8 ? new TextDecoder("utf-8", { fatal: true }) : undefined;
+  const chunks: Uint8Array[] = [];
+  let text = "";
+  const total = await streamBoundedBody(response.body, options, abortError, (value) => {
+    if (decoder) text += decoder.decode(value, { stream: true });
+    else chunks.push(value);
+  });
+  return decoder
+    ? text + decoder.decode()
+    : Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total).toString("utf8");
+}
+
+/**
+ * Read a binary response body under a hard byte bound with the same declared
+ * length, streamed bound, and cancellation rules as `readBoundedResponseText`.
+ */
+export async function readBoundedResponseBytes(
+  response: Response,
+  options: Omit<BoundedResponseTextOptions, "emptyBody" | "strictUtf8">,
+): Promise<Buffer> {
+  const { maxBytes, overflowError, signal } = options;
+  const abortError = options.abortError ?? (() => signal?.reason ?? cancellationError());
+
+  if (options.checkDeclaredLength !== false && exceedsDeclaredLength(response, maxBytes)) {
+    void response.body?.cancel().catch(() => undefined);
+    throw overflowError();
+  }
+  if (!response.body) return Buffer.alloc(0);
+
+  const chunks: Uint8Array[] = [];
+  const total = await streamBoundedBody(response.body, options, abortError, (value) => {
+    chunks.push(value);
+  });
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total);
 }
 
 /**

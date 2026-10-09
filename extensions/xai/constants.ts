@@ -46,6 +46,8 @@ export const XAI_IMAGES_EDITS_URL = "https://api.x.ai/v1/images/edits";
 export const XAI_VIDEOS_GENERATIONS_URL =
   "https://api.x.ai/v1/videos/generations";
 export const XAI_VIDEOS_STATUS_PREFIX = "https://api.x.ai/v1/videos/";
+export const XAI_TTS_URL = "https://api.x.ai/v1/tts";
+export const XAI_STT_URL = "https://api.x.ai/v1/stt";
 
 export const XAI_MODEL_CATALOG_CACHE_SCHEMA = 2;
 export const XAI_MODEL_CATALOG_FRESH_TTL_MS = 15 * 60 * 1000;

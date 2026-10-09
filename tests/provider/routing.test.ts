@@ -45,4 +45,18 @@ describe("credential-aware xAI routing", () => {
       });
     },
   );
+
+  it.each(["oauth-session", "api-key"] as const)(
+    "keeps %s Grok voice requests on the pinned public voice routes",
+    (kind) => {
+      expect(resolveXaiRoute(kind, "text-to-speech")).toEqual({
+        baseUrl: "https://api.x.ai/v1",
+        url: "https://api.x.ai/v1/tts",
+      });
+      expect(resolveXaiRoute(kind, "speech-to-text")).toEqual({
+        baseUrl: "https://api.x.ai/v1",
+        url: "https://api.x.ai/v1/stt",
+      });
+    },
+  );
 });
