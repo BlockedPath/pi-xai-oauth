@@ -14,12 +14,12 @@ const { parsePeerRange, satisfiesPeerRange, verifyRangePolicy } = require("../..
   satisfiesPeerRange(version: string, range: string): boolean;
   verifyRangePolicy(policy: RangePolicy): void;
 };
-const range = ">=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.1.0";
+const range = ">=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.2.0";
 const fixture = (): RangePolicy => ({
   peerRange: range,
   minimum: "0.80.1",
-  latest: "1.0.4",
-  unsupported: { older: "0.79.10", excluded: ["0.85.0", "0.88.0", "0.99.0"], upper: "1.1.0" },
+  latest: "1.1.0",
+  unsupported: { older: "0.79.10", excluded: ["0.85.0", "0.88.0", "0.99.0"], upper: "1.2.0" },
 });
 
 describe("bounded Pi compatibility policy", () => {
@@ -32,11 +32,11 @@ describe("bounded Pi compatibility policy", () => {
     })).not.toThrow();
   });
 
-  it.each(["0.80.1", "0.80.8", "0.84.4", "0.85.1", "0.85.9", "0.86.0", "0.86.1", "0.87.0", "0.87.1", "1.0.0", "1.0.1", "1.0.4", "1.0.99"])("accepts supported release %s", (version) => {
+  it.each(["0.80.1", "0.80.8", "0.84.4", "0.85.1", "0.85.9", "0.86.0", "0.86.1", "0.87.0", "0.87.1", "1.0.0", "1.0.1", "1.0.4", "1.0.99", "1.1.0", "1.1.99"])("accepts supported release %s", (version) => {
     expect(satisfiesPeerRange(version, range)).toBe(true);
   });
 
-  it.each(["0.79.10", "0.80.0", "0.85.0", "0.88.0", "0.99.0", "0.99.1", "0.99.2", "1.1.0", "2.0.0"])("rejects unsupported release %s", (version) => {
+  it.each(["0.79.10", "0.80.0", "0.85.0", "0.88.0", "0.99.0", "0.99.1", "0.99.2", "1.2.0", "2.0.0"])("rejects unsupported release %s", (version) => {
     expect(satisfiesPeerRange(version, range)).toBe(false);
   });
 
@@ -61,7 +61,7 @@ describe("bounded Pi compatibility policy", () => {
   });
 
   it("rejects widening through a known-broken release", () => {
-    expect(() => verifyRangePolicy({ ...fixture(), peerRange: ">=0.80.1 <1.1.0" }))
+    expect(() => verifyRangePolicy({ ...fixture(), peerRange: ">=0.80.1 <1.2.0" }))
       .toThrow(/Excluded release 0.85.0 must not be supported/);
   });
 
@@ -77,14 +77,14 @@ describe("bounded Pi compatibility policy", () => {
     expect(() => verifyRangePolicy(invalid)).toThrow(/Internal gap at 0.88.0/);
   });
 
-  it.each(["0.80.1", "0.84.4", "0.85.0", "0.87.1", "0.88.0", "0.99.0", "1.1.0"])("rejects latest endpoint %s outside the final interval", (latest) => {
+  it.each(["0.80.1", "0.84.4", "0.85.0", "0.87.1", "0.88.0", "0.99.0", "1.2.0"])("rejects latest endpoint %s outside the final interval", (latest) => {
     expect(() => verifyRangePolicy({ ...fixture(), latest })).toThrow(/final supported interval/);
   });
 
   it("rejects inconsistent lower and upper endpoints", () => {
     expect(() => verifyRangePolicy({ ...fixture(), minimum: "0.80.2" })).toThrow(/lower bound/);
     const invalid = fixture();
-    invalid.unsupported.upper = "1.2.0";
+    invalid.unsupported.upper = "1.3.0";
     expect(() => verifyRangePolicy(invalid)).toThrow(/final excluded bound/);
   });
 
@@ -94,7 +94,7 @@ describe("bounded Pi compatibility policy", () => {
     expect(() => verifyRangePolicy(invalid)).toThrow(/Older sentinel/);
   });
 
-  it.each(["0.79.10", "1.1.0", "0.85.1", "1.0.0"])("rejects misplaced exclusion %s", (excluded) => {
+  it.each(["0.79.10", "1.2.0", "0.85.1", "1.0.0", "1.1.0"])("rejects misplaced exclusion %s", (excluded) => {
     const invalid = fixture();
     invalid.unsupported.excluded = [...fixture().unsupported.excluded!, excluded];
     expect(() => verifyRangePolicy(invalid)).toThrow(/Excluded release/);
