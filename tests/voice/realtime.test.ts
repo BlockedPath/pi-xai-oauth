@@ -166,7 +166,7 @@ describe("xAI realtime voice chat", () => {
     ]);
   });
 
-  it("delivers each reply's final caption once and drops output from finished or cancelled responses", async () => {
+  it("delivers each reply's final caption once, plays a finished reply's trailing audio, and drops cancelled audio", async () => {
     const { conversation, socket, events } = await ready();
     const pcm = speechPcm(2);
     socket.message({ type: "response.created" });
@@ -174,9 +174,13 @@ describe("xAI realtime voice chat", () => {
     socket.message({ type: "response.output_audio_transcript.done", transcript: "Hi." });
     socket.message({ type: "response.output_text.done", text: "Hi." });
     socket.message({ type: "response.done" });
-    socket.message({ type: "response.output_audio.delta", item_id: "late", delta: pcm.toString("base64") });
+    socket.message({ type: "response.output_audio.delta", item_id: "a", delta: pcm.toString("base64") });
+    expect(conversation.responseActive).toBe(false);
     socket.message({ type: "response.output_audio_transcript.done", transcript: "late" });
     socket.message({ type: "response.done" });
+    // Interrupting the finished reply while it plays drops its remaining audio without a cancel request.
+    conversation.cancelResponse();
+    socket.message({ type: "response.output_audio.delta", item_id: "a", delta: pcm.toString("base64") });
     socket.message({ type: "input_audio_buffer.speech_started" });
     socket.message({ type: "response.created" });
     expect(conversation.responseActive).toBe(true);
@@ -189,10 +193,12 @@ describe("xAI realtime voice chat", () => {
       ["grok", "Hi", false],
       ["grok", "Hi.", true],
       ["done"],
+      ["audio", pcm, "a"],
       ["speech"],
       ["audio", pcm, "b"],
       ["grok", "Sure.", true],
     ]);
+    expect(socket.json().filter((event) => event.type === "response.cancel")).toHaveLength(1);
 
     // Without response.created announcements nothing is fenced.
     const unannounced = await ready();

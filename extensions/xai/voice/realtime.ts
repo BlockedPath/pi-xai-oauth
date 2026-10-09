@@ -49,7 +49,7 @@ export interface XaiRealtimeConversation {
   readonly responseActive: boolean;
   /** Stream microphone PCM16LE mono at 24 kHz. */
   appendAudio(pcm: Buffer): void;
-  /** Stop the response Grok is generating. */
+  /** Stop the response Grok is generating and drop any audio still arriving for it. */
   cancelResponse(): void;
   /** Trim Grok's last spoken item to what was actually heard. */
   truncate(itemId: string, audioEndMs: number): void;
@@ -154,7 +154,7 @@ export async function connectXaiRealtime(
   let ended = false;
   let responseActive = false;
   // Tracked only once xAI announces responses with `response.created`.
-  let response: "none" | "active" | "ended" = "none";
+  let response: "none" | "active" | "done" | "cancelled" = "none";
   let assistantFinal = false;
   let speechSequence = 0;
   let carry: Uint8Array | undefined;
@@ -216,9 +216,13 @@ export async function connectXaiRealtime(
       }
       return;
     }
-    // A finished or cancelled response is retired: drop its late output so it
-    // can neither replay audio after an interrupt nor repeat a caption.
-    if (response === "ended" && type.startsWith("response.") && type !== "response.created") return;
+    // A cancelled response is retired so an interrupt cannot replay its audio.
+    // A finished one only drops late captions: its trailing audio still plays.
+    if (
+      (response === "cancelled" || (response === "done" && type !== "response.output_audio.delta"))
+      && type.startsWith("response.")
+      && type !== "response.created"
+    ) return;
     switch (type) {
       case "response.created":
         response = "active";
@@ -231,7 +235,8 @@ export async function connectXaiRealtime(
           end("Grok voice chat received invalid audio.");
           return;
         }
-        responseActive = true;
+        // Trailing audio of a finished reply does not reopen it.
+        if (response !== "done") responseActive = true;
         handlers.onAudio(audio, typeof message.item_id === "string" ? message.item_id : undefined);
         return;
       }
@@ -271,7 +276,7 @@ export async function connectXaiRealtime(
       case "response.done":
         responseActive = false;
         assistantFinal = false;
-        if (response === "active") response = "ended";
+        if (response === "active") response = "done";
         handlers.onResponseDone();
         return;
       case "error": {
@@ -338,9 +343,11 @@ export async function connectXaiRealtime(
       send({ type: "input_audio_buffer.append", audio: Buffer.from(bytes).toString("base64") });
     },
     cancelResponse() {
+      // Interrupting a finished reply that is still playing drops its trailing audio.
+      if (response === "done") response = "cancelled";
       if (!responseActive) return;
       responseActive = false;
-      if (response === "active") response = "ended";
+      if (response === "active") response = "cancelled";
       send({ type: "response.cancel" });
     },
     truncate(itemId, audioEndMs) {

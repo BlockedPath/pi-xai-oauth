@@ -87,9 +87,13 @@ export const XAI_TALK_MAX_AUDIO_DELTA_BYTES = 1024 * 1024;
 export const XAI_TALK_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 /** Half-duplex keeps the microphone muted until this long after Grok's audio should have finished. */
 export const XAI_TALK_ECHO_TAIL_MS = 600;
+/** A finished reply's player closes once no audio has arrived for this long. */
+export const XAI_TALK_PLAYBACK_IDLE_MS = 300;
 /**
- * Allowance after each spoken reply for its player to drain and the next one
- * to start; half-duplex keeps the microphone muted through it.
+ * Silence played before a finished reply's player closes. Players read stdin
+ * in whole blocks, and closing a Bluetooth stream can drop what is still
+ * queued, so the last syllables are followed by silence instead of cut off.
+ * Half-duplex keeps the microphone muted through it.
  */
 export const XAI_TALK_PLAYBACK_DRAIN_MS = 400;
 export const XAI_TALK_MAX_CONTEXT_CHARS = 8_000;

@@ -921,7 +921,7 @@ A silent clip is never uploaded, and live dictation stops after ten seconds of p
 
 `/xai-talk` needs both a microphone recorder and an audio player (see the tables above); the error names any that are missing. If Grok keeps stopping mid-sentence in `duplex` mode, its own voice is reaching the microphone — use headphones or run `/xai-talk` without `duplex`. If xAI refuses the session, check that the signed-in account includes Grok voice.
 
-On Bluetooth headsets such as AirPods, using the headset's microphone switches it to a lower-quality hands-free mode, so Grok sounds like a phone call. Each reply opens playback after the microphone is on, so it plays at the right speed. For full-quality sound, pick your computer's built-in microphone as the input device (on macOS: System Settings → Sound → Input) and keep the headset as the output.
+On Bluetooth headsets such as AirPods, using the headset's microphone switches it to a lower-quality, mono hands-free mode, so Grok sounds like a phone call and may play in only one earbud. Each reply opens playback after the microphone is on, so it still plays at the right speed. For full-quality stereo sound, pick your computer's built-in microphone as the input device (on macOS: System Settings → Sound → Input) and keep the headset as the output.
 
 ### "Does this need an xAI API key?"
 

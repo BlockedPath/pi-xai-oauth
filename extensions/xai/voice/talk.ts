@@ -10,6 +10,7 @@ import {
   XAI_TALK_MAX_LINES,
   XAI_TALK_MAX_TRANSCRIPT_CHARS,
   XAI_TALK_PLAYBACK_DRAIN_MS,
+  XAI_TALK_PLAYBACK_IDLE_MS,
   XAI_TALK_SAMPLE_RATE,
   XAI_TTS_DEFAULT_VOICE,
   XAI_TTS_VOICES,
@@ -152,6 +153,7 @@ export class XaiTalkSession {
   private startedAt = 0;
   private playbackUntil = 0;
   private unfinishedAudio = false;
+  private finishTimer?: ReturnType<typeof setTimeout>;
   private assistantItem?: { id: string; bytes: number; startedAt: number };
 
   constructor(private readonly options: XaiTalkSessionOptions) {
@@ -234,7 +236,7 @@ export class XaiTalkSession {
       onResponseDone: () => {
         const last = this.lastLine("grok");
         if (last) last.final = true;
-        this.finishPlayback();
+        this.scheduleFinish();
       },
       onWarning: (message) => {
         this.warning = message;
@@ -245,8 +247,11 @@ export class XaiTalkSession {
 
   private onMicrophone(chunk: Buffer) {
     if (this.state !== "live") return;
-    // Half-duplex: drop microphone audio while Grok's reply could still be audible.
-    if (!this.duplex && this.now() < this.playbackUntil + XAI_TALK_ECHO_TAIL_MS) return;
+    // Half-duplex: drop microphone audio while Grok is replying or could still be heard,
+    // so neither echo nor background noise can make xAI cut the reply short.
+    if (!this.duplex && (this.conversation?.responseActive || this.now() < this.playbackUntil + XAI_TALK_ECHO_TAIL_MS)) {
+      return;
+    }
     this.conversation?.appendAudio(chunk);
   }
 
@@ -254,6 +259,9 @@ export class XaiTalkSession {
     if (this.state !== "live" || !this.player) return;
     this.player.write(pcm);
     this.unfinishedAudio = true;
+    // Audio can still arrive after xAI reports the reply done; close its player
+    // only once that trailing audio stops too.
+    if (this.finishTimer || !this.conversation?.responseActive) this.scheduleFinish();
     const now = this.now();
     const startsAt = Math.max(now, this.playbackUntil);
     this.playbackUntil = startsAt + pcm.length / BYTES_PER_MS;
@@ -264,15 +272,32 @@ export class XaiTalkSession {
     }
   }
 
+  /** Close a finished reply's player once its audio stops arriving. */
+  private scheduleFinish() {
+    if (this.state !== "live" || !this.unfinishedAudio) return;
+    clearTimeout(this.finishTimer);
+    this.finishTimer = setTimeout(() => {
+      this.finishTimer = undefined;
+      this.finishPlayback();
+    }, XAI_TALK_PLAYBACK_IDLE_MS);
+    this.finishTimer.unref?.();
+  }
+
   /**
-   * End a finished reply's player so it drains its last block (players read
-   * stdin in whole blocks and would otherwise hold the final syllables).
+   * End a finished reply's player after trailing silence, so its last block
+   * drains and the next reply opens output at the current format.
    */
   private finishPlayback() {
     if (this.state !== "live" || !this.player || !this.unfinishedAudio) return;
     this.unfinishedAudio = false;
+    this.player.write(Buffer.alloc(XAI_TALK_PLAYBACK_DRAIN_MS * BYTES_PER_MS));
     this.player.finish();
     this.playbackUntil = Math.max(this.now(), this.playbackUntil) + XAI_TALK_PLAYBACK_DRAIN_MS;
+  }
+
+  private cancelFinish() {
+    clearTimeout(this.finishTimer);
+    this.finishTimer = undefined;
   }
 
   private lastLine(role: XaiTalkLine["role"]): XaiTalkLine | undefined {
@@ -340,6 +365,7 @@ export class XaiTalkSession {
     const now = this.now();
     this.player?.stop();
     this.unfinishedAudio = false;
+    this.cancelFinish();
     conversation?.cancelResponse();
     if (item && conversation) {
       const produced = item.bytes / BYTES_PER_MS;
@@ -365,6 +391,7 @@ export class XaiTalkSession {
   private teardown() {
     this.settled = true;
     this.state = "ended";
+    this.cancelFinish();
     this.abort.abort();
     this.unsubscribe?.();
     this.recording?.cancel();

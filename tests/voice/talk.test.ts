@@ -155,37 +155,67 @@ describe("Grok voice chat session", () => {
     env.session.end(false);
   });
 
-  it("finishes each reply's player so it drains, allowing for the drain in half-duplex", async () => {
-    const env = makeSession();
-    await env.session.start();
-    expect(env.player.finish).toHaveBeenCalledTimes(1);
-    // A reply with no audio has nothing to drain.
-    env.handlers().onResponseDone();
-    expect(env.player.finish).toHaveBeenCalledTimes(1);
-    // 9,600 bytes is 200 ms of 24 kHz PCM16, then a 400 ms drain allowance.
-    env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_1");
-    env.handlers().onResponseDone();
-    env.handlers().onResponseDone();
-    expect(env.player.finish).toHaveBeenCalledTimes(2);
-    expect(env.player.written.map((chunk) => chunk.length)).toEqual([9_600]);
-    env.advance(599);
-    expect(env.session.speaking).toBe(true);
-    env.advance(1);
-    expect(env.session.speaking).toBe(false);
-    // The microphone stays muted through the silence plus the echo tail.
-    env.advance(599);
-    env.recording.emit(speechPcm(10));
-    expect(env.conversation.appended).toHaveLength(0);
-    env.advance(1);
-    env.recording.emit(speechPcm(10));
-    expect(env.conversation.appended).toHaveLength(1);
-    // An interrupted reply is discarded, not drained.
-    env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_2");
-    env.session.interrupt();
-    env.handlers().onResponseDone();
-    expect(env.player.stop).toHaveBeenCalledTimes(1);
-    expect(env.player.finish).toHaveBeenCalledTimes(2);
-    env.session.end(false);
+  it("closes each reply's player after its audio stops, with trailing silence counted in half-duplex", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const env = makeSession();
+      await env.session.start();
+      expect(env.player.finish).toHaveBeenCalledTimes(1);
+      // A reply with no audio has nothing to close.
+      env.handlers().onResponseDone();
+      vi.advanceTimersByTime(1_000);
+      expect(env.player.finish).toHaveBeenCalledTimes(1);
+      // 9,600 bytes is 200 ms of 24 kHz PCM16; audio arriving after "done" keeps the player open.
+      env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_1");
+      env.handlers().onResponseDone();
+      vi.advanceTimersByTime(299);
+      env.handlers().onAudio(Buffer.alloc(4_800, 1), "item_1");
+      vi.advanceTimersByTime(299);
+      expect(env.player.finish).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(1);
+      expect(env.player.finish).toHaveBeenCalledTimes(2);
+      expect(env.player.written.map((chunk) => chunk.length)).toEqual([9_600, 4_800, 19_200]);
+      expect(env.player.written[2]!.every((byte) => byte === 0)).toBe(true);
+      // 300 ms of audio plus 400 ms of silence, then the echo tail keeps the microphone muted.
+      env.advance(699);
+      expect(env.session.speaking).toBe(true);
+      env.advance(1);
+      expect(env.session.speaking).toBe(false);
+      env.advance(599);
+      env.recording.emit(speechPcm(10));
+      expect(env.conversation.appended).toHaveLength(0);
+      env.advance(1);
+      env.recording.emit(speechPcm(10));
+      expect(env.conversation.appended).toHaveLength(1);
+      // While Grok is generating, the microphone stays muted even before any audio arrives.
+      env.conversation.setActive(true);
+      env.recording.emit(speechPcm(10));
+      expect(env.conversation.appended).toHaveLength(1);
+      env.conversation.setActive(false);
+      // An interrupted reply is discarded, not drained.
+      env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_2");
+      env.handlers().onResponseDone();
+      env.session.interrupt();
+      vi.advanceTimersByTime(1_000);
+      expect(env.player.stop).toHaveBeenCalledTimes(1);
+      expect(env.player.finish).toHaveBeenCalledTimes(2);
+      // Trailing audio that arrives after the player closed gets its own close.
+      env.handlers().onAudio(Buffer.alloc(4_800, 1), "item_2b");
+      vi.advanceTimersByTime(300);
+      expect(env.player.finish).toHaveBeenCalledTimes(3);
+      // Audio of an active reply waits for "done"; ending the chat cancels a pending close.
+      env.conversation.setActive(true);
+      env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_3");
+      vi.advanceTimersByTime(1_000);
+      expect(env.player.finish).toHaveBeenCalledTimes(3);
+      env.conversation.setActive(false);
+      env.handlers().onResponseDone();
+      env.session.end(false);
+      vi.advanceTimersByTime(1_000);
+      expect(env.player.finish).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not let speech interrupt Grok in half-duplex mode", async () => {
