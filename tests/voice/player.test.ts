@@ -61,9 +61,15 @@ describe("Grok voice audio player", () => {
       { program: "pw-play", args: ["--raw", "--rate", "24000", "--channels", "1", "--format", "s16", "-"] },
       { program: "pacat", args: ["--playback", "--format=s16le", "--rate=24000", "--channels=1"] },
       { program: "aplay", args: ["-q", "-t", "raw", "-f", "S16_LE", "-c", "1", "-r", "24000", "-"] },
-      { program: "sox", args: ["-q", "-t", "raw", "-r", "24000", "-e", "signed-integer", "-b", "16", "-c", "1", "-L", "-", "-d"] },
+      { program: "sox", args: ["-q", "--ignore-length", "-t", "raw", "-r", "24000", "-e", "signed-integer", "-b", "16", "-c", "1", "-L", "-", "-d"] },
     ]);
     expect(xaiPlayerCommands("darwin").map(({ program }) => program)).toEqual(["sox", "ffplay"]);
+    // macOS reports a socket's buffered bytes as its size, which SoX would treat as the whole reply.
+    for (const platform of ["darwin", "linux", "win32"] as const) {
+      const sox = xaiPlayerCommands(platform).find(({ program }) => program === "sox")!;
+      expect(sox.args.indexOf("--ignore-length")).toBeGreaterThan(-1);
+      expect(sox.args.indexOf("--ignore-length")).toBeLessThan(sox.args.indexOf("-"));
+    }
     expect(xaiPlayerCommands("darwin", 16_000)[1]!.args).toEqual(expect.arrayContaining(["-f", "s16le", "-sample_rate", "16000", "-ch_layout", "mono", "-i", "-"]));
     expect(xaiPlayerCommands("win32").map(({ program }) => program)).toEqual(["sox"]);
     expect(xaiPlayerInstallHint("linux")).toMatch(/pw-play.*pacat.*aplay.*sox/);

@@ -35,10 +35,17 @@ export interface XaiPlayerDependencies {
   startGraceMs?: number;
 }
 
+/**
+ * SoX sizes raw input with `st_mode & S_IFREG`, which also matches sockets,
+ * and macOS `fstat` on a socket reports only the bytes buffered right now.
+ * Node feeds stdin through a socket and each reply's player starts with audio
+ * already queued, so without `--ignore-length` SoX plays about a second of
+ * the reply and exits as if it had reached the end.
+ */
 function soxPlayback(rate: string): XaiRecorderCommand {
   return {
     program: "sox",
-    args: ["-q", "-t", "raw", "-r", rate, "-e", "signed-integer", "-b", "16", "-c", "1", "-L", "-", "-d"],
+    args: ["-q", "--ignore-length", "-t", "raw", "-r", rate, "-e", "signed-integer", "-b", "16", "-c", "1", "-L", "-", "-d"],
   };
 }
 
