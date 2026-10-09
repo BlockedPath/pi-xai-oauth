@@ -11,6 +11,8 @@
 - [x] Tests: `tests/voice/*` (audio, speech, transcription, recorder incl. real subprocess, dictation), `tests/tools/custom-tools-voice.test.ts`, updated registration/routing/commands/custom-tools tables, loader smoke asserts tools/command/shortcuts.
 - [x] `npm test` (69 files / 1004 tests + loader + CLI), `npm run typecheck`, coverage above all floors, pack and GitHub-mirror checks.
 - [x] README, CHANGELOG (Unreleased), AGENTS.md, wire-protocol matrix.
+- [x] Live voice (user request: "it will also be through oauth / there is also live voice"): live dictation is the default and streams to `wss://api.x.ai/v1/stt` with the OAuth bearer on the WebSocket handshake (Node's built-in WebSocket sends headers since undici 6.13), mirroring Grok Build's query, readiness, partial/final assembly, and `audio.done`; clip fallback on any stream failure; `/xai-voice clip` keeps audio local until Enter.
+- [x] Independent review fixes: single recorder per trigger burst (slot claimed before awaits, generation guard on reset), second shortcut press stops dictation, wall-clock recorder cap, Kitty/modifyOtherKeys Ctrl+Space and F8 in the overlay with auto-repeat debounce, no insert after cancel or reset, RPC dialog dismissed via signal and RPC editor semantics documented, MP4/WebM sniffing limited to audio brands/doctype.
 
 ## Notes
 
@@ -20,5 +22,5 @@
 
 ## Follow-ups
 
-- Optional streaming STT (`wss://api.x.ai/v1/stt`) for live partial transcripts would need an Authorization-capable WebSocket client.
+- Optional Grok Voice Agent (speech-to-speech conversation over `wss://api.x.ai/v1/realtime`); OAuth acceptance on that route is not yet evidenced by Grok Build.
 - Optional read-aloud of assistant replies via TTS plus a local audio player.

@@ -13,7 +13,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Install / setup: `node bin/setup.js` or `npm run setup`
 - Install as pi extension: `pi install npm:pi-xai-oauth`
 - Explicit usage CSV export in Pi TUI/RPC: `/xai-usage csv` (normalized fields only, copyable output, no automatic file writes or status opt-in)
-- Grok voice dictation in Pi TUI/RPC: `/xai-voice [language|auto]`, Ctrl+Space, or F8 (needs a system recorder and a real microphone; not runnable headless)
+- Grok voice dictation in Pi TUI/RPC: `/xai-voice [language|auto] [live|clip]`, Ctrl+Space, or F8 (needs a system recorder, a real microphone, and xAI OAuth; not runnable headless)
 - Full policy/unit/loader/CLI gate: `npm test`
 - Focused Vitest suite: `npm run test:unit -- tests/oauth/browser-login.test.ts`
 - V8 coverage: `npm run test:coverage`
@@ -51,7 +51,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Keep normal Pi dev dependencies exact at the policy's latest tested release and review candidate releases before widening support
 - Resolve `x-userid` transiently from the pinned authenticated CLI-proxy `/user` endpoint before any billing request
 - Keep `/xai-usage` explicit, and keep its optional status off by default, session-scoped, bounded, and inactive outside xAI models
-- Send Grok voice audio and text only to the pinned `https://api.x.ai/v1/stt` and `https://api.x.ai/v1/tts` routes; keep dictation audio in memory, upload it only after the user chooses to transcribe, refuse silent clips locally, and check credentials before opening the microphone
+- Send Grok voice audio and text only to the pinned `wss://api.x.ai/v1/stt`, `https://api.x.ai/v1/stt`, and `https://api.x.ai/v1/tts` routes with the OAuth (or built-in `xai` API-key) bearer; keep dictation audio in memory, stream it only in explicitly started live mode, upload clip-mode audio only after the user chooses to transcribe, never upload silent clips, and check credentials before opening the microphone
 - Spawn microphone recorders only from the fixed per-platform candidate list with `shell: false`, bounded capture, and guaranteed kill on stop, cancel, reset, and process exit
 
 **MUST NOT:**

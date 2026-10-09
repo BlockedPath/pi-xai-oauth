@@ -21,6 +21,9 @@ export const XAI_AUDIO_FILE_EXTENSIONS: Readonly<Record<XaiAudioMimeType, string
   "audio/aac": "aac",
 };
 
+/** ISO-BMFF major brands used by M4A/MP4 audio; image (HEIC/AVIF) and QuickTime brands are excluded. */
+const MP4_AUDIO_BRANDS = new Set(["M4A ", "M4B ", "mp41", "mp42", "isom", "iso2", "dash"]);
+
 function ascii(bytes: Uint8Array, start: number, text: string): boolean {
   if (bytes.length < start + text.length) return false;
   for (let index = 0; index < text.length; index += 1) {
@@ -37,9 +40,13 @@ export function sniffAudioMimeType(bytes: Uint8Array): XaiAudioMimeType | undefi
   if (ascii(bytes, 0, "RIFF") && ascii(bytes, 8, "WAVE")) return "audio/wav";
   if (ascii(bytes, 0, "fLaC")) return "audio/flac";
   if (ascii(bytes, 0, "OggS")) return "audio/ogg";
-  if (ascii(bytes, 4, "ftyp")) return "audio/mp4";
+  if (ascii(bytes, 4, "ftyp")) {
+    const brand = bytes.length >= 12 ? Buffer.from(bytes.subarray(8, 12)).toString("latin1") : "";
+    return MP4_AUDIO_BRANDS.has(brand) ? "audio/mp4" : undefined;
+  }
   if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
-    return "audio/webm";
+    // EBML: accept only the WebM document type, not general Matroska video.
+    return Buffer.from(bytes.subarray(0, 64)).includes("webm", 4, "latin1") ? "audio/webm" : undefined;
   }
   if (ascii(bytes, 0, "ID3")) return "audio/mpeg";
   if (bytes.length >= 2 && bytes[0] === 0xff) {

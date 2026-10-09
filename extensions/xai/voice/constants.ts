@@ -59,3 +59,12 @@ export const XAI_DICTATION_SILENCE_PEAK = 64;
 export const XAI_RECORDER_START_GRACE_MS = 300;
 export const XAI_RECORDER_STOP_TIMEOUT_MS = 2_000;
 export const XAI_RECORDER_MAX_DIAGNOSTIC_CHARS = 160;
+
+/** Live dictation over the streaming STT socket, following Grok Build's voice defaults. */
+export const XAI_LIVE_STT_ENDPOINTING_MS = 400;
+export const XAI_LIVE_STT_CONNECT_TIMEOUT_MS = 15_000;
+export const XAI_LIVE_STT_FINISH_TIMEOUT_MS = 15_000;
+export const XAI_LIVE_STT_MAX_MESSAGE_BYTES = 64 * 1024;
+export const XAI_LIVE_STT_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
+/** A clip with no audible input by this point is stopped instead of recording a dead microphone. */
+export const XAI_DICTATION_NO_SPEECH_MS = 10_000;

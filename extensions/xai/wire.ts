@@ -231,6 +231,22 @@ export function xaiDirectSpeechHeaders(
 }
 
 /**
+ * Build the handshake headers for live speech-to-text over WebSocket.
+ *
+ * Mirrors Grok Build's voice socket: the bearer authorizes and bills the
+ * stream, while the truthful package identity only enriches attribution.
+ */
+export function xaiLiveSpeechHeaders(
+  authToken: string,
+): Record<string, string> {
+  return {
+    Authorization: `Bearer ${authToken}`,
+    "User-Agent": XAI_USER_AGENT,
+    "x-grok-client-identifier": XAI_CLIENT_IDENTIFIER,
+  };
+}
+
+/**
  * Build protected headers for a direct multipart speech-to-text POST.
  *
  * Content-Type is deliberately omitted so fetch derives the multipart

@@ -86,7 +86,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 - **Grok 4.5 still supported** — remains a first-class entitled catalog model when `/models-v2` returns it
 - **Grok 4.3 OAuth compatibility** — advertises the independently verified `grok-4.3` request route only when `grok-4.5` is entitled, retaining authenticated input evidence and conservative limits
 - **Authenticated model catalog** — fetches the OAuth-visible `/models-v2` list from the official CLI proxy, so additions and removals track the signed-in account
-- **Grok voice** — Grok Build–style dictation with `/xai-voice`, Ctrl+Space, or F8 records your microphone, transcribes it with Grok speech-to-text, and inserts the text into Pi's editor; opt-in `xai_text_to_speech` and `xai_transcribe_audio` tools cover Grok voices and audio files
+- **Grok voice over OAuth** — Grok Build–style live dictation with `/xai-voice`, Ctrl+Space, or F8 streams your microphone to Grok speech-to-text with your xAI OAuth login, shows words as you speak, and inserts the text into Pi's editor; opt-in `xai_text_to_speech` and `xai_transcribe_audio` tools cover Grok voices and audio files
 - **Explicit subscription usage** — `/xai-usage` performs a bounded, identity-first lookup against the revision-pinned unofficial Grok billing surface without retaining account identity
 - **Coding models when entitled** — directly advertised Grok Build variants track the account catalog; the Composer compatibility alias appears only while its verified `grok-4.5` entitlement source is present
 - **Reasoning support** — parses supplied reasoning capability and thinking levels while preserving known model compatibility
@@ -337,23 +337,30 @@ Enabling status performs one immediate lookup. Later refreshes are event-driven 
 
 ### Grok voice dictation
 
-Dictate a prompt instead of typing it, matching Grok Build's `/voice`:
+Talk instead of typing, like Grok Build's `/voice`. Grok voice uses your **xAI OAuth login** — the same `/login xai-auth` session (or Pi's built-in `xai` SuperGrok/X Premium login) that runs your chats — so no API key is needed. A built-in `xai` API key also works.
 
 ```text
-/xai-voice          # dictate in the session language (English by default)
+/xai-voice          # live dictation in the session language (English by default)
 /xai-voice es       # dictate in Spanish and keep Spanish for this Pi session
 /xai-voice auto     # use the system locale's language when Grok supports it
+/xai-voice clip     # record privately and upload once on Enter (kept for the session)
+/xai-voice live     # back to live dictation
 ```
 
-**Ctrl+Space** and **F8** start the same dictation from the editor. While the 🎙 Grok voice overlay shows the elapsed time and an input-level meter, press **Enter** (or Ctrl+Space/F8 again) to transcribe or **Esc** to discard. The transcript is inserted at the cursor and is never submitted automatically, so you can edit it first. In RPC clients a modal choice replaces the overlay and the text is appended to the client editor.
+**Ctrl+Space** and **F8** start the same dictation from the editor. Press **Enter** (or Ctrl+Space/F8 again) to insert the text, or **Esc** to discard it. The text lands at the cursor and is never submitted automatically, so you can edit it first.
 
-How it works and what leaves your machine:
+**Live mode (default).** The microphone streams to xAI's live speech-to-text socket, `wss://api.x.ai/v1/stt`, with your OAuth bearer on the WebSocket handshake — the same route and authorization Grok Build uses — and the Grok voice overlay shows your words as Grok recognizes them, alongside the elapsed time and an input-level meter. Enter sends end-of-audio and inserts the final transcript. Because audio streams while you speak, **Esc discards the text but cannot recall audio already streamed**. If the live connection fails or drops, the recording is still held in memory, so Enter uploads it once through the request/response route instead and tells you so.
 
-- Audio is captured by a system recorder as 16 kHz mono PCM, held only in memory, and never written to disk. Capture stops automatically at five minutes (or if the recorder exits) and then waits for you to transcribe or discard.
-- Nothing is sent until you choose to transcribe. **Esc discards locally**, and a clip that contains only silence (the usual symptom of a denied microphone permission) is refused locally with a permission hint instead of being uploaded.
-- On transcribe, the clip is wrapped as WAV and posted once to the pinned `https://api.x.ai/v1/stt` route with your xAI credential (`xai-auth` or built-in `xai` OAuth, or a built-in `xai` API key). Grok Build sends OAuth voice requests to the same public route, where xAI attributes usage to the signed-in account. Redirects are rejected, the request is bounded to four minutes, and the response is read under a 1 MiB bound.
-- Dictation is an explicit command, so it works whichever model is active, as long as xAI credentials are available. Credentials are checked before the microphone opens.
-- The language is sent for written-form numbers, currencies, and units. Supported codes: `ar`, `cs`, `da`, `nl`, `en`, `fil`, `fr`, `de`, `hi`, `id`, `it`, `ja`, `ko`, `mk`, `ms`, `fa`, `pl`, `pt`, `ro`, `ru`, `es`, `sv`, `th`, `tr`, `vi`.
+**Clip mode.** Audio stays in memory and nothing is sent until you press Enter; Esc discards locally. The clip is then wrapped as WAV and posted once to `https://api.x.ai/v1/stt`.
+
+Both modes:
+
+- Audio is captured by a system recorder as 16 kHz mono PCM, held only in memory, and never written to disk. Capture stops automatically at five minutes (or if the recorder exits) and then waits for you to insert or discard.
+- A clip that is still pure silence after ten seconds — the usual symptom of a denied microphone permission — is stopped with a permission hint, and a silent clip is never uploaded.
+- Credentials are checked before the microphone opens. Dictation is an explicit command, so it works whichever model is active.
+- Requests use only the pinned `api.x.ai` routes, reject redirects, and are time- and size-bounded; xAI error text is never echoed.
+- The language enables written-form numbers, currencies, and units. Supported codes: `ar`, `cs`, `da`, `nl`, `en`, `fil`, `fr`, `de`, `hi`, `id`, `it`, `ja`, `ko`, `mk`, `ms`, `fa`, `pl`, `pt`, `ro`, `ru`, `es`, `sv`, `th`, `tr`, `vi`.
+- In RPC clients a modal choice replaces the overlay. Pi's RPC host cannot read the client's draft, so the transcript is set as the client's editor text.
 
 Microphone capture uses a recorder already on your system, tried in order:
 
@@ -769,7 +776,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 }
 ```
 
-> **Note:** Every tool in this section makes a separate xAI request and can consume subscription allowances, credits, or rate limits. OAuth-backed Responses helpers use the session proxy; built-in `xai` API-key helpers use the public API. Image generation, image editing, and Grok voice are intentional OAuth transport exceptions: matching official Grok Build behavior, they send the OAuth bearer directly to the pinned public routes at `https://api.x.ai/v1/images/generations`, `https://api.x.ai/v1/images/edits`, `https://api.x.ai/v1/tts`, and `https://api.x.ai/v1/stt`. See [xAI pricing](https://docs.x.ai/developers/pricing) for current rates.
+> **Note:** Every tool in this section makes a separate xAI request and can consume subscription allowances, credits, or rate limits. OAuth-backed Responses helpers use the session proxy; built-in `xai` API-key helpers use the public API. Image generation, image editing, and Grok voice are intentional OAuth transport exceptions: matching official Grok Build behavior, they send the OAuth bearer directly to the pinned public routes at `https://api.x.ai/v1/images/generations`, `https://api.x.ai/v1/images/edits`, `https://api.x.ai/v1/tts`, `https://api.x.ai/v1/stt`, and the live `wss://api.x.ai/v1/stt` socket. See [xAI pricing](https://docs.x.ai/developers/pricing) for current rates.
 
 ---
 
@@ -790,7 +797,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 | Show subscription usage | `/xai-usage` (unofficial, explicit request) |
 | Export copyable usage CSV | `/xai-usage csv` (no automatic file writes) |
 | Manage optional usage status | `/xai-usage status on\|off` (off by default) |
-| Dictate a prompt with Grok voice | `/xai-voice [language]`, Ctrl+Space, or F8 |
+| Dictate a prompt with Grok voice | `/xai-voice [language] [live\|clip]`, Ctrl+Space, or F8 |
 | Manage outbound xAI tools | `/xai-tools` (in TUI) |
 | Recreate extension/catalog state | `/reload` (respects the 15-minute cache TTL) |
 
@@ -868,7 +875,7 @@ This re-runs the full OAuth flow and replaces your stored tokens.
 
 `/xai-voice` needs a system recorder: on Linux install PipeWire (`pw-record`), PulseAudio utilities (`parec`), ALSA utilities (`arecord`), or SoX; on macOS install SoX or FFmpeg with Homebrew; elsewhere put `sox` on `PATH`. When a recorder exists but cannot open the microphone, the error lists each recorder's first diagnostic line.
 
-A silent clip is never uploaded. On macOS, allow microphone access for your terminal in System Settings → Privacy & Security → Microphone and restart the terminal; on Windows check Settings → Privacy & security → Microphone; on Linux check the default input device and its level (`pavucontrol`, or `wpctl status` on PipeWire). If Ctrl+Space switches input sources on macOS, use F8 or `/xai-voice` instead.
+A silent clip is never uploaded, and live dictation stops after ten seconds of pure silence. If the overlay says "live unavailable", Enter still works: the recording is uploaded once instead of streamed. On macOS, allow microphone access for your terminal in System Settings → Privacy & Security → Microphone and restart the terminal; on Windows check Settings → Privacy & security → Microphone; on Linux check the default input device and its level (`pavucontrol`, or `wpctl status` on PipeWire). If Ctrl+Space switches input sources on macOS, use F8 or `/xai-voice` instead.
 
 ### "Does this need an xAI API key?"
 

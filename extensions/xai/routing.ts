@@ -5,6 +5,7 @@ import {
   XAI_IMAGES_EDITS_URL,
   XAI_IMAGES_GENERATIONS_URL,
   XAI_RESPONSES_URL,
+  XAI_STT_STREAM_URL,
   XAI_STT_URL,
   XAI_TTS_URL,
   XAI_VIDEOS_GENERATIONS_URL,
@@ -27,7 +28,8 @@ export type XaiRequestKind =
   | "video-generation-create"
   | "video-generation-status"
   | "text-to-speech"
-  | "speech-to-text";
+  | "speech-to-text"
+  | "speech-to-text-stream";
 
 export interface XaiRoute {
   baseUrl: string;
@@ -47,6 +49,7 @@ const XAI_ROUTES: Record<XaiCredentialKind, Record<XaiRequestKind, XaiRoute>> = 
     // the voice API attributes OAuth usage per user.
     "text-to-speech": { baseUrl: XAI_API_BASE_URL, url: XAI_TTS_URL },
     "speech-to-text": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_URL },
+    "speech-to-text-stream": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_STREAM_URL },
   },
   "api-key": {
     responses: { baseUrl: XAI_API_BASE_URL, url: XAI_RESPONSES_URL },
@@ -56,6 +59,7 @@ const XAI_ROUTES: Record<XaiCredentialKind, Record<XaiRequestKind, XaiRoute>> = 
     "video-generation-status": { baseUrl: XAI_API_BASE_URL, url: XAI_VIDEOS_STATUS_PREFIX },
     "text-to-speech": { baseUrl: XAI_API_BASE_URL, url: XAI_TTS_URL },
     "speech-to-text": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_URL },
+    "speech-to-text-stream": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_STREAM_URL },
   },
 };
 

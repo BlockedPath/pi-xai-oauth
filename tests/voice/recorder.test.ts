@@ -187,6 +187,38 @@ describe("Grok voice microphone recorder", () => {
     expect(await recording.stop()).toEqual(Buffer.alloc(0));
   });
 
+  it("shares the backlog and later chunks with subscribers without breaking capture", async () => {
+    const { spawn, children } = fakeSpawn({ first: (child) => child.stdout.write(Buffer.from([1, 0])) });
+    const recording = await startXaiMicrophoneRecording({ spawn, commands, startGraceMs: 10 });
+    expect(recording.snapshot()).toEqual(Buffer.from([1, 0]));
+    const received: Buffer[] = [];
+    const unsubscribe = recording.subscribe((chunk) => received.push(chunk));
+    recording.subscribe(() => {
+      throw new Error("consumer failed");
+    });
+    const child = children.get("first")!;
+    child.stdout.write(Buffer.from([2, 0]));
+    await new Promise((resolve) => setImmediate(resolve));
+    unsubscribe();
+    child.stdout.write(Buffer.from([3, 0]));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(received).toEqual([Buffer.from([2, 0])]);
+    expect(recording.snapshot()).toEqual(Buffer.from([1, 0, 2, 0, 3, 0]));
+    child.onKill = () => child.exit(null, "SIGTERM");
+    expect(await recording.stop()).toEqual(Buffer.from([1, 0, 2, 0, 3, 0]));
+    expect(recording.snapshot()).toEqual(Buffer.from([1, 0, 2, 0, 3, 0]));
+    const late = vi.fn();
+    recording.subscribe(late)();
+    expect(late).not.toHaveBeenCalled();
+  });
+
+  it("enforces the wall-clock limit even when the recorder delivers no audio", async () => {
+    const { spawn, children } = fakeSpawn({ first: () => undefined });
+    const recording = await startXaiMicrophoneRecording({ spawn, commands, startGraceMs: 5, maxDurationMs: 20 });
+    expect(await recording.ended).toBe("cap");
+    expect(children.get("first")!.kills).toEqual(["SIGTERM"]);
+  });
+
   it("captures raw PCM from a real recorder subprocess", async () => {
     const script = [
       "const chunk = Buffer.alloc(320);",

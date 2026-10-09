@@ -1,6 +1,7 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 import { pcm16Peak } from "./audio";
 import {
+  XAI_DICTATION_MAX_DURATION_MS,
   XAI_DICTATION_MAX_PCM_BYTES,
   XAI_DICTATION_SAMPLE_RATE,
   XAI_RECORDER_MAX_DIAGNOSTIC_CHARS,
@@ -27,6 +28,10 @@ export interface XaiMicrophoneRecording {
   bytesCaptured(): number;
   /** Normalized 0–1 peak of the most recent audio chunk, for a level meter. */
   level(): number;
+  /** A copy of the PCM captured so far. */
+  snapshot(): Buffer;
+  /** Receive each accepted PCM chunk from now on; returns an unsubscribe function. */
+  subscribe(listener: (chunk: Buffer) => void): () => void;
   /** Stop gracefully, drain queued audio, and return the captured PCM16LE mono frames. */
   stop(): Promise<Buffer>;
   /** Kill the recorder and discard every captured byte. */
@@ -41,6 +46,8 @@ export interface XaiRecorderDependencies {
   maxBytes?: number;
   startGraceMs?: number;
   stopTimeoutMs?: number;
+  /** Wall-clock capture limit, enforced even when the recorder delivers no data. */
+  maxDurationMs?: number;
 }
 
 /** The microphone recorder could not be started; the message is safe to show. */
@@ -112,6 +119,7 @@ interface Capture {
   total: number;
   lastPeak: number;
   capped: boolean;
+  listeners: Set<(chunk: Buffer) => void>;
 }
 
 type StartAttempt =
@@ -156,6 +164,13 @@ function attemptStart(
         capture.chunks.push(accepted);
         capture.total += accepted.length;
         capture.lastPeak = pcm16Peak(accepted);
+        for (const listener of capture.listeners) {
+          try {
+            listener(accepted);
+          } catch {
+            // A failing consumer must not stop local capture.
+          }
+        }
       }
       if (capture.total >= maxBytes) {
         capture.capped = true;
@@ -205,12 +220,13 @@ export async function startXaiMicrophoneRecording(
   const spawnFn = dependencies.spawn ?? nodeSpawn;
   const graceMs = dependencies.startGraceMs ?? XAI_RECORDER_START_GRACE_MS;
   const stopTimeoutMs = dependencies.stopTimeoutMs ?? XAI_RECORDER_STOP_TIMEOUT_MS;
+  const maxDurationMs = dependencies.maxDurationMs ?? XAI_DICTATION_MAX_DURATION_MS;
   const commands = dependencies.commands ?? xaiRecorderCommands(platform, sampleRate);
 
   const failures: string[] = [];
   let allMissing = true;
   for (const command of commands) {
-    const capture: Capture = { chunks: [], total: 0, lastPeak: 0, capped: false };
+    const capture: Capture = { chunks: [], total: 0, lastPeak: 0, capped: false, listeners: new Set() };
     let resolveEnded!: (end: XaiRecordingEnd) => void;
     const ended = new Promise<XaiRecordingEnd>((resolve) => {
       resolveEnded = resolve;
@@ -227,7 +243,7 @@ export async function startXaiMicrophoneRecording(
     }
     child = attempt.child;
     if (capture.capped) killQuietly(child, "SIGTERM");
-    return createRecording(command.program, child, capture, ended, resolveEnded, stopTimeoutMs);
+    return createRecording(command.program, child, capture, ended, resolveEnded, stopTimeoutMs, maxDurationMs);
   }
   if (allMissing) {
     throw new XaiRecorderUnavailableError(
@@ -246,9 +262,17 @@ function createRecording(
   ended: Promise<XaiRecordingEnd>,
   resolveEnded: (end: XaiRecordingEnd) => void,
   stopTimeoutMs: number,
+  maxDurationMs: number,
 ): XaiMicrophoneRecording {
   let closed = false;
   let finished = false;
+  const durationTimer = setTimeout(() => {
+    if (finished || closed || capture.capped) return;
+    capture.capped = true;
+    killQuietly(child, "SIGTERM");
+    resolveEnded("cap");
+  }, maxDurationMs);
+  durationTimer.unref?.();
   // A late spawn/kill error must never become an uncaught EventEmitter error.
   child.on("error", () => undefined);
   const closedPromise = new Promise<void>((resolve) => {
@@ -266,8 +290,11 @@ function createRecording(
   void closedPromise.then(() => resolveEnded("exited"));
   const killOnExit = () => killQuietly(child, "SIGKILL");
   process.once("exit", killOnExit);
+  void closedPromise.then(() => clearTimeout(durationTimer));
   const release = () => {
     finished = true;
+    clearTimeout(durationTimer);
+    capture.listeners.clear();
     process.removeListener("exit", killOnExit);
   };
 
@@ -276,6 +303,12 @@ function createRecording(
     ended,
     bytesCaptured: () => capture.total,
     level: () => Math.min(1, capture.lastPeak / 32768),
+    snapshot: () => Buffer.concat(capture.chunks, capture.total),
+    subscribe(listener) {
+      if (finished) return () => undefined;
+      capture.listeners.add(listener);
+      return () => capture.listeners.delete(listener);
+    },
     async stop() {
       if (finished) return Buffer.alloc(0);
       if (!closed) {
@@ -290,7 +323,6 @@ function createRecording(
       }
       release();
       const pcm = Buffer.concat(capture.chunks, capture.total);
-      capture.chunks = [];
       return pcm.subarray(0, pcm.length & ~1);
     },
     cancel() {

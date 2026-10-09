@@ -18,7 +18,8 @@ describe("Grok voice audio primitives", () => {
     ["audio/flac", Buffer.from("fLaC\0\0\0\x22", "latin1")],
     ["audio/ogg", Buffer.from("OggS\0\x02", "latin1")],
     ["audio/mp4", Buffer.from("\0\0\0\x20ftypM4A ", "latin1")],
-    ["audio/webm", Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x9f])],
+    ["audio/mp4", Buffer.from("\0\0\0\x20ftypisom", "latin1")],
+    ["audio/webm", Buffer.from("\x1a\x45\xdf\xa3\x9f\x42\x82\x84webm", "latin1")],
   ])("recognizes %s from leading bytes", (mimeType, bytes) => {
     expect(sniffAudioMimeType(bytes)).toBe(mimeType);
   });
@@ -32,6 +33,11 @@ describe("Grok voice audio primitives", () => {
     ["reserved MPEG version", Buffer.from([0xff, 0xea, 0x90, 0x00])],
     ["reserved MPEG layer", Buffer.from([0xff, 0xe1, 0x90, 0x00])],
     ["truncated sync", Buffer.from([0xff])],
+    ["a HEIC photo", Buffer.from("\0\0\0\x18ftypheic", "latin1")],
+    ["an AVIF image", Buffer.from("\0\0\0\x1cftypavif", "latin1")],
+    ["a QuickTime movie", Buffer.from("\0\0\0\x14ftypqt  ", "latin1")],
+    ["a truncated ftyp box", Buffer.from("\0\0\0\x14ftyp", "latin1")],
+    ["Matroska video", Buffer.from("\x1a\x45\xdf\xa3\xa3\x42\x82\x88matroska", "latin1")],
   ])("rejects %s bytes", (_name, bytes) => {
     expect(sniffAudioMimeType(bytes)).toBeUndefined();
   });
