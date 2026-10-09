@@ -14,6 +14,8 @@
 - [x] Live voice (user request: "it will also be through oauth / there is also live voice"): live dictation is the default and streams to `wss://api.x.ai/v1/stt` with the OAuth bearer on the WebSocket handshake (Node's built-in WebSocket sends headers since undici 6.13), mirroring Grok Build's query, readiness, partial/final assembly, and `audio.done`; clip fallback on any stream failure; `/xai-voice clip` keeps audio local until Enter.
 - [x] Independent review fixes: single recorder per trigger burst (slot claimed before awaits, generation guard on reset), second shortcut press stops dictation, wall-clock recorder cap, Kitty/modifyOtherKeys Ctrl+Space and F8 in the overlay with auto-repeat debounce, no insert after cancel or reset, RPC dialog dismissed via signal and RPC editor semantics documented, MP4/WebM sniffing limited to audio brands/doctype.
 
+- [x] Talk-back voice chat (user request: "I want a feature for it to talk back to me ... through OAuth"): `/xai-talk` on `wss://api.x.ai/v1/realtime` with the OAuth bearer, following OpenClaw's OAuth-authenticated xAI realtime bridge; system audio player walk; non-retaining 24 kHz mic stream; half-duplex default, duplex barge-in with truncation, Space interrupt, captions, Enter inserts transcript, opt-in `context`.
+
 ## Notes
 
 - `node scripts/verify-compatibility.js registry` fails on `main` too: Pi 1.0.4 is published inside the supported range while `policy.latest` is 1.0.0. Reviewing and adopting 1.0.4 is a separate compatibility task.
@@ -22,5 +24,5 @@
 
 ## Follow-ups
 
-- Optional Grok Voice Agent (speech-to-speech conversation over `wss://api.x.ai/v1/realtime`); OAuth acceptance on that route is not yet evidenced by Grok Build.
+- Optional voice-chat tools that hand requests to the Pi agent and speak its results.
 - Optional read-aloud of assistant replies via TTS plus a local audio player.

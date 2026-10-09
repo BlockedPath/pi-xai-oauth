@@ -4,6 +4,7 @@ import {
   XAI_CLI_RESPONSES_URL,
   XAI_IMAGES_EDITS_URL,
   XAI_IMAGES_GENERATIONS_URL,
+  XAI_REALTIME_URL,
   XAI_RESPONSES_URL,
   XAI_STT_STREAM_URL,
   XAI_STT_URL,
@@ -29,7 +30,8 @@ export type XaiRequestKind =
   | "video-generation-status"
   | "text-to-speech"
   | "speech-to-text"
-  | "speech-to-text-stream";
+  | "speech-to-text-stream"
+  | "realtime-voice";
 
 export interface XaiRoute {
   baseUrl: string;
@@ -50,6 +52,7 @@ const XAI_ROUTES: Record<XaiCredentialKind, Record<XaiRequestKind, XaiRoute>> = 
     "text-to-speech": { baseUrl: XAI_API_BASE_URL, url: XAI_TTS_URL },
     "speech-to-text": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_URL },
     "speech-to-text-stream": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_STREAM_URL },
+    "realtime-voice": { baseUrl: XAI_API_BASE_URL, url: XAI_REALTIME_URL },
   },
   "api-key": {
     responses: { baseUrl: XAI_API_BASE_URL, url: XAI_RESPONSES_URL },
@@ -60,6 +63,7 @@ const XAI_ROUTES: Record<XaiCredentialKind, Record<XaiRequestKind, XaiRoute>> = 
     "text-to-speech": { baseUrl: XAI_API_BASE_URL, url: XAI_TTS_URL },
     "speech-to-text": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_URL },
     "speech-to-text-stream": { baseUrl: XAI_API_BASE_URL, url: XAI_STT_STREAM_URL },
+    "realtime-voice": { baseUrl: XAI_API_BASE_URL, url: XAI_REALTIME_URL },
   },
 };
 

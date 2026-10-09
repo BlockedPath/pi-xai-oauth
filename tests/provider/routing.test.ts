@@ -61,6 +61,10 @@ describe("credential-aware xAI routing", () => {
         baseUrl: "https://api.x.ai/v1",
         url: "wss://api.x.ai/v1/stt",
       });
+      expect(resolveXaiRoute(kind, "realtime-voice")).toEqual({
+        baseUrl: "https://api.x.ai/v1",
+        url: "wss://api.x.ai/v1/realtime",
+      });
     },
   );
 });

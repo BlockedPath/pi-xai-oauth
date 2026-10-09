@@ -89,6 +89,10 @@ try {
 		"/xai-voice dictation should be registered",
 	);
 	assert.ok(
+		loaded.commands.has("xai-talk"),
+		"/xai-talk realtime voice chat should be registered",
+	);
+	assert.ok(
 		loaded.shortcuts.has("ctrl+space") && loaded.shortcuts.has("f8"),
 		"Grok voice dictation shortcuts should be registered",
 	);

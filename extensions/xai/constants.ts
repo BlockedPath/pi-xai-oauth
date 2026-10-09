@@ -49,6 +49,7 @@ export const XAI_VIDEOS_STATUS_PREFIX = "https://api.x.ai/v1/videos/";
 export const XAI_TTS_URL = "https://api.x.ai/v1/tts";
 export const XAI_STT_URL = "https://api.x.ai/v1/stt";
 export const XAI_STT_STREAM_URL = "wss://api.x.ai/v1/stt";
+export const XAI_REALTIME_URL = "wss://api.x.ai/v1/realtime";
 
 export const XAI_MODEL_CATALOG_CACHE_SCHEMA = 2;
 export const XAI_MODEL_CATALOG_FRESH_TTL_MS = 15 * 60 * 1000;

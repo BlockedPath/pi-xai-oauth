@@ -60,6 +60,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 - [Usage](#usage)
   - [Subscription usage (unofficial)](#subscription-usage-unofficial)
   - [Grok voice dictation](#grok-voice-dictation)
+  - [Talk with Grok (voice chat)](#talk-with-grok-voice-chat)
   - [Switching Models](#switching-models)
   - [Reasoning / Thinking Levels](#reasoning--thinking-levels)
 - [Custom Tools](#custom-tools)
@@ -87,6 +88,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 - **Grok 4.3 OAuth compatibility** — advertises the independently verified `grok-4.3` request route only when `grok-4.5` is entitled, retaining authenticated input evidence and conservative limits
 - **Authenticated model catalog** — fetches the OAuth-visible `/models-v2` list from the official CLI proxy, so additions and removals track the signed-in account
 - **Grok voice over OAuth** — Grok Build–style live dictation with `/xai-voice`, Ctrl+Space, or F8 streams your microphone to Grok speech-to-text with your xAI OAuth login, shows words as you speak, and inserts the text into Pi's editor; opt-in `xai_text_to_speech` and `xai_transcribe_audio` tools cover Grok voices and audio files
+- **Talk with Grok** — `/xai-talk` opens a spoken conversation with Grok's realtime voice over your xAI OAuth login: you speak, Grok answers out loud, with live captions and an optional transcript
 - **Explicit subscription usage** — `/xai-usage` performs a bounded, identity-first lookup against the revision-pinned unofficial Grok billing surface without retaining account identity
 - **Coding models when entitled** — directly advertised Grok Build variants track the account catalog; the Composer compatibility alias appears only while its verified `grok-4.5` entitlement source is present
 - **Reasoning support** — parses supplied reasoning capability and thinking levels while preserving known model compatibility
@@ -371,6 +373,43 @@ Microphone capture uses a recorder already on your system, tried in order:
 | Windows / other | `sox` on `PATH` |
 
 On macOS, allow microphone access for your terminal in System Settings → Privacy & Security → Microphone.
+
+### Talk with Grok (voice chat)
+
+Have a spoken conversation with Grok — you talk, Grok talks back. It uses xAI's realtime voice route (`wss://api.x.ai/v1/realtime`, model `grok-voice-latest`) with your **xAI OAuth login** on the WebSocket handshake, the same way OpenClaw's Grok Talk uses a SuperGrok/X Premium sign-in; a built-in `xai` API key also works.
+
+```text
+/xai-talk              # talk with Grok in the default voice (eve)
+/xai-talk ara          # pick a voice: eve, ara, rex, sal, or leo
+/xai-talk duplex       # talk over Grok to interrupt it (use headphones)
+/xai-talk context      # let Grok see your recent Pi conversation text
+```
+
+While the voice chat overlay is open, captions show what you said and what Grok is saying, with the elapsed time and a microphone meter.
+
+| Key | Action |
+| --- | ------ |
+| Space | Interrupt Grok |
+| Enter | End the chat and insert the transcript into Pi's editor (not submitted) |
+| Esc | End the chat |
+
+How it works:
+
+- Your microphone streams 24 kHz mono audio to xAI and Grok's reply plays through your speakers via a system audio player. Audio is never written to disk, and only the visible captions are kept.
+- **Half-duplex by default:** the microphone is muted while Grok is speaking (plus a short echo tail), so laptop speakers cannot make Grok interrupt itself; press Space to cut Grok off. With headphones, `duplex` keeps the microphone open so speaking interrupts Grok, which trims its memory to what you actually heard.
+- `context` adds the recent visible user/assistant text of the current Pi branch (at most 8,000 characters; no tool output or thinking) to Grok's instructions, labelled as reference material. Without it, nothing from your Pi session is sent. Note that this shares that text with xAI even when another provider produced it.
+- The voice chat cannot run tools or change files; Grok will suggest dictating or typing requests into Pi. Enter puts the transcript into the editor so you can hand the conversation to the coding agent.
+- Conversations end after 30 minutes. Requests use only the pinned route, the bearer is sent only on the handshake, messages and audio chunks are size-bounded, and xAI error text is never echoed.
+
+Playback uses an audio player already on your system, tried in order:
+
+| Platform | Players |
+| -------- | ------- |
+| Linux | `pw-play` (PipeWire ≥ 1.0), `pacat` (PulseAudio), `aplay` (ALSA), `sox` |
+| macOS | `sox` (`brew install sox`), `ffplay` (`brew install ffmpeg`) |
+| Windows / other | `sox` on `PATH` |
+
+Microphone capture uses the same recorders as dictation.
 
 ### Switching Models
 
@@ -776,7 +815,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 }
 ```
 
-> **Note:** Every tool in this section makes a separate xAI request and can consume subscription allowances, credits, or rate limits. OAuth-backed Responses helpers use the session proxy; built-in `xai` API-key helpers use the public API. Image generation, image editing, and Grok voice are intentional OAuth transport exceptions: matching official Grok Build behavior, they send the OAuth bearer directly to the pinned public routes at `https://api.x.ai/v1/images/generations`, `https://api.x.ai/v1/images/edits`, `https://api.x.ai/v1/tts`, `https://api.x.ai/v1/stt`, and the live `wss://api.x.ai/v1/stt` socket. See [xAI pricing](https://docs.x.ai/developers/pricing) for current rates.
+> **Note:** Every tool in this section makes a separate xAI request and can consume subscription allowances, credits, or rate limits. OAuth-backed Responses helpers use the session proxy; built-in `xai` API-key helpers use the public API. Image generation, image editing, and Grok voice are intentional OAuth transport exceptions: matching official Grok Build behavior, they send the OAuth bearer directly to the pinned public routes at `https://api.x.ai/v1/images/generations`, `https://api.x.ai/v1/images/edits`, `https://api.x.ai/v1/tts`, `https://api.x.ai/v1/stt`, the live `wss://api.x.ai/v1/stt` socket, and the realtime `wss://api.x.ai/v1/realtime` voice chat. See [xAI pricing](https://docs.x.ai/developers/pricing) for current rates.
 
 ---
 
@@ -798,6 +837,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 | Export copyable usage CSV | `/xai-usage csv` (no automatic file writes) |
 | Manage optional usage status | `/xai-usage status on\|off` (off by default) |
 | Dictate a prompt with Grok voice | `/xai-voice [language] [live\|clip]`, Ctrl+Space, or F8 |
+| Talk with Grok out loud | `/xai-talk [voice] [duplex] [context]` |
 | Manage outbound xAI tools | `/xai-tools` (in TUI) |
 | Recreate extension/catalog state | `/reload` (respects the 15-minute cache TTL) |
 
@@ -876,6 +916,10 @@ This re-runs the full OAuth flow and replaces your stored tokens.
 `/xai-voice` needs a system recorder: on Linux install PipeWire (`pw-record`), PulseAudio utilities (`parec`), ALSA utilities (`arecord`), or SoX; on macOS install SoX or FFmpeg with Homebrew; elsewhere put `sox` on `PATH`. When a recorder exists but cannot open the microphone, the error lists each recorder's first diagnostic line.
 
 A silent clip is never uploaded, and live dictation stops after ten seconds of pure silence. If the overlay says "live unavailable", Enter still works: the recording is uploaded once instead of streamed. On macOS, allow microphone access for your terminal in System Settings → Privacy & Security → Microphone and restart the terminal; on Windows check Settings → Privacy & security → Microphone; on Linux check the default input device and its level (`pavucontrol`, or `wpctl status` on PipeWire). If Ctrl+Space switches input sources on macOS, use F8 or `/xai-voice` instead.
+
+### Grok voice chat is silent or keeps interrupting itself
+
+`/xai-talk` needs both a microphone recorder and an audio player (see the tables above); the error names any that are missing. If Grok keeps stopping mid-sentence in `duplex` mode, its own voice is reaching the microphone — use headphones or run `/xai-talk` without `duplex`. If xAI refuses the session, check that the signed-in account includes Grok voice.
 
 ### "Does this need an xAI API key?"
 
@@ -1101,7 +1145,7 @@ pi-xai-oauth/
 │       ├── usage.ts          # Explicit bounded /xai-usage command + status
 │       ├── video-download.ts # DNS/IP-pinned MP4 download
 │       ├── vision-routing.ts # Opt-in routing for text-only entitlements
-│       ├── voice/            # /xai-voice dictation, recorder, TTS/STT clients, audio checks
+│       ├── voice/            # /xai-voice dictation, /xai-talk voice chat, recorder/player, TTS/STT/realtime clients
 │       └── wire.ts           # Route-aware headers, scrubbing, identity, safe errors
 ├── bin/
 │   └── setup.js              # One-command setup (npx pi-xai-oauth)

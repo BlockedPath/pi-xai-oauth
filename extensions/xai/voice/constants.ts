@@ -68,3 +68,26 @@ export const XAI_LIVE_STT_MAX_MESSAGE_BYTES = 64 * 1024;
 export const XAI_LIVE_STT_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 /** A clip with no audible input by this point is stopped instead of recording a dead microphone. */
 export const XAI_DICTATION_NO_SPEECH_MS = 10_000;
+
+/**
+ * Realtime voice conversation (Grok Voice Agent) defaults, following the
+ * OAuth-authenticated OpenClaw xAI realtime bridge: PCM16 mono at 24 kHz in
+ * both directions, server VAD, and `grok-transcribe` input captions.
+ */
+export const XAI_TALK_MODEL = "grok-voice-latest";
+export const XAI_TALK_SAMPLE_RATE = 24_000;
+export const XAI_TALK_INPUT_TRANSCRIPTION_MODEL = "grok-transcribe";
+export const XAI_TALK_VAD_THRESHOLD = 0.85;
+export const XAI_TALK_VAD_PREFIX_PADDING_MS = 333;
+export const XAI_TALK_VAD_SILENCE_DURATION_MS = 500;
+export const XAI_TALK_CONNECT_TIMEOUT_MS = 15_000;
+export const XAI_TALK_MAX_DURATION_MS = 30 * 60 * 1000;
+export const XAI_TALK_MAX_MESSAGE_BYTES = 2 * 1024 * 1024;
+export const XAI_TALK_MAX_AUDIO_DELTA_BYTES = 1024 * 1024;
+export const XAI_TALK_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
+/** Half-duplex keeps the microphone muted until this long after Grok's audio should have finished. */
+export const XAI_TALK_ECHO_TAIL_MS = 600;
+export const XAI_TALK_MAX_CONTEXT_CHARS = 8_000;
+export const XAI_TALK_MAX_LINE_CHARS = 4_000;
+export const XAI_TALK_MAX_LINES = 200;
+export const XAI_TALK_MAX_TRANSCRIPT_CHARS = 20_000;

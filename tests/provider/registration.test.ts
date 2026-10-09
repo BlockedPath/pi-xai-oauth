@@ -53,6 +53,7 @@ describe("provider registration", () => {
     expect(harness.commands.has("xai-tools")).toBe(true);
     expect(harness.commands.has("xai-usage")).toBe(true);
     expect(harness.commands.has("xai-voice")).toBe(true);
+    expect(harness.commands.has("xai-talk")).toBe(true);
     expect([...harness.shortcuts.keys()]).toEqual(["ctrl+space", "f8"]);
     expect([...harness.handlers.keys()]).toEqual(
       expect.arrayContaining([

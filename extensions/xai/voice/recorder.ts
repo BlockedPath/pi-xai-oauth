@@ -48,6 +48,8 @@ export interface XaiRecorderDependencies {
   stopTimeoutMs?: number;
   /** Wall-clock capture limit, enforced even when the recorder delivers no data. */
   maxDurationMs?: number;
+  /** Keep captured PCM in memory (default); streaming consumers turn this off. */
+  retainAudio?: boolean;
 }
 
 /** The microphone recorder could not be started; the message is safe to show. */
@@ -119,6 +121,7 @@ interface Capture {
   total: number;
   lastPeak: number;
   capped: boolean;
+  retain: boolean;
   listeners: Set<(chunk: Buffer) => void>;
 }
 
@@ -161,7 +164,7 @@ function attemptStart(
       const room = maxBytes - capture.total;
       const accepted = chunk.length > room ? chunk.subarray(0, room) : chunk;
       if (accepted.length > 0) {
-        capture.chunks.push(accepted);
+        if (capture.retain) capture.chunks.push(accepted);
         capture.total += accepted.length;
         capture.lastPeak = pcm16Peak(accepted);
         for (const listener of capture.listeners) {
@@ -226,7 +229,14 @@ export async function startXaiMicrophoneRecording(
   const failures: string[] = [];
   let allMissing = true;
   for (const command of commands) {
-    const capture: Capture = { chunks: [], total: 0, lastPeak: 0, capped: false, listeners: new Set() };
+    const capture: Capture = {
+      chunks: [],
+      total: 0,
+      lastPeak: 0,
+      capped: false,
+      retain: dependencies.retainAudio !== false,
+      listeners: new Set(),
+    };
     let resolveEnded!: (end: XaiRecordingEnd) => void;
     const ended = new Promise<XaiRecordingEnd>((resolve) => {
       resolveEnded = resolve;
@@ -303,7 +313,7 @@ function createRecording(
     ended,
     bytesCaptured: () => capture.total,
     level: () => Math.min(1, capture.lastPeak / 32768),
-    snapshot: () => Buffer.concat(capture.chunks, capture.total),
+    snapshot: () => Buffer.concat(capture.chunks),
     subscribe(listener) {
       if (finished) return () => undefined;
       capture.listeners.add(listener);
@@ -322,7 +332,7 @@ function createRecording(
         if (outcome === "timeout") killQuietly(child, "SIGKILL");
       }
       release();
-      const pcm = Buffer.concat(capture.chunks, capture.total);
+      const pcm = Buffer.concat(capture.chunks);
       return pcm.subarray(0, pcm.length & ~1);
     },
     cancel() {
