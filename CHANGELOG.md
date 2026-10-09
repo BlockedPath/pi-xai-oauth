@@ -6,6 +6,8 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.7.0 - 2026-10-09
+
 ### Added
 
 - Added Grok voice over xAI OAuth. `/xai-voice [language] [live|clip]`, Ctrl+Space, and F8 provide Grok Build–style dictation that inserts text at the editor cursor without submitting. Live mode (the default) streams the microphone to the pinned `wss://api.x.ai/v1/stt` socket with the OAuth (or built-in `xai` API-key) bearer on the WebSocket handshake and shows words as they are recognized; if the live stream fails, Enter uploads the in-memory recording once to `https://api.x.ai/v1/stt` instead. Clip mode keeps audio local until Enter. A system recorder (`pw-record`, `parec`, `arecord`, or SoX on Linux; SoX or FFmpeg on macOS; SoX elsewhere) captures 16 kHz mono audio in memory for up to five minutes; capture that ends on its own waits for an explicit choice. Silent clips are stopped after ten seconds and never uploaded, credentials are checked before the microphone opens, a second press of the shortcut stops dictation, and the language (one of Grok's 25 speech-to-text codes, or `auto`) and mode are kept for the Pi session.
@@ -16,7 +18,7 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ### Changed
 
-- Raise the latest exact Pi test boundary from 1.0.0 to 1.0.4 (development dependencies and the packed `latest` matrix job). The peer range is unchanged. Pi 1.0.4 passed clean packed candidate tests, loader checks, CLI checks, and typechecks; its 1.0.1–1.0.4 changes need no extension migration.
+- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.2.0`, with exact packed test boundaries at 0.80.1 and 1.1.0 (development dependencies and the packed `latest` matrix job). Pi 1.0.4 and 1.1.0 passed clean packed candidate tests, loader checks, CLI checks, and typechecks; their changes since 1.0.0 are additive for extensions and need no migration. Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported.
 
 ## 1.6.1 - 2026-10-02
 

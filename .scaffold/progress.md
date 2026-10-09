@@ -1,3 +1,13 @@
+# Execution Progress — v1.7.0 release with Pi 1.1 support
+
+**Branch:** `feature/pi-1.1-release-1.7.0` (from `main` @ 5d60258)
+
+- [x] Pi 1.1.0 review: release notes are additive for extensions (tool-render `durationMs`/`outputPad`, `agent_settled.aborted`, OSC 7501 status); the extension uses none of the changed surfaces. Packed candidate run passed (1095 tests, loader, CLI, typecheck).
+- [x] Widened the 1.x peer interval to `>=1.0.0 <1.2.0`; `latest` and exact dev dependencies at 1.1.0; upper sentinel 1.2.0; policy test cases updated.
+- [x] `npm audit fix` (lockfile only, dev tree): brace-expansion 5.0.9 -> 5.0.12, source-map-js 1.2.1 -> 1.2.2; `npm audit` reports 0 vulnerabilities. Supersedes Dependabot #236.
+- [x] Version 1.7.0 in package.json and lockfile; CHANGELOG Unreleased dated as 1.7.0; README release banner, compatibility, and updating sections.
+- [ ] After merge: publish a GitHub Release tagged `v1.7.0` on main; `publish.yml` runs only on `release: published`.
+
 # Execution Progress — Grok voice
 
 **Branch:** `feature/grok-voice` (from `main` @ 1aa4676)
