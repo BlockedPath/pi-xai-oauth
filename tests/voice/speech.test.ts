@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, realpath, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -16,7 +16,8 @@ let sessions: string;
 
 beforeEach(async () => {
   temp = await createTempDir("pi-xai-tts-");
-  sessions = join(temp.path, "sessions");
+  // Saved audio paths are real paths; macOS tmpdir() sits under the /var -> /private/var symlink.
+  sessions = join(await realpath(temp.path), "sessions");
   await mkdir(sessions);
 });
 
