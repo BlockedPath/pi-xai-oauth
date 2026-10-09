@@ -151,6 +151,37 @@ describe("Grok voice chat session", () => {
     env.session.end(false);
   });
 
+  it("flushes each finished reply through the player with trailing silence", async () => {
+    const env = makeSession();
+    await env.session.start();
+    // A reply with no audio needs no flush.
+    env.handlers().onResponseDone();
+    expect(env.player.written).toHaveLength(0);
+    // 9,600 bytes is 200 ms of 24 kHz PCM16; 400 ms of silence follows it.
+    env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_1");
+    env.handlers().onResponseDone();
+    env.handlers().onResponseDone();
+    expect(env.player.written.map((chunk) => chunk.length)).toEqual([9_600, 19_200]);
+    expect(env.player.written[1]!.every((byte) => byte === 0)).toBe(true);
+    env.advance(599);
+    expect(env.session.speaking).toBe(true);
+    env.advance(1);
+    expect(env.session.speaking).toBe(false);
+    // The microphone stays muted through the silence plus the echo tail.
+    env.advance(599);
+    env.recording.emit(speechPcm(10));
+    expect(env.conversation.appended).toHaveLength(0);
+    env.advance(1);
+    env.recording.emit(speechPcm(10));
+    expect(env.conversation.appended).toHaveLength(1);
+    // An interrupted reply is discarded, not flushed.
+    env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_2");
+    env.session.interrupt();
+    env.handlers().onResponseDone();
+    expect(env.player.written).toHaveLength(3);
+    env.session.end(false);
+  });
+
   it("does not let speech interrupt Grok in half-duplex mode", async () => {
     const env = makeSession();
     await env.session.start();

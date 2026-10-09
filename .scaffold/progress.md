@@ -17,6 +17,7 @@
 - [x] Talk-back voice chat (user request: "I want a feature for it to talk back to me ... through OAuth"): `/xai-talk` on `wss://api.x.ai/v1/realtime` with the OAuth bearer, following OpenClaw's OAuth-authenticated xAI realtime bridge; system audio player walk; non-retaining 24 kHz mic stream; half-duplex default, duplex barge-in with truncation, Space interrupt, captions, Enter inserts transcript, opt-in `context`.
 - [x] Pi 1.0.4 review (PR #235 registry gate): 1.0.1–1.0.4 changelog needs no extension migration; packed candidate run passed (tests, loader, CLI, typecheck). `policy.latest`, exact dev dependencies, lockfile, policy test, README, and CHANGELOG moved to 1.0.4; peer range unchanged.
 - [x] Voice chat duplicate captions (user report: "it sends the voice to text multiple copies"): xAI resends cumulative input-transcription snapshots per item (OpenClaw `realtime-voice-events.ts`), so user captions are keyed by `item_id` or speech turn and revised in place; duplicate assistant finals and late output from finished/cancelled responses are dropped. Regression test fails on the previous code.
+- [x] Voice chat replies cut off at the end (user report): system players read stdin in whole blocks (SoX ~170 ms, aplay one period), holding a reply's last syllables until the next reply. Each finished reply that produced audio is followed by 400 ms of silence, counted in the half-duplex playback estimate; interrupted replies are not flushed. Verified the holdback and flush with a real ffmpeg pipe reader.
 
 ## Notes
 
