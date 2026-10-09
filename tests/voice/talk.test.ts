@@ -243,6 +243,43 @@ describe("Grok voice chat session", () => {
     env.session.end(false);
   });
 
+  it("keeps one caption per utterance when xAI resends cumulative transcript snapshots", async () => {
+    const env = makeSession();
+    await env.session.start();
+    const h = env.handlers();
+    h.onSpeechStarted();
+    h.onUserText("How", true, "speech-1");
+    h.onAssistantText("Earth is", false);
+    h.onUserText("How big is Earth?", true, "speech-1");
+    h.onAssistantText("Earth is about 12,742 km across.", true);
+    h.onResponseDone();
+    h.onUserText("How big is Earth?", true, "speech-1");
+    h.onSpeechStarted();
+    h.onUserText("Ag", false, "item_b");
+    h.onUserText("ain", false, "item_b");
+    h.onUserText("Again", true, "item_b");
+    h.onAssistantText("Sure.", true);
+    h.onResponseDone();
+    h.onSpeechStarted();
+    h.onUserText("Again", true, "item_c");
+    h.onUserText("How big is Earth, really?", true, "speech-1");
+    expect(env.session.lines).toEqual([
+      { role: "you", text: "How big is Earth, really?", final: true, key: "speech-1" },
+      { role: "grok", text: "Earth is about 12,742 km across.", final: true },
+      { role: "you", text: "Again", final: true, key: "item_b" },
+      { role: "grok", text: "Sure.", final: true },
+      { role: "you", text: "Again", final: true, key: "item_c" },
+    ]);
+    expect(env.session.transcript()).toBe(
+      "Voice chat with Grok:\nYou: How big is Earth, really?\nGrok: Earth is about 12,742 km across.\n"
+        + "You: Again\nGrok: Sure.\nYou: Again",
+    );
+    // Captions without an earlier placeholder start their own line.
+    h.onUserText("Late", true, "item_d");
+    expect(env.session.lines.at(-1)).toEqual({ role: "you", text: "Late", final: true, key: "item_d" });
+    env.session.end(false);
+  });
+
   it("ends once with duration, transcript, and reason, releasing every resource", async () => {
     const env = makeSession();
     await env.session.start();

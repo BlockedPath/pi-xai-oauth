@@ -15,7 +15,7 @@ function handlers() {
   const value: XaiRealtimeHandlers = {
     onAudio: (pcm, itemId) => events.push(["audio", pcm, itemId]),
     onAssistantText: (text, final) => events.push(["grok", text, final]),
-    onUserText: (text, final) => events.push(["you", text, final]),
+    onUserText: (text, final, key) => events.push(["you", text, final, key]),
     onSpeechStarted: () => events.push(["speech"]),
     onResponseDone: () => events.push(["done"]),
     onWarning: (message) => events.push(["warning", message]),
@@ -137,10 +137,79 @@ describe("xAI realtime voice chat", () => {
       ["grok", "Hel", false],
       ["grok", "lo[2J", false],
       ["grok", "Hello.", true],
-      ["you", "hi", false],
-      ["you", "Hi there.", true],
+      ["you", "hi", false, "speech-0"],
+      ["you", "Hi there.", true, "speech-0"],
       ["speech"],
       ["done"],
+    ]);
+  });
+
+  it("keys cumulative input snapshots by item, falling back to the speech turn", async () => {
+    const { socket, events } = await ready();
+    socket.message({ type: "input_audio_buffer.speech_started" });
+    socket.message({ type: "conversation.item.input_audio_transcription.completed", transcript: "How" });
+    socket.message({ type: "conversation.item.input_audio_transcription.completed", transcript: "How big is Earth?" });
+    socket.message({ type: "input_audio_buffer.speech_started" });
+    socket.message({ type: "conversation.item.input_audio_transcription.delta", item_id: "item_b", delta: "Ag" });
+    socket.message({ type: "conversation.item.input_audio_transcription.updated", item_id: "item_b", transcript: "Again" });
+    socket.message({ type: "conversation.item.input_audio_transcription.completed", item_id: "item_b", transcript: "Again" });
+    socket.message({ type: "conversation.item.input_audio_transcription.completed", item_id: "x".repeat(300), transcript: "Long" });
+    expect(events).toEqual([
+      ["speech"],
+      ["you", "How", true, "speech-1"],
+      ["you", "How big is Earth?", true, "speech-1"],
+      ["speech"],
+      ["you", "Ag", false, "item_b"],
+      ["you", "Again", true, "item_b"],
+      ["you", "Again", true, "item_b"],
+      ["you", "Long", true, "x".repeat(128)],
+    ]);
+  });
+
+  it("delivers each reply's final caption once and drops output from finished or cancelled responses", async () => {
+    const { conversation, socket, events } = await ready();
+    const pcm = speechPcm(2);
+    socket.message({ type: "response.created" });
+    socket.message({ type: "response.output_audio_transcript.delta", delta: "Hi" });
+    socket.message({ type: "response.output_audio_transcript.done", transcript: "Hi." });
+    socket.message({ type: "response.output_text.done", text: "Hi." });
+    socket.message({ type: "response.done" });
+    socket.message({ type: "response.output_audio.delta", item_id: "late", delta: pcm.toString("base64") });
+    socket.message({ type: "response.output_audio_transcript.done", transcript: "late" });
+    socket.message({ type: "response.done" });
+    socket.message({ type: "input_audio_buffer.speech_started" });
+    socket.message({ type: "response.created" });
+    expect(conversation.responseActive).toBe(true);
+    socket.message({ type: "response.output_audio.delta", item_id: "b", delta: pcm.toString("base64") });
+    socket.message({ type: "response.output_audio_transcript.done", transcript: "Sure." });
+    conversation.cancelResponse();
+    socket.message({ type: "response.output_audio.delta", item_id: "b", delta: pcm.toString("base64") });
+    socket.message({ type: "response.done" });
+    expect(events).toEqual([
+      ["grok", "Hi", false],
+      ["grok", "Hi.", true],
+      ["done"],
+      ["speech"],
+      ["audio", pcm, "b"],
+      ["grok", "Sure.", true],
+    ]);
+
+    // Without response.created announcements nothing is fenced.
+    const unannounced = await ready();
+    unannounced.socket.message({ type: "response.output_audio.delta", item_id: "c", delta: pcm.toString("base64") });
+    unannounced.socket.message({ type: "response.done" });
+    unannounced.socket.message({ type: "response.output_audio.delta", item_id: "d", delta: pcm.toString("base64") });
+    unannounced.socket.message({ type: "response.output_audio_transcript.done", transcript: "First." });
+    unannounced.socket.message({ type: "response.output_audio_transcript.done", transcript: "First." });
+    unannounced.socket.message({ type: "response.done" });
+    unannounced.socket.message({ type: "response.output_audio_transcript.done", transcript: "Second." });
+    expect(unannounced.events).toEqual([
+      ["audio", pcm, "c"],
+      ["done"],
+      ["audio", pcm, "d"],
+      ["grok", "First.", true],
+      ["done"],
+      ["grok", "Second.", true],
     ]);
   });
 

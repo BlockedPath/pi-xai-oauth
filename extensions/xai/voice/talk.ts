@@ -47,6 +47,8 @@ export interface XaiTalkLine {
   role: "you" | "grok";
   text: string;
   final: boolean;
+  /** The input item a user caption belongs to; xAI revises each item in place. */
+  key?: string;
 }
 
 /** How a voice chat ended. */
@@ -217,7 +219,8 @@ export class XaiTalkSession {
     return {
       onAudio: (pcm, itemId) => this.onAudio(pcm, itemId),
       onAssistantText: (text, final) => this.caption("grok", text, final),
-      onUserText: (text, final) => this.caption("you", text, final),
+      onUserText: (text, final, key) =>
+        key === undefined ? this.caption("you", text, final) : this.userCaption(text, final, key),
       onSpeechStarted: () => {
         this.pendingUserLine();
         if (this.duplex && (this.speaking || this.conversation?.responseActive)) this.interrupt();
@@ -268,7 +271,33 @@ export class XaiTalkSession {
 
   private pendingUserLine() {
     const last = this.lastLine("you");
-    if (!last || last.final) this.push({ role: "you", text: "", final: false });
+    if (!last || last.final || last.key !== undefined) this.push({ role: "you", text: "", final: false });
+  }
+
+  /**
+   * xAI resends cumulative snapshots of each utterance (and may repeat them
+   * after Grok replies), so revise that item's caption in place. A new item
+   * fills the placeholder opened when its speech started.
+   */
+  private userCaption(text: string, final: boolean, key: string) {
+    let line: XaiTalkLine | undefined;
+    for (let index = this.lines.length - 1; index >= 0 && !line; index -= 1) {
+      const candidate = this.lines[index]!;
+      if (candidate.role === "you" && candidate.key === key) line = candidate;
+    }
+    if (!line) {
+      const last = this.lastLine("you");
+      if (last && last.key === undefined && !last.final && !last.text) {
+        line = last;
+        line.key = key;
+      }
+    }
+    if (!line) {
+      this.push({ role: "you", text: capText(text.trim()), final, key });
+      return;
+    }
+    line.text = capText(final ? text.trim() : `${line.text}${text}`);
+    line.final = final;
   }
 
   private caption(role: XaiTalkLine["role"], text: string, final: boolean) {

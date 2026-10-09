@@ -25,10 +25,14 @@ const BENIGN_ERROR_PATTERN = /no active response|already has an active response/
 export interface XaiRealtimeHandlers {
   /** Grok's synthesized speech as PCM16LE mono at 24 kHz. */
   onAudio(pcm: Buffer, itemId?: string): void;
-  /** Grok's spoken words; `final` text replaces the deltas for that reply. */
+  /** Grok's spoken words; `final` text replaces the deltas for that reply and arrives once per reply. */
   onAssistantText(text: string, final: boolean): void;
-  /** Captions of the user's speech; `final` text replaces the deltas for that turn. */
-  onUserText(text: string, final: boolean): void;
+  /**
+   * Captions of the user's speech for one input item (`key`). xAI resends
+   * cumulative snapshots of an utterance while it revises it, so `final`
+   * text replaces that item's caption rather than starting a new turn.
+   */
+  onUserText(text: string, final: boolean, key?: string): void;
   /** Server VAD heard the user start speaking. */
   onSpeechStarted(): void;
   /** A response finished or was cancelled. */
@@ -149,6 +153,10 @@ export async function connectXaiRealtime(
   let closed = false;
   let ended = false;
   let responseActive = false;
+  // Tracked only once xAI announces responses with `response.created`.
+  let response: "none" | "active" | "ended" = "none";
+  let assistantFinal = false;
+  let speechSequence = 0;
   let carry: Uint8Array | undefined;
   let settleReady: ((error?: XaiVoiceOperationError) => void) | undefined;
 
@@ -175,6 +183,10 @@ export async function connectXaiRealtime(
     ended = true;
     handlers.onClose(reason);
   };
+  const inputKey = (message: any): string =>
+    typeof message.item_id === "string" && message.item_id
+      ? message.item_id.slice(0, 128)
+      : `speech-${speechSequence}`;
 
   socket.addEventListener("open", () => send(buildXaiRealtimeSessionUpdate(options.voice, options.instructions)));
   socket.addEventListener("message", (event: any) => {
@@ -204,9 +216,14 @@ export async function connectXaiRealtime(
       }
       return;
     }
+    // A finished or cancelled response is retired: drop its late output so it
+    // can neither replay audio after an interrupt nor repeat a caption.
+    if (response === "ended" && type.startsWith("response.") && type !== "response.created") return;
     switch (type) {
       case "response.created":
+        response = "active";
         responseActive = true;
+        assistantFinal = false;
         return;
       case "response.output_audio.delta": {
         const audio = decodeAudio(message.delta ?? message.data);
@@ -222,31 +239,39 @@ export async function connectXaiRealtime(
       case "response.output_text.delta":
       case "response.text.delta": {
         const text = cleanText(message.delta);
-        if (text) handlers.onAssistantText(text, false);
+        if (!text) return;
+        assistantFinal = false;
+        handlers.onAssistantText(text, false);
         return;
       }
       case "response.output_audio_transcript.done":
       case "response.output_text.done":
       case "response.text.done": {
         const text = cleanText(message.transcript ?? message.text);
-        if (text) handlers.onAssistantText(text, true);
+        if (!text || assistantFinal) return;
+        assistantFinal = true;
+        handlers.onAssistantText(text, true);
         return;
       }
       case "conversation.item.input_audio_transcription.delta": {
         const text = cleanText(message.delta);
-        if (text) handlers.onUserText(text, false);
+        if (text) handlers.onUserText(text, false, inputKey(message));
         return;
       }
+      case "conversation.item.input_audio_transcription.updated":
       case "conversation.item.input_audio_transcription.completed": {
         const text = cleanText(message.transcript);
-        if (text) handlers.onUserText(text, true);
+        if (text) handlers.onUserText(text, true, inputKey(message));
         return;
       }
       case "input_audio_buffer.speech_started":
+        speechSequence += 1;
         handlers.onSpeechStarted();
         return;
       case "response.done":
         responseActive = false;
+        assistantFinal = false;
+        if (response === "active") response = "ended";
         handlers.onResponseDone();
         return;
       case "error": {
@@ -315,6 +340,7 @@ export async function connectXaiRealtime(
     cancelResponse() {
       if (!responseActive) return;
       responseActive = false;
+      if (response === "active") response = "ended";
       send({ type: "response.cancel" });
     },
     truncate(itemId, audioEndMs) {
