@@ -112,6 +112,30 @@ describe("Grok voice audio player", () => {
     player.close();
   });
 
+  it("finishes a player so it drains, starts a fresh one next, and kills draining players on stop and close", async () => {
+    const { spawn, spawned } = fakeSpawn({ first: () => undefined });
+    const player = await startXaiAudioPlayer({ spawn, commands: [commands[0]!], startGraceMs: 5 });
+    player.finish();
+    player.finish();
+    expect(spawned[0]!.child.stdin.writableEnded).toBe(true);
+    expect(spawned[0]!.child.kills).toEqual([]);
+    player.write(Buffer.from([1, 2]));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(spawned).toHaveLength(2);
+    expect(Buffer.concat(spawned[1]!.child.written)).toEqual(Buffer.from([1, 2]));
+    player.finish();
+    // A drained player that exited on its own is forgotten.
+    spawned[0]!.child.emit("close", 0, null);
+    player.stop();
+    expect(spawned[0]!.child.kills).toEqual([]);
+    expect(spawned[1]!.child.kills).toEqual(["SIGKILL"]);
+    player.write(Buffer.from([3]));
+    await new Promise((resolve) => setImmediate(resolve));
+    player.finish();
+    player.close();
+    expect(spawned[2]!.child.kills).toEqual(["SIGKILL"]);
+  });
+
   it("explains missing players and joins start failures", async () => {
     const enoent = (child: FakePlayer) => child.emit("error", Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     const missing = await startXaiAudioPlayer({ spawn: fakeSpawn({ first: enoent, second: enoent }).spawn, commands, platform: "darwin", startGraceMs: 5 })
@@ -139,6 +163,25 @@ describe("Grok voice audio player", () => {
     });
     player.write(Buffer.from([1, 2, 3, 4]));
     await vi.waitFor(async () => expect(await readFile(output)).toEqual(Buffer.from([1, 2, 3, 4])));
+    player.close();
+  });
+
+  it("drains a finished real player to the end and plays the next reply in a new process", async () => {
+    const output = join(temp.path, "replies.raw");
+    // Like SoX or aplay, this player only writes whole 4-byte blocks until stdin ends.
+    const script = `const fs=require('fs');let held=Buffer.alloc(0);`
+      + `process.stdin.on('data',(c)=>{held=Buffer.concat([held,c]);const n=held.length-held.length%4;`
+      + `if(n){fs.appendFileSync(${JSON.stringify(output)},held.subarray(0,n));held=held.subarray(n);}});`
+      + `process.stdin.on('end',()=>{fs.appendFileSync(${JSON.stringify(output)},held);});`;
+    const player = await startXaiAudioPlayer({ commands: [{ program: process.execPath, args: ["-e", script] }], startGraceMs: 150 });
+    player.finish();
+    player.write(Buffer.from([1, 2, 3, 4, 5, 6]));
+    await vi.waitFor(async () => expect(await readFile(output)).toEqual(Buffer.from([1, 2, 3, 4])));
+    player.finish();
+    await vi.waitFor(async () => expect(await readFile(output)).toEqual(Buffer.from([1, 2, 3, 4, 5, 6])));
+    player.write(Buffer.from([7, 8]));
+    player.finish();
+    await vi.waitFor(async () => expect(await readFile(output)).toEqual(Buffer.from([1, 2, 3, 4, 5, 6, 7, 8])));
     player.close();
   });
 });

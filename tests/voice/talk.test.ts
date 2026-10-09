@@ -68,7 +68,7 @@ function fakeRecording() {
 function fakePlayer() {
   return { program: "fake-player", written: [] as Buffer[], write: vi.fn(function (this: any, pcm: Buffer) {
     this.written.push(pcm);
-  }), stop: vi.fn(), close: vi.fn() };
+  }), finish: vi.fn(), stop: vi.fn(), close: vi.fn() };
 }
 
 function makeSession(options: { duplex?: boolean; connect?: () => Promise<any>; startPlayer?: () => Promise<any>; startRecording?: () => Promise<any> } = {}) {
@@ -106,6 +106,8 @@ describe("Grok voice chat session", () => {
     const order: string[] = [];
     const conversation = fakeConversation();
     const recording = fakeRecording();
+    const player = fakePlayer();
+    player.finish.mockImplementation(() => order.push("release player"));
     const session = new XaiTalkSession({
       voice: "eve",
       duplex: false,
@@ -116,7 +118,7 @@ describe("Grok voice chat session", () => {
       },
       startPlayer: async () => {
         order.push("player");
-        return fakePlayer();
+        return player;
       },
       startRecording: async () => {
         order.push("microphone");
@@ -125,7 +127,9 @@ describe("Grok voice chat session", () => {
     });
     expect(renderXaiTalk(session, 200)[0]).toBe("Grok voice chat (eve) — Connecting…");
     await session.start();
-    expect(order).toEqual(["connect", "player", "microphone"]);
+    // The checked player is released once the microphone is on, so a Bluetooth
+    // headset's hands-free switch happens before the first reply opens output.
+    expect(order).toEqual(["connect", "player", "microphone", "release player"]);
     expect(session.state).toBe("live");
     recording.emit(speechPcm(10));
     expect(conversation.appended).toEqual([speechPcm(10)]);
@@ -151,18 +155,19 @@ describe("Grok voice chat session", () => {
     env.session.end(false);
   });
 
-  it("flushes each finished reply through the player with trailing silence", async () => {
+  it("finishes each reply's player so it drains, allowing for the drain in half-duplex", async () => {
     const env = makeSession();
     await env.session.start();
-    // A reply with no audio needs no flush.
+    expect(env.player.finish).toHaveBeenCalledTimes(1);
+    // A reply with no audio has nothing to drain.
     env.handlers().onResponseDone();
-    expect(env.player.written).toHaveLength(0);
-    // 9,600 bytes is 200 ms of 24 kHz PCM16; 400 ms of silence follows it.
+    expect(env.player.finish).toHaveBeenCalledTimes(1);
+    // 9,600 bytes is 200 ms of 24 kHz PCM16, then a 400 ms drain allowance.
     env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_1");
     env.handlers().onResponseDone();
     env.handlers().onResponseDone();
-    expect(env.player.written.map((chunk) => chunk.length)).toEqual([9_600, 19_200]);
-    expect(env.player.written[1]!.every((byte) => byte === 0)).toBe(true);
+    expect(env.player.finish).toHaveBeenCalledTimes(2);
+    expect(env.player.written.map((chunk) => chunk.length)).toEqual([9_600]);
     env.advance(599);
     expect(env.session.speaking).toBe(true);
     env.advance(1);
@@ -174,11 +179,12 @@ describe("Grok voice chat session", () => {
     env.advance(1);
     env.recording.emit(speechPcm(10));
     expect(env.conversation.appended).toHaveLength(1);
-    // An interrupted reply is discarded, not flushed.
+    // An interrupted reply is discarded, not drained.
     env.handlers().onAudio(Buffer.alloc(9_600, 1), "item_2");
     env.session.interrupt();
     env.handlers().onResponseDone();
-    expect(env.player.written).toHaveLength(3);
+    expect(env.player.stop).toHaveBeenCalledTimes(1);
+    expect(env.player.finish).toHaveBeenCalledTimes(2);
     env.session.end(false);
   });
 

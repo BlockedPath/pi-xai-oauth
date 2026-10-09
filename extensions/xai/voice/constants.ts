@@ -88,11 +88,10 @@ export const XAI_TALK_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 /** Half-duplex keeps the microphone muted until this long after Grok's audio should have finished. */
 export const XAI_TALK_ECHO_TAIL_MS = 600;
 /**
- * Silence written after each spoken reply. Players read stdin in whole blocks
- * (SoX about 170 ms, aplay one period), so without it a reply's last syllables
- * wait in the player until the next reply arrives.
+ * Allowance after each spoken reply for its player to drain and the next one
+ * to start; half-duplex keeps the microphone muted through it.
  */
-export const XAI_TALK_PLAYBACK_FLUSH_MS = 400;
+export const XAI_TALK_PLAYBACK_DRAIN_MS = 400;
 export const XAI_TALK_MAX_CONTEXT_CHARS = 8_000;
 export const XAI_TALK_MAX_LINE_CHARS = 4_000;
 export const XAI_TALK_MAX_LINES = 200;

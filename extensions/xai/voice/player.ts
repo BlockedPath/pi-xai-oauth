@@ -13,8 +13,14 @@ const MAX_PENDING_PLAYBACK_BYTES = 16 * 1024 * 1024;
 export interface XaiAudioPlayer {
   /** The player program that is running. */
   readonly program: string;
-  /** Queue audio; a stopped player restarts on the next write. */
+  /** Queue audio; a stopped or finished player restarts on the next write. */
   write(pcm: Buffer): void;
+  /**
+   * Let everything queued play to the end, then exit. The next write starts a
+   * fresh player that opens the output at its current format, which matters
+   * when a Bluetooth headset switches profiles because its microphone opened.
+   */
+  finish(): void;
   /** Drop everything queued or playing right now (used when interrupting). */
   stop(): void;
   /** Stop playback and release the player. */
@@ -181,12 +187,20 @@ function createPlayer(
 ): XaiAudioPlayer {
   let child: ChildProcess | undefined = first;
   let closed = false;
+  // Finished players still playing their last audio; killed on stop and close.
+  const draining = new Set<ChildProcess>();
   const forget = (exited: ChildProcess) => {
     if (child === exited) child = undefined;
   };
   first.once("close", () => forget(first));
-  const killOnExit = () => killQuietly(child);
-  process.once("exit", killOnExit);
+  const killAll = () => {
+    const current = child;
+    child = undefined;
+    killQuietly(current);
+    for (const finished of draining) killQuietly(finished);
+    draining.clear();
+  };
+  process.once("exit", killAll);
 
   return {
     program: command.program,
@@ -209,18 +223,26 @@ function createPlayer(
         // A player that died mid-write restarts on the next chunk.
       }
     },
-    stop() {
+    finish() {
       const current = child;
+      if (!current) return;
       child = undefined;
-      killQuietly(current);
+      draining.add(current);
+      current.once("close", () => draining.delete(current));
+      try {
+        current.stdin?.end();
+      } catch {
+        killQuietly(current);
+      }
+    },
+    stop() {
+      killAll();
     },
     close() {
       if (closed) return;
       closed = true;
-      process.removeListener("exit", killOnExit);
-      const current = child;
-      child = undefined;
-      killQuietly(current);
+      process.removeListener("exit", killAll);
+      killAll();
     },
   };
 }
