@@ -121,25 +121,37 @@ function setup(options: {
 function tuiContext(editorText = "draft") {
   const notices: Array<{ message: string; type?: string }> = [];
   let component: any;
+  const editor = { text: editorText };
   const ui = {
     notify: (message: string, type?: string) => notices.push({ message, type }),
+    // Like Pi's showExtensionCustom, closing the component restores the editor's pre-dialog draft.
     custom: vi.fn((factory: any) => new Promise((resolve) => {
+      const saved = editor.text;
       component = factory(
         { requestRender: vi.fn() },
         { fg: (_role: string, text: string) => text },
         { matches: (data: string, id: string) => (id === "tui.select.confirm" && data === "enter") || (id === "tui.select.cancel" && data === "escape") },
-        resolve,
+        (result: unknown) => {
+          editor.text = saved;
+          resolve(result);
+          component?.dispose?.();
+        },
       );
     })),
-    pasteToEditor: vi.fn(),
-    getEditorText: vi.fn(() => editorText),
-    setEditorText: vi.fn(),
+    pasteToEditor: vi.fn((text: string) => {
+      editor.text += text;
+    }),
+    getEditorText: vi.fn(() => editor.text),
+    setEditorText: vi.fn((text: string) => {
+      editor.text = text;
+    }),
     select: vi.fn(),
   };
   return {
     ctx: { mode: "tui", hasUI: true, ui, model: undefined, modelRegistry: {} },
     ui,
     notices,
+    editor,
     component: async () => {
       await vi.waitFor(() => expect(component).toBeDefined());
       return component;
@@ -227,7 +239,7 @@ describe("Grok voice dictation", () => {
   it("streams live over the OAuth bearer, shows words as they arrive, and inserts the transcript", async () => {
     const env = setup();
     const live = env.live as ReturnType<typeof fakeLive>;
-    const { ui, notices, running, view } = await startTui(env);
+    const { ui, notices, running, view, editor } = await startTui(env);
     await vi.waitFor(() => expect(env.connectLive).toHaveBeenCalledTimes(1));
     const options = env.connectLive.mock.calls[0]![0] as any;
     expect(options).toMatchObject({ credential, language: "en" });
@@ -254,6 +266,7 @@ describe("Grok voice dictation", () => {
     expect(env.resolveCredential).toHaveBeenCalledTimes(1);
     expect(live.close).toHaveBeenCalled();
     expect(ui.pasteToEditor).toHaveBeenCalledWith(" hello world");
+    expect(editor.text).toBe("draft hello world");
     expect(notices).toEqual([]);
   });
 
