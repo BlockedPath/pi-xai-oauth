@@ -16,6 +16,8 @@ import { resolveXaiRoute } from "./xai/routing";
 import { registerXaiTools, syncXaiToolsForModel } from "./xai/tools";
 import { registerXaiUsage } from "./xai/usage";
 import { createXaiVisionRoutingController } from "./xai/vision-routing";
+import { registerXaiVoice } from "./xai/voice/dictation";
+import { registerXaiTalk } from "./xai/voice/talk";
 
 /** Register the xAI OAuth provider and its authenticated model catalog. */
 export default async function (pi: ExtensionAPI) {
@@ -188,6 +190,8 @@ export default async function (pi: ExtensionAPI) {
   };
 
   registerXaiTools(pi, visionRouting);
+  const xaiVoice = registerXaiVoice(pi);
+  const xaiTalk = registerXaiTalk(pi);
 
   if (typeof (pi as any).on === "function") {
     // Active-tool accessors belong to the ExtensionAPI (`pi`), while models
@@ -195,6 +199,8 @@ export default async function (pi: ExtensionAPI) {
     (pi as any).on("session_start", async (_event: any, ctx: any) => {
       xaiUsage.reset(ctx);
       visionRouting.reset();
+      xaiVoice.reset();
+      xaiTalk.reset();
       await refreshDeferredCatalog(ctx);
       syncXaiToolsForModel(pi, ctx?.model, { resetNetworkTools: true });
     });
@@ -267,6 +273,8 @@ export default async function (pi: ExtensionAPI) {
     (pi as any).on("session_shutdown", (_event: any, ctx: any) => {
       xaiUsage.reset(ctx);
       visionRouting.reset();
+      xaiVoice.reset();
+      xaiTalk.reset();
     });
   }
 }

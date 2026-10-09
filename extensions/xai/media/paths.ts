@@ -53,24 +53,6 @@ function assembleBoundedRead(chunks: readonly Buffer[], total: number, maxBytes:
   return Buffer.concat(chunks, total);
 }
 
-async function readHandleBounded(
-  handle: Awaited<ReturnType<typeof open>>,
-  maxBytes: number,
-  signal?: AbortSignal,
-): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  let total = 0;
-  while (total <= maxBytes) {
-    throwIfAborted(signal);
-    const chunk = nextReadChunk(maxBytes, total);
-    const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
-    if (bytesRead === 0) break;
-    chunks.push(chunk.subarray(0, bytesRead));
-    total += bytesRead;
-  }
-  return assembleBoundedRead(chunks, total, maxBytes);
-}
-
 function readDescriptorBounded(fd: number, maxBytes: number): Buffer {
   const chunks: Buffer[] = [];
   let total = 0;
@@ -100,15 +82,36 @@ function imageOpenFlags(): number {
   return constants.O_RDONLY | noFollow | nonBlock;
 }
 
-/** Read a byte-bounded regular image whose resolved path remains inside the workspace. */
-export async function readBoundedWorkspaceImageFile(
+export interface BoundedWorkspaceFileOptions {
+  /** Maximum accepted file size in bytes. */
+  maxBytes: number;
+  /** User-facing subject that prefixes every sanitized error message. */
+  label: string;
+  /** Caller cancellation checked between bounded reads. */
+  signal?: AbortSignal;
+}
+
+/**
+ * Read a byte-bounded regular file whose resolved path remains inside the
+ * workspace. Symlinks are resolved once, the final open refuses symlinks, the
+ * opened handle must match the inspected file identity, and every failure is
+ * reduced to a stable `label`-prefixed message.
+ */
+export async function readBoundedWorkspaceFile(
   inputPath: string,
   workspaceRoot: string,
-  signal?: AbortSignal,
-): Promise<VerifiedImageBytes> {
-  validateWorkspacePathInputs(inputPath, workspaceRoot);
+  options: BoundedWorkspaceFileOptions,
+): Promise<Buffer> {
+  const { label, maxBytes, signal } = options;
+  if (typeof inputPath !== "string" || !inputPath.trim() || inputPath.includes("\0")) {
+    throw new Error(`${label} path is invalid.`);
+  }
+  if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
+    throw new Error("Workspace root is unavailable.");
+  }
   throwIfAborted(signal);
 
+  const unreadable = () => new Error(`${label} is not a readable workspace file.`);
   let root: string;
   let target: string;
   let initialStat: Awaited<ReturnType<typeof fsStat>>;
@@ -118,28 +121,59 @@ export async function readBoundedWorkspaceImageFile(
     initialStat = await fsStat(candidate, { bigint: true });
     target = await realpath(candidate);
   } catch {
-    throw new Error("Image reference is not a readable workspace file.");
+    throw unreadable();
   }
-  if (!isContainedPath(root, target)) throw new Error("Image reference resolves outside the workspace.");
+  if (!isContainedPath(root, target)) throw new Error(`${label} resolves outside the workspace.`);
 
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
-    if (!initialStat.isFile()) throw new Error("Image reference must be a regular file.");
+    if (!initialStat.isFile()) throw new Error(`${label} must be a regular file.`);
     handle = await open(target, imageOpenFlags());
     const stat = await handle.stat({ bigint: true });
     if (!hasSameFileIdentity(initialStat, stat)) {
-      throw new Error("Image reference changed while being opened.");
+      throw new Error(`${label} changed while being opened.`);
     }
-    assertReadableImageStat(stat);
-    const bytes = await readHandleBounded(handle, MEDIA_MAX_SOURCE_BYTES, signal);
+    if (!stat.isFile()) throw new Error(`${label} must be a regular file.`);
+    if (stat.size <= 0n) throw new Error(`${label} contains no data.`);
+    if (stat.size > BigInt(maxBytes)) throw new Error(`${label} exceeds the source-byte limit.`);
+    const chunks: Buffer[] = [];
+    let total = 0;
+    while (total <= maxBytes) {
+      throwIfAborted(signal);
+      const chunk = nextReadChunk(maxBytes, total);
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
+      if (bytesRead === 0) break;
+      chunks.push(chunk.subarray(0, bytesRead));
+      total += bytesRead;
+    }
+    if (total > maxBytes) throw new Error(`${label} exceeds the source-byte limit.`);
+    return Buffer.concat(chunks, total);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    if (error instanceof Error && error.message.startsWith(`${label} `)) throw error;
+    throw unreadable();
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+/** Read a byte-bounded regular image whose resolved path remains inside the workspace. */
+export async function readBoundedWorkspaceImageFile(
+  inputPath: string,
+  workspaceRoot: string,
+  signal?: AbortSignal,
+): Promise<VerifiedImageBytes> {
+  const bytes = await readBoundedWorkspaceFile(inputPath, workspaceRoot, {
+    maxBytes: MEDIA_MAX_SOURCE_BYTES,
+    label: "Image reference",
+    signal,
+  });
+  try {
     const inspected = inspectSupportedImageBytes(bytes, { maxPixels: MEDIA_MAX_SOURCE_PIXELS });
     return { bytes, ...inspected, source: "workspace-path" };
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") throw error;
     if (shouldPreserveImageReadError(error)) throw error;
     throw new Error("Image reference is not a readable workspace file.");
-  } finally {
-    await handle?.close().catch(() => undefined);
   }
 }
 

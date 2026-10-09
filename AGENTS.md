@@ -6,13 +6,15 @@
 
 pi-xai-oauth is a pi-package that registers the optional xAI OAuth provider (`xai-auth`) and the authenticated account's OAuth-visible Grok model catalog, including Grok 4.7 when entitled, with Grok 4.6 retained as the curated offline fallback. Opt-in network tools and `/xai-usage` also work with Pi's built-in `xai` SuperGrok/X Premium chat provider; setup seeds `defaultProvider: xai` only when unset and never overwrites an existing provider choice.
 
-Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `extensions/xai/catalog.ts` → provider registration in `extensions/xai-oauth.ts` → browser PKCE or bounded device authorization in `extensions/xai/oauth.ts` / `extensions/xai/device-auth.ts` → pinned browser OIDC/JWKS validation in `extensions/xai/oidc.ts` → streaming via xAI API helpers in `extensions/xai/responses.ts`; explicit revision-pinned subscription usage lives in `extensions/xai/usage.ts`.
+Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `extensions/xai/catalog.ts` → provider registration in `extensions/xai-oauth.ts` → browser PKCE or bounded device authorization in `extensions/xai/oauth.ts` / `extensions/xai/device-auth.ts` → pinned browser OIDC/JWKS validation in `extensions/xai/oidc.ts` → streaming via xAI API helpers in `extensions/xai/responses.ts`; explicit revision-pinned subscription usage lives in `extensions/xai/usage.ts`; Grok voice dictation and the opt-in TTS/STT tools live in `extensions/xai/voice/`.
 
 ## Key Commands (Exact, Copy-Paste Ready)
 
 - Install / setup: `node bin/setup.js` or `npm run setup`
 - Install as pi extension: `pi install npm:pi-xai-oauth`
 - Explicit usage CSV export in Pi TUI/RPC: `/xai-usage csv` (normalized fields only, copyable output, no automatic file writes or status opt-in)
+- Grok voice dictation in Pi TUI/RPC: `/xai-voice [language|auto] [live|clip]`, Ctrl+Space, or F8 (needs a system recorder, a real microphone, and xAI OAuth; not runnable headless)
+- Grok voice chat in Pi TUI/RPC: `/xai-talk [eve|ara|rex|sal|leo] [duplex] [context]` (needs a recorder, an audio player, speakers or headphones, and xAI OAuth; not runnable headless)
 - Full policy/unit/loader/CLI gate: `npm test`
 - Focused Vitest suite: `npm run test:unit -- tests/oauth/browser-login.test.ts`
 - V8 coverage: `npm run test:coverage`
@@ -50,6 +52,9 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Keep normal Pi dev dependencies exact at the policy's latest tested release and review candidate releases before widening support
 - Resolve `x-userid` transiently from the pinned authenticated CLI-proxy `/user` endpoint before any billing request
 - Keep `/xai-usage` explicit, and keep its optional status off by default, session-scoped, bounded, and inactive outside xAI models
+- Send Grok voice audio and text only to the pinned `wss://api.x.ai/v1/stt`, `https://api.x.ai/v1/stt`, and `https://api.x.ai/v1/tts` routes with the OAuth (or built-in `xai` API-key) bearer; keep dictation audio in memory, stream it only in explicitly started live mode, upload clip-mode audio only after the user chooses to transcribe, never upload silent clips, and check credentials before opening the microphone
+- Keep `/xai-talk` on the pinned `wss://api.x.ai/v1/realtime` route with the bearer only on the handshake; stream microphone audio without retaining it, default to half-duplex, expose no tools to the voice model, and send Pi session text only on the explicit `context` opt-in
+- Spawn microphone recorders and audio players only from the fixed per-platform candidate lists with `shell: false`, bounded capture, and guaranteed kill on stop, cancel, reset, and process exit
 
 **MUST NOT:**
 
@@ -59,6 +64,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Log or reflect authorization codes, opaque device codes, tokens, PKCE verifiers, state, nonce, device/token response bodies, or authenticated request headers
 - Cache raw `/models-v2` responses, credentials, identity fields, endpoint URLs, or known API-key-only models
 - Persist, cache, log, or display `/user` identity, authenticated usage headers, or raw authenticated usage bodies
+- Write dictation audio to disk, auto-submit a transcript, accept remote or out-of-workspace audio files, or identify audio by file extension instead of leading bytes
 - Send `/billing?format=credits` when the transient authenticated `/user` lookup is missing, malformed, cancelled, oversized, redirected, or unsuccessful
 - Trust catalog-provided endpoints or route non-Responses models through the OAuth provider
 - Delete or revoke existing user credentials during validation
@@ -90,6 +96,7 @@ pi-xai-oauth/
 │       ├── image-edit.ts # Bounded pinned image-edit orchestration
 │       ├── media/        # Reusable strict media/path/compression/storage primitives
 │       ├── usage.ts      # Explicit bounded identity-first subscription usage command/status
+│       ├── voice/        # /xai-voice dictation, recorder walk, pinned TTS/STT clients, audio sniffing
 │       └── tools/        # Custom xAI tools + collision-free Grok-native adapters
 ├── compatibility/
 │   ├── pi-versions.json # Peer range plus exact minimum/latest matrix policy

@@ -72,6 +72,8 @@ describe("custom xAI tools", () => {
     ["xai_generate_image", { prompt: "guard" }],
     ["xai_edit_image", { prompt: "guard", image: [{ path: "secret.png" }] }],
     ["xai_image_to_video", { image: { path: "secret.png" } }],
+    ["xai_text_to_speech", { text: "guard" }],
+    ["xai_transcribe_audio", { path: "secret.wav" }],
     ["xai_analyze_image", { image: "https://example.test/a.png" }],
     ["xai_critique", { content: "guard" }],
   ])(
@@ -94,7 +96,7 @@ describe("custom xAI tools", () => {
       expect(requests).toHaveLength(0);
     },
   );
-  it.each(["xai_edit_image", "xai_image_to_video"] as const)(
+  it.each(["xai_edit_image", "xai_image_to_video", "xai_text_to_speech", "xai_transcribe_audio"] as const)(
     "blocks disabled %s without touching params, credentials, filesystem context, or network",
     async (toolName) => {
     const params = new Proxy({}, {
@@ -145,6 +147,8 @@ describe("custom xAI tools", () => {
     ["xai_generate_image", { prompt: "guard" }],
     ["xai_edit_image", { prompt: "edit", image: [{ data_url: `data:image/png;base64,${tinyPngBytes().toString("base64")}` }] }],
     ["xai_image_to_video", { image: { data_url: `data:image/png;base64,${tinyPngBytes().toString("base64")}` } }],
+    ["xai_text_to_speech", { text: "guard" }],
+    ["xai_transcribe_audio", { path: "secret.wav" }],
     ["xai_critique", { content: "guard" }],
     ["xai_analyze_image", { image: "https://example.test/a.png" }],
     ["xai_deep_research", { topic: "guard" }],

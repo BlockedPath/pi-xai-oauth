@@ -59,6 +59,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 - [Authentication](#authentication)
 - [Usage](#usage)
   - [Subscription usage (unofficial)](#subscription-usage-unofficial)
+  - [Grok voice dictation](#grok-voice-dictation)
+  - [Talk with Grok (voice chat)](#talk-with-grok-voice-chat)
   - [Switching Models](#switching-models)
   - [Reasoning / Thinking Levels](#reasoning--thinking-levels)
 - [Custom Tools](#custom-tools)
@@ -85,6 +87,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete version-by-version feature and
 - **Grok 4.5 still supported** — remains a first-class entitled catalog model when `/models-v2` returns it
 - **Grok 4.3 OAuth compatibility** — advertises the independently verified `grok-4.3` request route only when `grok-4.5` is entitled, retaining authenticated input evidence and conservative limits
 - **Authenticated model catalog** — fetches the OAuth-visible `/models-v2` list from the official CLI proxy, so additions and removals track the signed-in account
+- **Grok voice over OAuth** — Grok Build–style live dictation with `/xai-voice`, Ctrl+Space, or F8 streams your microphone to Grok speech-to-text with your xAI OAuth login, shows words as you speak, and inserts the text into Pi's editor; opt-in `xai_text_to_speech` and `xai_transcribe_audio` tools cover Grok voices and audio files
+- **Talk with Grok** — `/xai-talk` opens a spoken conversation with Grok's realtime voice over your xAI OAuth login: you speak, Grok answers out loud, with live captions and an optional transcript
 - **Explicit subscription usage** — `/xai-usage` performs a bounded, identity-first lookup against the revision-pinned unofficial Grok billing surface without retaining account identity
 - **Coding models when entitled** — directly advertised Grok Build variants track the account catalog; the Composer compatibility alias appears only while its verified `grok-4.5` entitlement source is present
 - **Reasoning support** — parses supplied reasoning capability and thinking levels while preserving known model compatibility
@@ -215,11 +219,11 @@ Version 1.6.1 uses the same bounded range for both Pi runtime peers:
 @earendil-works/pi-coding-agent:  >=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.1.0
 ```
 
-The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **1.0.0**, the latest release inside the allowed lines when this policy was reviewed. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
+The lower boundary is **0.80.1**, the first published Pi 0.80 release. It provides the `@earendil-works/pi-ai/compat` transport used by this extension and the matching Pi 0.80 extension-loader contract. The packed package's complete test and typecheck suites run against exact 0.80.1 in CI. The other matrix boundary is exact **1.0.4**, the latest release inside the allowed lines when this policy was last reviewed; the published 1.6.1 release was validated at 1.0.0. Pi 0.80.8 introduced the unified `ModelRuntime` credential API and replaced the exported `AuthStorage` surface with `readStoredCredential()` for one-off reads. Pi 0.83 added five-minute-early OAuth refresh, and Pi 0.84 added cross-process credential reloads, bounded refresh locking, concrete refresh abort signals, and generation-checked model-catalog publication. This package supports the 0.80.1 legacy surface and the newer ModelRuntime/ModelRegistry contracts through bounded compatibility paths; its OAuth callback forwards Pi 0.84's abort signal through the pinned token exchange. Pi 0.82 also began exposing `PI_*` session metadata to `bash`; the Grok-native `run_terminal_command` adapter deliberately suppresses that metadata, including inherited stale parent values on Pi 0.80.1, through the `spawnHook` available across the entire supported range.
 
 Pi 0.86 moves provider system instructions and tool declarations into normalized transcript messages. The Responses adapter uses Pi's native normalizer when available, preserving system/tool deltas and reasoning-recovery behavior; older Pi versions retain their legacy top-level prompt/tools unchanged. Both 0.86.0 and 0.86.1 passed clean packed candidate validation before widening this range.
 
-Pi 0.87.0, 0.87.1, and 1.0.0 passed clean packed candidate tests, loader checks, CLI checks, and typechecks before widening this range. Pi 1.0.0 retains the Responses compatibility dispatcher, native context normalizer, and credential APIs used here. The package also checks the real `pi --version`, `pi update`, and `pi update npm:pi-xai-oauth` commands with an isolated updater fixture. The update checks verify command dispatch without installing packages or accessing the network.
+Pi 0.87.0, 0.87.1, and 1.0.0 passed clean packed candidate tests, loader checks, CLI checks, and typechecks before widening this range, and Pi 1.0.4 passed the same candidate checks before becoming the latest tested boundary. Pi 1.0.x retains the Responses compatibility dispatcher, native context normalizer, and credential APIs used here. The package also checks the real `pi --version`, `pi update`, and `pi update npm:pi-xai-oauth` commands with an isolated updater fixture. The update checks verify command dispatch without installing packages or accessing the network.
 
 Pi **0.85.0 is explicitly excluded** because its packaged SDK imports fail on a missing `@earendil-works/pi-server` dependency ([upstream issue #9132](https://github.com/earendil-works/pi/issues/9132)); Pi 0.85.1 fixes that packaging defect. The pre-1.0 `<0.88.0` boundary remains deliberate; the unreviewed 0.99 releases stay outside the range. Pi 1.0 support occupies a separate `>=1.0.0 <1.1.0` interval. A new minor line must pass the packed compatibility suite before support is claimed, and the registry gate flags newer releases inside the range for review. Strict npm peer resolution rejects 0.79.10, 0.85.0, the 0.88.0 gap sentinel, published 0.99.0, and the 1.1.0 upper sentinel. Older `pi-xai-oauth` 1.6.0 releases retain their `<0.87.0` upper bound; upgrade to 1.6.1 for Pi 0.87 and 1.0 support.
 
@@ -332,6 +336,80 @@ The compact footer status is off by default and requires a separate per-session 
 ```
 
 Enabling status performs one immediate lookup. Later refreshes are event-driven after completed turns and occur no more than once per minute. The status disables and clears on model, provider, login, or session changes and on the next extension-handled event after stored OAuth removal; it never refreshes for non-xAI models. Status failures clear silently and never interfere with chat. Every request rejects redirects, has a 15-second timeout, reads at most 64 KiB, and applies bounded JSON depth, collection counts, history length, and numeric ranges.
+
+### Grok voice dictation
+
+Talk instead of typing, like Grok Build's `/voice`. Grok voice uses your **xAI OAuth login** — the same `/login xai-auth` session (or Pi's built-in `xai` SuperGrok/X Premium login) that runs your chats — so no API key is needed. A built-in `xai` API key also works.
+
+```text
+/xai-voice          # live dictation in the session language (English by default)
+/xai-voice es       # dictate in Spanish and keep Spanish for this Pi session
+/xai-voice auto     # use the system locale's language when Grok supports it
+/xai-voice clip     # record privately and upload once on Enter (kept for the session)
+/xai-voice live     # back to live dictation
+```
+
+**Ctrl+Space** and **F8** start the same dictation from the editor. Press **Enter** (or Ctrl+Space/F8 again) to insert the text, or **Esc** to discard it. The text lands at the cursor and is never submitted automatically, so you can edit it first.
+
+**Live mode (default).** The microphone streams to xAI's live speech-to-text socket, `wss://api.x.ai/v1/stt`, with your OAuth bearer on the WebSocket handshake — the same route and authorization Grok Build uses — and the Grok voice overlay shows your words as Grok recognizes them, alongside the elapsed time and an input-level meter. Enter sends end-of-audio and inserts the final transcript. Because audio streams while you speak, **Esc discards the text but cannot recall audio already streamed**. If the live connection fails or drops, the recording is still held in memory, so Enter uploads it once through the request/response route instead and tells you so.
+
+**Clip mode.** Audio stays in memory and nothing is sent until you press Enter; Esc discards locally. The clip is then wrapped as WAV and posted once to `https://api.x.ai/v1/stt`.
+
+Both modes:
+
+- Audio is captured by a system recorder as 16 kHz mono PCM, held only in memory, and never written to disk. Capture stops automatically at five minutes (or if the recorder exits) and then waits for you to insert or discard.
+- A clip that is still pure silence after ten seconds — the usual symptom of a denied microphone permission — is stopped with a permission hint, and a silent clip is never uploaded.
+- Credentials are checked before the microphone opens. Dictation is an explicit command, so it works whichever model is active.
+- Requests use only the pinned `api.x.ai` routes, reject redirects, and are time- and size-bounded; xAI error text is never echoed.
+- The language enables written-form numbers, currencies, and units. Supported codes: `ar`, `cs`, `da`, `nl`, `en`, `fil`, `fr`, `de`, `hi`, `id`, `it`, `ja`, `ko`, `mk`, `ms`, `fa`, `pl`, `pt`, `ro`, `ru`, `es`, `sv`, `th`, `tr`, `vi`.
+- In RPC clients a modal choice replaces the overlay. Pi's RPC host cannot read the client's draft, so the transcript is set as the client's editor text.
+
+Microphone capture uses a recorder already on your system, tried in order:
+
+| Platform | Recorders |
+| -------- | --------- |
+| Linux | `pw-record` (PipeWire ≥ 1.0), `parec` (PulseAudio), `arecord` (ALSA), `sox` |
+| macOS | `sox` (`brew install sox`), `ffmpeg` (`brew install ffmpeg`) |
+| Windows / other | `sox` on `PATH` |
+
+On macOS, allow microphone access for your terminal in System Settings → Privacy & Security → Microphone.
+
+### Talk with Grok (voice chat)
+
+Have a spoken conversation with Grok — you talk, Grok talks back. It uses xAI's realtime voice route (`wss://api.x.ai/v1/realtime`, model `grok-voice-latest`) with your **xAI OAuth login** on the WebSocket handshake, the same way OpenClaw's Grok Talk uses a SuperGrok/X Premium sign-in; a built-in `xai` API key also works.
+
+```text
+/xai-talk              # talk with Grok in the default voice (eve)
+/xai-talk ara          # pick a voice: eve, ara, rex, sal, or leo
+/xai-talk duplex       # talk over Grok to interrupt it (use headphones)
+/xai-talk context      # let Grok see your recent Pi conversation text
+```
+
+While the voice chat overlay is open, captions show what you said and what Grok is saying, with the elapsed time and a microphone meter.
+
+| Key | Action |
+| --- | ------ |
+| Space | Interrupt Grok |
+| Enter | End the chat and insert the transcript into Pi's editor (not submitted) |
+| Esc | End the chat |
+
+How it works:
+
+- Your microphone streams 24 kHz mono audio to xAI and Grok's reply plays through your speakers via a system audio player. Audio is never written to disk, and only the visible captions are kept.
+- **Half-duplex by default:** the microphone is muted while Grok is speaking (plus a short echo tail), so laptop speakers cannot make Grok interrupt itself; press Space to cut Grok off. With headphones, `duplex` keeps the microphone open so speaking interrupts Grok, which trims its memory to what you actually heard.
+- `context` adds the recent visible user/assistant text of the current Pi branch (at most 8,000 characters; no tool output or thinking) to Grok's instructions, labelled as reference material. Without it, nothing from your Pi session is sent. Note that this shares that text with xAI even when another provider produced it.
+- The voice chat cannot run tools or change files; Grok will suggest dictating or typing requests into Pi. Enter puts the transcript into the editor so you can hand the conversation to the coding agent.
+- Conversations end after 30 minutes. Requests use only the pinned route, the bearer is sent only on the handshake, messages and audio chunks are size-bounded, and xAI error text is never echoed.
+
+Playback uses an audio player already on your system, tried in order:
+
+| Platform | Players |
+| -------- | ------- |
+| Linux | `pw-play` (PipeWire ≥ 1.0), `pacat` (PulseAudio), `aplay` (ALSA), `sox` |
+| macOS | `sox` (`brew install sox`), `ffplay` (`brew install ffmpeg`) |
+| Windows / other | `sox` on `PATH` |
+
+Microphone capture uses the same recorders as dictation.
 
 ### Switching Models
 
@@ -528,6 +606,8 @@ This opt-in boundary applies only to the extra tools below. Normal conversation 
 | `xai_generate_image` | Image generation | Charged per generated image; supports 1-4 images |
 | `xai_edit_image` | Image editing | Imagine usage for one output conditioned on 1-3 local references |
 | `xai_image_to_video` | Video generation | High-cost, long-running 6- or 10-second video generation |
+| `xai_text_to_speech` | Voice | Charged per synthesized character |
+| `xai_transcribe_audio` | Voice | Speech-to-text usage for one local audio file |
 | `xai_analyze_image` | Vision | Separate model-token and image-input usage |
 | `xai_critique` | Reasoning | Separate high-reasoning model-token usage |
 | `web_search` | Search | Model tokens plus native tool usage |
@@ -551,6 +631,8 @@ The picker shows each tool's category and cost-risk context, warns that calls ma
 /xai-tools enable xai_generate_image
 /xai-tools enable xai_edit_image
 /xai-tools enable xai_image_to_video
+/xai-tools enable xai_text_to_speech
+/xai-tools enable xai_transcribe_audio
 /xai-tools enable vision-routing
 /xai-tools disable vision-routing
 ```
@@ -680,6 +762,37 @@ Duration is `6` or `10` seconds (default `6`); resolution is `480p` or `720p` (d
 
 Completed MP4s are downloaded without OAuth headers through an HTTPS-only, no-redirect, resolve-once public-IPv4 DNS/IP-pinned transport; IPv6-only download hosts fail closed. Downloads accept only MP4 MIME, are streamed under a 256 MiB limit, require bounded `ftyp` evidence, and are atomically saved under `pi-xai-oauth/<session-hash>/videos/` with private `0700` directories and `0600` files. Signed URLs, request IDs, source data, prompts, credentials, and raw authenticated bodies are not returned or logged.
 
+### `xai_text_to_speech`
+
+Opt-in speech synthesis with a Grok voice. Enable it through `/xai-tools` first, then explicitly ask for spoken audio.
+
+```json
+{
+  "text": "Build passed. [pause] Shipping to production now.",
+  "voice": "eve",
+  "language": "en",
+  "format": "mp3",
+  "speed": 1.1
+}
+```
+
+Voices are `eve` (default, energetic), `ara` (warm), `rex` (confident), `sal` (balanced), and `leo` (authoritative). `language` is a BCP-47 code or `auto` (default); `format` is `mp3` (default) or `wav`; `speed` ranges from 0.7 to 1.5. Text is limited to 5,000 characters and may include xAI speech tags such as `[pause]`, `[laugh]`, or `<whisper>…</whisper>`.
+
+The request goes to the pinned `https://api.x.ai/v1/tts` route without redirects and with a two-minute bound. The response must be audio, at most 32 MiB, and its leading bytes must match the requested MP3 or WAV container. Exactly one file is saved atomically under Pi's session directory at `pi-xai-oauth/<session-hash>/audio/` with private `0700` directories and `0600` files; the tool returns the path and size, never the audio bytes. Errors report the HTTP status only.
+
+### `xai_transcribe_audio`
+
+Opt-in speech-to-text for one audio file inside the current workspace. Enable it through `/xai-tools` first.
+
+```json
+{
+  "path": "recordings/standup.m4a",
+  "language": "en"
+}
+```
+
+The file is resolved through realpath and must stay inside the workspace; symlink escapes, URLs, and outside paths are rejected. Files are limited to 20 MiB, and the container is identified from its bytes rather than its extension: WAV, MP3, FLAC, OGG/Opus, M4A/MP4, WebM, or AAC. Anything else is refused before any request. `language` is optional; when set, xAI returns written-form numbers, currencies, and units. The transcript is returned as text with the detected language and duration when xAI provides them; control characters are stripped.
+
 ### `xai_critique`
 
 Opt-in structured critique for code, designs, writing, or ideas. Enable it through `/xai-tools` first.
@@ -702,7 +815,7 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 }
 ```
 
-> **Note:** Every tool in this section makes a separate xAI request and can consume subscription allowances, credits, or rate limits. OAuth-backed Responses helpers use the session proxy; built-in `xai` API-key helpers use the public API. Image generation and image editing are intentional OAuth transport exceptions: matching official Grok Build behavior, they send the OAuth bearer directly to the pinned public Images routes at `https://api.x.ai/v1/images/generations` and `https://api.x.ai/v1/images/edits`. See [xAI pricing](https://docs.x.ai/developers/pricing) for current rates.
+> **Note:** Every tool in this section makes a separate xAI request and can consume subscription allowances, credits, or rate limits. OAuth-backed Responses helpers use the session proxy; built-in `xai` API-key helpers use the public API. Image generation, image editing, and Grok voice are intentional OAuth transport exceptions: matching official Grok Build behavior, they send the OAuth bearer directly to the pinned public routes at `https://api.x.ai/v1/images/generations`, `https://api.x.ai/v1/images/edits`, `https://api.x.ai/v1/tts`, `https://api.x.ai/v1/stt`, the live `wss://api.x.ai/v1/stt` socket, and the realtime `wss://api.x.ai/v1/realtime` voice chat. See [xAI pricing](https://docs.x.ai/developers/pricing) for current rates.
 
 ---
 
@@ -723,6 +836,8 @@ Opt-in research using the active xAI model plus native web and X search tools. E
 | Show subscription usage | `/xai-usage` (unofficial, explicit request) |
 | Export copyable usage CSV | `/xai-usage csv` (no automatic file writes) |
 | Manage optional usage status | `/xai-usage status on\|off` (off by default) |
+| Dictate a prompt with Grok voice | `/xai-voice [language] [live\|clip]`, Ctrl+Space, or F8 |
+| Talk with Grok out loud | `/xai-talk [voice] [duplex] [context]` |
 | Manage outbound xAI tools | `/xai-tools` (in TUI) |
 | Recreate extension/catalog state | `/reload` (respects the 15-minute cache TTL) |
 
@@ -795,6 +910,18 @@ Then, in the pi TUI:
 ```
 
 This re-runs the full OAuth flow and replaces your stored tokens.
+
+### "No microphone recorder was found" or "recorded only silence"
+
+`/xai-voice` needs a system recorder: on Linux install PipeWire (`pw-record`), PulseAudio utilities (`parec`), ALSA utilities (`arecord`), or SoX; on macOS install SoX or FFmpeg with Homebrew; elsewhere put `sox` on `PATH`. When a recorder exists but cannot open the microphone, the error lists each recorder's first diagnostic line.
+
+A silent clip is never uploaded, and live dictation stops after ten seconds of pure silence. If the overlay says "live unavailable", Enter still works: the recording is uploaded once instead of streamed. On macOS, allow microphone access for your terminal in System Settings → Privacy & Security → Microphone and restart the terminal; on Windows check Settings → Privacy & security → Microphone; on Linux check the default input device and its level (`pavucontrol`, or `wpctl status` on PipeWire). If Ctrl+Space switches input sources on macOS, use F8 or `/xai-voice` instead.
+
+### Grok voice chat is silent or keeps interrupting itself
+
+`/xai-talk` needs both a microphone recorder and an audio player (see the tables above); the error names any that are missing. If Grok keeps stopping mid-sentence in `duplex` mode, its own voice is reaching the microphone — use headphones or run `/xai-talk` without `duplex`. If xAI refuses the session, check that the signed-in account includes Grok voice.
+
+On Bluetooth headsets such as AirPods, using the headset's microphone switches it to a lower-quality, mono hands-free mode, so Grok sounds like a phone call and may play in only one earbud. Each reply opens playback after the microphone is on, so it still plays at the right speed. For full-quality stereo sound, pick your computer's built-in microphone as the input device (on macOS: System Settings → Sound → Input) and keep the headset as the output.
 
 ### "Does this need an xAI API key?"
 
@@ -1020,6 +1147,7 @@ pi-xai-oauth/
 │       ├── usage.ts          # Explicit bounded /xai-usage command + status
 │       ├── video-download.ts # DNS/IP-pinned MP4 download
 │       ├── vision-routing.ts # Opt-in routing for text-only entitlements
+│       ├── voice/            # /xai-voice dictation, /xai-talk voice chat, recorder/player, TTS/STT/realtime clients
 │       └── wire.ts           # Route-aware headers, scrubbing, identity, safe errors
 ├── bin/
 │   └── setup.js              # One-command setup (npx pi-xai-oauth)
@@ -1035,6 +1163,7 @@ pi-xai-oauth/
 │   ├── images/                # Codec budgets and Images tool behavior
 │   ├── media/                 # Strict media/path/compression/storage primitives
 │   ├── tools/                 # Network lifecycle, commands, custom tools, and Grok-native adapters
+│   ├── voice/                 # Dictation, recorder, TTS/STT transport, and audio primitives
 │   └── setup/                 # Installer/settings behavior
 ├── scripts/
 │   ├── prepare-github-package.js   # Canonical tarball → scoped mirror staging

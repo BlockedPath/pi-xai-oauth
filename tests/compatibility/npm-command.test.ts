@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -14,7 +14,8 @@ const { npmCommand, resolveNpmCli } = require("../../scripts/npm-command.js") as
 const temporaryRoots: string[] = [];
 
 function temporaryRoot() {
-  const root = mkdtempSync(path.join(tmpdir(), "pi-npm-command-"));
+  // resolveNpmCli returns real paths; macOS tmpdir() sits under the /var -> /private/var symlink.
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "pi-npm-command-")));
   temporaryRoots.push(root);
   return root;
 }

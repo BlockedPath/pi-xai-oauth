@@ -8,6 +8,7 @@ export interface ExtensionHarness {
   providers: Map<string, any>;
   tools: Map<string, any>;
   commands: Map<string, any>;
+  shortcuts: Map<string, any>;
   handlers: Map<string, AnyHandler>;
   selectedModels: any[];
   getActiveTools(): string[];
@@ -22,6 +23,7 @@ export function createExtensionHarness(
   const providers = new Map<string, any>();
   const tools = new Map<string, any>();
   const commands = new Map<string, any>();
+  const shortcuts = new Map<string, any>();
   const handlers = new Map<string, AnyHandler>();
   const selectedModels: any[] = [];
   let activeTools = [...initialTools];
@@ -66,6 +68,9 @@ export function createExtensionHarness(
     registerCommand(name: string, command: any) {
       commands.set(name, command);
     },
+    registerShortcut(shortcut: string, options: any) {
+      shortcuts.set(shortcut, options);
+    },
     getActiveTools() {
       if (failGet) throw new Error("tool registry unavailable");
       return [...activeTools];
@@ -85,6 +90,7 @@ export function createExtensionHarness(
     providers,
     tools,
     commands,
+    shortcuts,
     handlers,
     selectedModels,
     getActiveTools: () => [...activeTools],

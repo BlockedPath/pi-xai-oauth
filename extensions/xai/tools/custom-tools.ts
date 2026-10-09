@@ -21,6 +21,19 @@ import { defaultXaiRuntimeModelId, grokSupportsReasoningEffort, normalizedXaiMod
 import { createXaiResponse, postXaiJson } from "../responses";
 import { resolveXaiRoute } from "../routing";
 import { extractResponsesText, messageFromError, statusFromError } from "../text";
+import { XaiVoiceOperationError } from "../voice/common";
+import {
+  XAI_STT_LANGUAGES,
+  XAI_TTS_DEFAULT_FORMAT,
+  XAI_TTS_DEFAULT_VOICE,
+  XAI_TTS_FORMATS,
+  XAI_TTS_MAX_SPEED,
+  XAI_TTS_MAX_TEXT_CHARS,
+  XAI_TTS_MIN_SPEED,
+  XAI_TTS_VOICES,
+} from "../voice/constants";
+import { executeXaiTextToSpeech, validateXaiTextToSpeechInput } from "../voice/speech";
+import { executeXaiTranscribeAudioFile, validateXaiTranscribeAudioInput } from "../voice/transcription";
 import { XAI_IMAGE_REFERENCE_SCHEMA, xaiTextInput, xaiToolError } from "./common";
 import { activeXaiModel, isXaiNetworkToolActive, type XaiNetworkToolName } from "./model-scope";
 
@@ -509,6 +522,153 @@ Be specific and cite examples where helpful.`;
             {
               error: true,
               code: operationError?.code ?? "output_failure",
+              ...(operationError?.status ? { status: operationError.status } : {}),
+            },
+          );
+        }
+      },
+    } as any);
+
+    pi.registerTool({
+      name: "xai_text_to_speech",
+      label: "xAI Text to Speech",
+      description:
+        "Opt-in paid speech synthesis with a Grok voice; saves one MP3 or WAV file to private Pi session storage. Enable via /xai-tools and call only when the user explicitly asks for spoken audio.",
+      promptGuidelines: [
+        "Call xai_text_to_speech only when the user explicitly asks to turn text into speech or audio with a Grok/xAI voice.",
+        "Speech tags such as [pause], [laugh], or <whisper>…</whisper> may be included in the text to shape delivery.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            minLength: 1,
+            maxLength: XAI_TTS_MAX_TEXT_CHARS,
+            description: "Text to speak; may include xAI speech tags such as [pause] or <whisper>…</whisper>",
+          },
+          voice: {
+            type: "string",
+            enum: [...XAI_TTS_VOICES],
+            default: XAI_TTS_DEFAULT_VOICE,
+            description: "eve (energetic), ara (warm), rex (confident), sal (balanced), or leo (authoritative)",
+          },
+          language: {
+            type: "string",
+            description: "BCP-47 language code such as en or pt-BR, or auto (default)",
+          },
+          format: { type: "string", enum: [...XAI_TTS_FORMATS], default: XAI_TTS_DEFAULT_FORMAT },
+          speed: { type: "number", minimum: XAI_TTS_MIN_SPEED, maximum: XAI_TTS_MAX_SPEED },
+        },
+        required: ["text"],
+        additionalProperties: false,
+      },
+      execute: async (_toolCallId: string, params: unknown, signal: AbortSignal | undefined, _onUpdate: any, ctx: any) => {
+        if (!activeModelForXaiTool(pi, ctx, "xai_text_to_speech")) {
+          return xaiToolDisabledError("xai_text_to_speech");
+        }
+        let input: ReturnType<typeof validateXaiTextToSpeechInput>;
+        try {
+          input = validateXaiTextToSpeechInput(params);
+        } catch (error) {
+          const message = error instanceof XaiVoiceOperationError ? error.message : "Text-to-speech input is invalid.";
+          return xaiToolError(`Error: ${message}`, { error: true, code: "invalid_input" });
+        }
+        const credential = await resolveXaiCredential(ctx);
+        if (!credential) {
+          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { error: true });
+        }
+        try {
+          const output = await executeXaiTextToSpeech({
+            credential,
+            input,
+            sessionManager: ctx?.sessionManager,
+            signal,
+          });
+          return {
+            content: [{
+              type: "text",
+              text: `Speech saved to ${output.path} (${output.mimeType}, ${output.byteLength} bytes, voice ${output.voice}).`,
+            }],
+            details: output,
+          };
+        } catch (error) {
+          const operationError = error instanceof XaiVoiceOperationError ? error : undefined;
+          return xaiToolError(
+            `Error: ${operationError?.message ?? "xAI text to speech failed safely."}`,
+            {
+              error: true,
+              code: operationError?.code ?? "output_failure",
+              ...(operationError?.status ? { status: operationError.status } : {}),
+            },
+          );
+        }
+      },
+    } as any);
+
+    pi.registerTool({
+      name: "xai_transcribe_audio",
+      label: "xAI Transcribe Audio",
+      description:
+        "Opt-in paid speech-to-text for one bounded audio file in the workspace (WAV, MP3, FLAC, OGG/Opus, M4A/MP4, WebM, or AAC; up to 20 MiB). Enable via /xai-tools and call only when the user explicitly requests a transcription.",
+      promptGuidelines: [
+        "Call xai_transcribe_audio only when the user explicitly asks to transcribe a specific audio file with xAI.",
+        "Use only a user-supplied workspace path; never invent paths or send remote URLs.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Audio file path inside the current workspace" },
+          language: {
+            type: "string",
+            enum: [...XAI_STT_LANGUAGES],
+            description: "Optional spoken language; enables written-form numbers, currencies, and units",
+          },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      execute: async (_toolCallId: string, params: unknown, signal: AbortSignal | undefined, _onUpdate: any, ctx: any) => {
+        if (!activeModelForXaiTool(pi, ctx, "xai_transcribe_audio")) {
+          return xaiToolDisabledError("xai_transcribe_audio");
+        }
+        let input: ReturnType<typeof validateXaiTranscribeAudioInput>;
+        try {
+          input = validateXaiTranscribeAudioInput(params);
+        } catch (error) {
+          const message = error instanceof XaiVoiceOperationError ? error.message : "Transcription input is invalid.";
+          return xaiToolError(`Error: ${message}`, { error: true, code: "invalid_input" });
+        }
+        const credential = await resolveXaiCredential(ctx);
+        if (!credential) {
+          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { error: true });
+        }
+        try {
+          const output = await executeXaiTranscribeAudioFile({
+            credential,
+            input,
+            workspaceRoot: ctx?.cwd,
+            signal,
+          });
+          return {
+            content: [{ type: "text", text: output.text || "No speech was detected in the audio file." }],
+            details: {
+              path: output.path,
+              mimeType: output.mimeType,
+              byteLength: output.byteLength,
+              ...(output.language ? { language: output.language } : {}),
+              ...(output.duration !== undefined ? { duration: output.duration } : {}),
+            },
+          };
+        } catch (error) {
+          const operationError = error instanceof XaiVoiceOperationError ? error : undefined;
+          return xaiToolError(
+            `Error: ${operationError?.message ?? "xAI speech to text failed safely."}`,
+            {
+              error: true,
+              code: operationError?.code ?? "invalid_response",
               ...(operationError?.status ? { status: operationError.status } : {}),
             },
           );

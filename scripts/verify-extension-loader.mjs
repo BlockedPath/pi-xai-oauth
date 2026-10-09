@@ -53,6 +53,10 @@ try {
 		"bounded xAI image-to-video tool should be registered",
 	);
 	assert.ok(
+		loaded.tools.has("xai_text_to_speech") && loaded.tools.has("xai_transcribe_audio"),
+		"opt-in Grok voice tools should be registered",
+	);
+	assert.ok(
 		loaded.tools.has("xai_grok_grep"),
 		"collision-free Grok grep dispatcher should be registered",
 	);
@@ -79,6 +83,18 @@ try {
 	assert.ok(
 		loaded.commands.has("xai-usage"),
 		"/xai-usage should be registered",
+	);
+	assert.ok(
+		loaded.commands.has("xai-voice"),
+		"/xai-voice dictation should be registered",
+	);
+	assert.ok(
+		loaded.commands.has("xai-talk"),
+		"/xai-talk realtime voice chat should be registered",
+	);
+	assert.ok(
+		loaded.shortcuts.has("ctrl+space") && loaded.shortcuts.has("f8"),
+		"Grok voice dictation shortcuts should be registered",
 	);
 	assert.equal(
 		runtime.pendingProviderRegistrations.length,
