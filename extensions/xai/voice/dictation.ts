@@ -577,13 +577,16 @@ export function registerXaiVoice(
     }
 
     const failSafely = () => session.fail("Grok voice stopped unexpectedly; nothing was inserted.");
+    let overlayClosed: Promise<unknown> = Promise.resolve();
     if (ctx.mode === "tui" && typeof ctx.ui.custom === "function") {
-      void Promise.resolve().then(() => openTuiDictation(ctx, session)).catch(failSafely);
+      overlayClosed = Promise.resolve().then(() => openTuiDictation(ctx, session)).catch(failSafely);
     } else {
       void Promise.resolve().then(() => runSelectDictation(ctx, session)).catch(failSafely);
     }
     const result = await session.outcome;
     if (active === session) active = undefined;
+    // Pi restores the pre-dictation draft when the overlay closes, so insert only after it has closed.
+    await overlayClosed;
     // A reset (session switch) must not insert text into the next session's editor.
     if (startGeneration !== generation) return;
     reportResult(ctx, result, sessionMode, platform);

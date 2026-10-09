@@ -475,20 +475,32 @@ function talkSetup(options: { credentials?: Array<typeof credential | null>; con
 function tui(editorText = "") {
   const notices: Array<{ message: string; type?: string }> = [];
   let component: any;
+  const editor = { text: editorText };
   const ui = {
     notify: (message: string, type?: string) => notices.push({ message, type }),
+    // Like Pi's showExtensionCustom, closing the component restores the editor's pre-dialog draft.
     custom: vi.fn((factory: any) => new Promise((resolve) => {
-      component = factory({ requestRender: vi.fn() }, { fg: (_role: string, text: string) => text }, { matches: () => false }, resolve);
+      const saved = editor.text;
+      component = factory({ requestRender: vi.fn() }, { fg: (_role: string, text: string) => text }, { matches: () => false }, (result: unknown) => {
+        editor.text = saved;
+        resolve(result);
+        component?.dispose?.();
+      });
     })),
-    pasteToEditor: vi.fn(),
-    getEditorText: vi.fn(() => editorText),
-    setEditorText: vi.fn(),
+    pasteToEditor: vi.fn((text: string) => {
+      editor.text += text;
+    }),
+    getEditorText: vi.fn(() => editor.text),
+    setEditorText: vi.fn((text: string) => {
+      editor.text = text;
+    }),
     select: vi.fn(),
   };
   return {
     ctx: { mode: "tui", hasUI: true, ui, sessionManager: { getBranch: () => [{ type: "message", message: { role: "user", content: "refactor the lexer" } }] } },
     ui,
     notices,
+    editor,
     component: async () => {
       await vi.waitFor(() => expect(component).toBeDefined());
       return component;
@@ -551,6 +563,7 @@ describe("/xai-talk", () => {
     component.handleInput("\r");
     await running;
     expect(view.ui.pasteToEditor).toHaveBeenCalledWith("\n\nVoice chat with Grok:\nYou: Hi Grok\nGrok: Hello!");
+    expect(view.editor.text).toBe("draft\n\nVoice chat with Grok:\nYou: Hi Grok\nGrok: Hello!");
     expect(view.notices).toEqual([{ message: "Ended the Grok voice chat (0:00).", type: "info" }]);
   });
 

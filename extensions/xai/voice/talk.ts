@@ -629,14 +629,17 @@ export function registerXaiTalk(pi: ExtensionAPI, dependencies: XaiTalkDependenc
       }
 
       const failSafely = () => session.fail("Grok voice chat stopped unexpectedly.");
+      let overlayClosed: Promise<unknown> = Promise.resolve();
       if (ctx.mode === "tui" && typeof ctx.ui.custom === "function") {
-        void Promise.resolve().then(() => openTuiTalk(ctx, session)).catch(failSafely);
+        overlayClosed = Promise.resolve().then(() => openTuiTalk(ctx, session)).catch(failSafely);
       } else {
         void Promise.resolve().then(() => runSelectTalk(ctx, session)).catch(failSafely);
       }
       void session.start();
       const result = await session.outcome;
       if (active === session) active = undefined;
+      // Pi restores the pre-chat draft when the overlay closes, so insert only after it has closed.
+      await overlayClosed;
       if (startGeneration !== generation) return;
       if (result.kind === "error") {
         ctx.ui.notify(result.message, "error");
