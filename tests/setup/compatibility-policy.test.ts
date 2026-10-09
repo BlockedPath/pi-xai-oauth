@@ -18,7 +18,7 @@ const range = ">=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.1.0";
 const fixture = (): RangePolicy => ({
   peerRange: range,
   minimum: "0.80.1",
-  latest: "1.0.0",
+  latest: "1.0.4",
   unsupported: { older: "0.79.10", excluded: ["0.85.0", "0.88.0", "0.99.0"], upper: "1.1.0" },
 });
 
@@ -32,7 +32,7 @@ describe("bounded Pi compatibility policy", () => {
     })).not.toThrow();
   });
 
-  it.each(["0.80.1", "0.80.8", "0.84.4", "0.85.1", "0.85.9", "0.86.0", "0.86.1", "0.87.0", "0.87.1", "1.0.0", "1.0.1", "1.0.99"])("accepts supported release %s", (version) => {
+  it.each(["0.80.1", "0.80.8", "0.84.4", "0.85.1", "0.85.9", "0.86.0", "0.86.1", "0.87.0", "0.87.1", "1.0.0", "1.0.1", "1.0.4", "1.0.99"])("accepts supported release %s", (version) => {
     expect(satisfiesPeerRange(version, range)).toBe(true);
   });
 

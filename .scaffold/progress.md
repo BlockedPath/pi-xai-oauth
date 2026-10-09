@@ -15,10 +15,10 @@
 - [x] Independent review fixes: single recorder per trigger burst (slot claimed before awaits, generation guard on reset), second shortcut press stops dictation, wall-clock recorder cap, Kitty/modifyOtherKeys Ctrl+Space and F8 in the overlay with auto-repeat debounce, no insert after cancel or reset, RPC dialog dismissed via signal and RPC editor semantics documented, MP4/WebM sniffing limited to audio brands/doctype.
 
 - [x] Talk-back voice chat (user request: "I want a feature for it to talk back to me ... through OAuth"): `/xai-talk` on `wss://api.x.ai/v1/realtime` with the OAuth bearer, following OpenClaw's OAuth-authenticated xAI realtime bridge; system audio player walk; non-retaining 24 kHz mic stream; half-duplex default, duplex barge-in with truncation, Space interrupt, captions, Enter inserts transcript, opt-in `context`.
+- [x] Pi 1.0.4 review (PR #235 registry gate): 1.0.1–1.0.4 changelog needs no extension migration; packed candidate run passed (tests, loader, CLI, typecheck). `policy.latest`, exact dev dependencies, lockfile, policy test, README, and CHANGELOG moved to 1.0.4; peer range unchanged.
 
 ## Notes
 
-- `node scripts/verify-compatibility.js registry` fails on `main` too: Pi 1.0.4 is published inside the supported range while `policy.latest` is 1.0.0. Reviewing and adopting 1.0.4 is a separate compatibility task.
 - Local npm 10.9.4 crashes in arborist (`edgesOut`) during the packed boundary install; run boundaries with CI's npm 11.6.2 via `npm_execpath`.
 - Live microphone capture and live xAI voice requests were not exercised (no audio device or credentials in the container).
 
