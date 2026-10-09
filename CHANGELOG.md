@@ -6,6 +6,12 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.7.1 - 2026-10-09
+
+### Fixed
+
+- Fix `/xai-voice` dictation (and Ctrl+Space / F8) and `/xai-talk`'s Enter-to-insert transcript never appearing in the prompt in Pi's TUI. Pi restores the editor's pre-dialog draft when an extension overlay closes, and the transcript was inserted just before that restore, which erased it. Transcripts are now inserted after the overlay closes. RPC clients were not affected.
+
 ## 1.7.0 - 2026-10-09
 
 ### Added
