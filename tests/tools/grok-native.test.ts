@@ -686,6 +686,35 @@ describe("Grok-native tools", () => {
     }
   });
 
+  it("keeps pi's path rewrites (@, ~, Unicode spaces, look-alike names) from leaving the workspace", async () => {
+    const outside = await createTempDir("pi-xai-grok-outside-rewrite-");
+    try {
+      const outsideSecret = join(outside.path, "secret.txt");
+      await writeFile(outsideSecret, "SECRET\n");
+      stubHome(outside.path);
+      await symlink(outsideSecret, join(temp.path, "escape-file"));
+      await symlink(outsideSecret, join(temp.path, "escape file"));
+      await symlink(outsideSecret, join(temp.path, "it\u2019s"));
+      await writeFile(join(temp.path, "@scoped.txt"), "AT FILE\n");
+      await writeFile(join(temp.path, "scoped.txt"), "PLAIN FILE\n");
+
+      await expect(run("read_file", { target_file: "@escape-file" })).rejects.toThrow(/Path not found/);
+      await expect(run("read_file", { target_file: "it's" })).rejects.toThrow(/Path not found/);
+      await expect(run("list_dir", { target_directory: "~" })).rejects.toThrow(/not found/i);
+      await expect(
+        run("search_replace", { file_path: "escape\u00A0file", old_string: "", new_string: "NBSP" }),
+      ).rejects.toThrow(/non-ASCII whitespace/);
+      await run("search_replace", { file_path: "@escape-file", old_string: "", new_string: "AT CREATE" });
+
+      expect(await readFile(outsideSecret, "utf8")).toBe("SECRET\n");
+      expect(await readFile(join(temp.path, "@escape-file"), "utf8")).toBe("AT CREATE");
+      const atRead = await run("read_file", { target_file: "@scoped.txt" });
+      expect(atRead.content[0].text).toContain("AT FILE");
+    } finally {
+      await outside.cleanup();
+    }
+  });
+
   it("rejects oversized package-owned full-file reads without modifying the file", async () => {
     const oversizedPath = join(temp.path, "oversized.txt");
     const oversized = Buffer.alloc(5_000_001, "x");
