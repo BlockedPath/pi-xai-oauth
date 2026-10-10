@@ -6,6 +6,11 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Fixed
+
+- Keep Pi behavior on hosts that export `openAIResponsesApi`, `resizeImage`, and a model `compat` object. omp 18.8.7 omits the first two exports and throws when `model.compat` is missing. Use Pi's OpenAI Responses stream and `resizeImage` when they exist. Otherwise use omp's `streamSimpleOpenAIResponses` export and a local PNG/JPEG resize. Always pass a compat object, copying the host object unchanged when it is already present.
+- Name a missing `ffmpeg` binary from the omp PNG/JPEG resize instead of a generic compaction failure. An image that is already within limits keeps the MIME type read from its bytes.
+
 ## 1.7.1 - 2026-10-10
 
 ### Fixed

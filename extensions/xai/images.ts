@@ -1,6 +1,6 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resizeImage } from "@earendil-works/pi-coding-agent";
+import { MissingFfmpegError, resizeImage } from "./resize-image";
 import { MEDIA_MAX_DATA_URL_CHARS } from "./media/constants";
 import { toImageDataUrl } from "./media/data-url";
 import { readBoundedWorkspaceImageFileSync } from "./media/paths";
@@ -269,6 +269,7 @@ export async function compactXaiInlineImages(
         jpegQuality: XAI_JPEG_QUALITY,
       });
     } catch (error) {
+      if (error instanceof MissingFfmpegError) throw error;
       compressionError = error;
       resized = null;
     }
