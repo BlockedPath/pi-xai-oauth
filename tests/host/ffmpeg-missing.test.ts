@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { compactXaiInlineImages } from "../../extensions/xai/images";
 import { MissingFfmpegError, resizeImageFallback } from "../../extensions/xai/resize-image";
 
-const ffmpeg = vi.hoisted(() => ({ missing: false }));
-
 vi.mock("node:child_process", () => ({
   spawn() {
     const stdout = new EventEmitter();
@@ -24,28 +22,13 @@ vi.mock("node:child_process", () => ({
   },
 }));
 
-interface ResizeImageModule {
-  MissingFfmpegError: new () => Error;
-  resizeImage: (
-    inputBytes: Uint8Array,
-    mimeType: string,
-    options?: object,
-  ) => Promise<unknown>;
-}
-
-vi.mock("../../extensions/xai/resize-image", async (importOriginal) => {
-  const actual = await importOriginal<ResizeImageModule>();
-  return {
-    ...actual,
-    resizeImage: (
-      inputBytes: Uint8Array,
-      mimeType: string,
-      options?: object,
-    ) => {
-      if (ffmpeg.missing) return Promise.reject(new actual.MissingFfmpegError());
-      return actual.resizeImage(inputBytes, mimeType, options);
-    },
-  };
+// This file checks the omp path. Hide Pi's resize export so the public helper
+// uses the local fallback and the mocked ffmpeg ENOENT is real.
+vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const host = { ...actual };
+  delete host.resizeImage;
+  return host;
 });
 
 const ONE_PIXEL_PNG = Buffer.from(
@@ -62,11 +45,10 @@ describe("missing ffmpeg", () => {
     })).rejects.toThrow(MissingFfmpegError);
   });
 
-  it("shows the missing ffmpeg error instead of a generic compaction failure", async () => {
-    ffmpeg.missing = true;
+  it("rethrows that ffmpeg error from inline image compaction", async () => {
     const url = `data:image/png;base64,${ONE_PIXEL_PNG.toString("base64")}`;
     await expect(compactXaiInlineImages({
       input: [{ content: [{ type: "input_image", image_url: url }] }],
-    }, 1_000_000)).rejects.toThrow(/Install ffmpeg/);
+    }, 8)).rejects.toThrow(MissingFfmpegError);
   });
 });

@@ -1,7 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { copyModelCompat, resolveOpenAIResponsesStream, selectResizeImage } from "../../extensions/xai/host-compat";
 import { jpegHeaderBytes } from "../fixtures/images";
 import { resizeImage, resizeImageFallback } from "../../extensions/xai/resize-image";
+
+const piResizeCalls = vi.hoisted(() => ({ count: 0 }));
+
+vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const resizeImage = actual.resizeImage;
+  if (typeof resizeImage !== "function") return actual;
+  return {
+    ...actual,
+    async resizeImage(...args: unknown[]) {
+      piResizeCalls.count += 1;
+      return resizeImage(...args);
+    },
+  };
+});
 
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -71,7 +86,9 @@ describe("omp host compatibility", () => {
   });
 
   it("uses Pi's resizeImage from the public helper on this host", async () => {
+    piResizeCalls.count = 0;
     const result = await resizeImage(ONE_PIXEL_PNG, "image/png");
+    expect(piResizeCalls.count).toBe(1);
     expect(result?.wasResized).toBe(false);
     expect(result?.width).toBe(1);
     expect(result?.height).toBe(1);
