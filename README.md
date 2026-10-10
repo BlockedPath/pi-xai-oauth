@@ -1074,7 +1074,7 @@ NODE_OPTIONS=--unhandled-rejections=strict npm test
 # Verify source/lock/range/registry/packed metadata and unsupported peers
 npm run compatibility:check
 
-# Repack, install, report, test, and typecheck both exact Pi boundaries
+# Repack, install, report, test, run the real-Pi e2e suite, and typecheck both exact Pi boundaries
 npm run compatibility:boundaries
 
 # Install local version in pi
@@ -1167,7 +1167,7 @@ pi-xai-oauth/
 │   └── setup/                 # Installer/settings behavior
 ├── scripts/
 │   ├── prepare-github-package.js   # Canonical tarball → scoped mirror staging
-│   ├── run-compatibility-matrix.js # Clean packed exact-version test/typecheck runner
+│   ├── run-compatibility-matrix.js # Clean packed exact-version test/e2e/typecheck runner
 │   ├── verify-compatibility.js     # Range/lock/registry/pack/unsupported-peer checks
 │   ├── verify-extension-loader.mjs # Small real Pi loader integration smoke
 │   ├── verify-pi-cli.mjs # Real version + isolated self/extension update dispatch

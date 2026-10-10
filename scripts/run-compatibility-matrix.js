@@ -112,6 +112,12 @@ function main() {
       ...(candidate ? { PI_COMPAT_CANDIDATE_PEER_VERSION: requested } : {}),
     };
     run("npm", ["test"], { cwd: packageRoot, env: matrixEnv });
+    // Execute the extension's commands in a real Pi RPC process at this exact
+    // Pi pair; the loader smoke and unit suites only cover registration and mocks.
+    run("npm", ["run", "test:e2e"], {
+      cwd: packageRoot,
+      env: { ...matrixEnv, E2E_TELEMETRY_DISABLED: "1" },
+    });
     run("npm", ["run", "typecheck"], { cwd: packageRoot, env: matrixEnv });
     console.log(`\nPi compatibility ${requested}: ok`);
   } finally {
