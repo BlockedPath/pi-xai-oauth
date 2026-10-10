@@ -9,5 +9,5 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["extensions/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
+  "include": ["extensions/**/*.ts", "tests/**/*.ts", "vitest.config.mts", "e2e.config.ts"]
 }

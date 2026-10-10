@@ -18,6 +18,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Full policy/unit/loader/CLI gate: `npm test`
 - Focused Vitest suite: `npm run test:unit -- tests/oauth/browser-login.test.ts`
 - V8 coverage: `npm run test:coverage`
+- Real Pi RPC e2e suite: `npm run test:e2e` (spawns `pi --mode rpc` with only this extension in an isolated HOME; offline, no credentials, no model calls; uses the installed Pi only, not the exact-version matrix)
 - Real Pi loader smoke: `npm run test:loader`
 - Real Pi version and isolated update-dispatch smoke: `npm run test:cli`
 - Run TypeScript: `npm run typecheck` (production, tests, fixtures, config)
@@ -102,6 +103,8 @@ pi-xai-oauth/
 │   ├── pi-versions.json # Peer range plus exact minimum/latest matrix policy
 │   └── grok-build-wire-protocol.md # Pinned xAI route/header review procedure
 ├── tests/                    # Focused typed Vitest domain suites + isolated fixtures
+│   └── e2e/                  # e2e runner suites (*.e2e.ts) over a real Pi RPC session
+├── e2e.config.ts             # e2e runner config (tools-only target; agent model unused by current suites)
 ├── vitest.config.mts         # Node isolation and measured V8 coverage floors
 ├── scripts/
 │   ├── verify-extension-loader.mjs # Small real Pi loader smoke
