@@ -1,4 +1,4 @@
-import { resizeImage } from "@earendil-works/pi-coding-agent";
+import { resizeImage } from "../resize-image";
 import { awaitAbortable, cancellationError } from "../abort";
 import {
   IMAGE_EDIT_MAX_AGGREGATE_REFERENCE_BYTES,

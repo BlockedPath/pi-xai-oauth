@@ -1,6 +1,6 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resizeImage } from "@earendil-works/pi-coding-agent";
+import { resizeImage } from "./resize-image";
 import { MEDIA_MAX_DATA_URL_CHARS } from "./media/constants";
 import { toImageDataUrl } from "./media/data-url";
 import { readBoundedWorkspaceImageFileSync } from "./media/paths";
