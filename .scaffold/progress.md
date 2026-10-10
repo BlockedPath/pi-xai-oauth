@@ -1,3 +1,19 @@
+# Execution Progress — v1.7.1 publication with review fixes
+
+**Branch:** `release/v1.7.1-publish` (from `main` @ 5b66d82)
+
+- [x] v1.7.1 was merged in #239 but never tagged or published (npm latest stayed 1.7.0), so it ships now with the #246 fixes instead of skipping a version. CHANGELOG folds the Unreleased fixes into 1.7.1 dated 2026-10-10; README release banner and updating sections list them. No version, dependency, or peer-range changes.
+- [ ] After merge: tag `v1.7.1` on main and publish the GitHub Release; `publish.yml` runs only on `release: published`.
+
+# Execution Progress — review fixes (path rewrites, settings BOM, callback URL)
+
+**Branch:** `fix/review-path-setup-callback` (from `main` @ a93b81b)
+
+- [x] Grok-native read_file/search_replace/list_dir handed pi a relative path that pi rewrites before opening (leading `@` stripped, `~` expanded, Unicode spaces normalized, look-alike fallback for missing reads), escaping the workspace through symlinks. Tool paths are now `./`-anchored, non-ASCII whitespace is refused, and read_file requires the checked target to exist.
+- [x] `bin/setup.js` treated a BOM-prefixed settings.json (readable by Pi) as corrupt and replaced it, overwriting the user's provider. It now strips a leading BOM like Pi.
+- [x] The browser callback server threw `ERR_INVALID_URL` out of its request listener on a malformed request target, crashing pi; it now answers 404.
+- [x] Regression tests fail on the old code; `npm test`, `npm run typecheck`, and both exact compatibility boundaries pass.
+
 # Execution Progress — v1.7.1 release
 
 **Branch:** `release/v1.7.1` (from `main` @ b6c7523)
@@ -40,6 +56,8 @@
 - [x] Voice chat still cut off early (user report, AirPods, right earbud only): audio arriving after `response.done` is now played (only cancelled replies, including a finished reply interrupted while playing, drop audio, and trailing audio no longer reopens the reply); a reply's player closes only after 300 ms without audio and 400 ms of trailing silence, since closing a Bluetooth stream can drop queued audio; half-duplex also mutes the microphone while a response is active. One-earbud mono playback is the headset's hands-free profile; README recommends the built-in microphone.
 - [x] Voice chat breaking up / stopping mid-reply on AirPods and built-in speakers (user report): root cause was SoX, not the stream or Bluetooth. Node feeds child stdin through a UNIX socket; SoX sizes raw input with `st_mode & S_IFREG` (true for sockets) and macOS `fstat` on a socket reports only the currently buffered bytes, so a player spawned with audio already queued (every reply since the fresh-player change) played ~1.4 s and exited 0, and the next chunk respawned a player that did the same. `--ignore-length` on the SoX player fixes it. Measured live: xAI delivers reply audio 7–8× real time in ~2 s deltas with clean PCM; with the fix a scripted-mic `XaiTalkSession` run used one player per reply that lived for the full reply (38.4 s for 37.7 s of audio) instead of ~2 s. `ffplay` is unaffected. The earlier "cut off early" fixes were partly chasing this bug.
 - [x] macOS temp-path test failures (branch `fix/macos-tmpdir-realpath`): `os.tmpdir()` is under `/var` -> `/private/var`, and `resolveNpmCli` and session output storage deliberately return real paths (symlink resolution and containment), so 3 `npm-command` and 2 `speech` tests failed locally. The two suites now realpath their temp roots; production and assertions unchanged. `npm test`, `npm run typecheck`, and `npm run compatibility:boundaries` (Pi 0.80.1 and 1.0.4) pass on macOS.
+- [x] e2e runner suite (branch `feature/e2e-pi-rpc`): replaced the scaffolded `localhost:3000` placeholder with `tests/e2e/slash-commands.e2e.ts`, which drives a real `pi --mode rpc` process (isolated HOME, `--no-extensions -e extensions/xai-oauth.ts`, blank `XAI_API_KEY`) and asserts the four extension commands register, no xAI models leak in, and `/xai-usage`, `/xai-usage csv`, `/xai-tools`, `/xai-voice`, `/xai-talk` each fail with their credential-required notify. Offline, no agent steps. CLI path comes from the Pi package `bin` (0.80 `dist/cli.js`, 1.x `dist/bundle/cli.js`). `.e2e/`, `.cursor/`, `.mcp.json` excluded from the pack.
+- [x] e2e in the exact-Pi boundary jobs (branch `feature/e2e-compat-matrix`): `run-compatibility-matrix.js` runs `npm run test:e2e` after `npm test` inside the packed workspace with `E2E_TELEMETRY_DISABLED=1`, so command execution is checked against real Pi 0.80.1 and 1.1.0, not just registration. Kept out of `npm test` because e2e needs Node ^22.22.3 or >=24.8 (Cursor Cloud pod is 22.14). `verify-compatibility.js pack` now requires `e2e.config.ts` in the tarball.
 
 ## Notes
 

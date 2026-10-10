@@ -195,8 +195,15 @@ async function startCallbackServer(expectedState: string): Promise<{
         return;
       }
 
-      const url = new URL(req.url || "/", `http://${XAI_OAUTH_REDIRECT_HOST}`);
-      if (url.pathname !== XAI_OAUTH_REDIRECT_PATH) {
+      // A malformed request target (e.g. `GET http://[`) must not throw out of
+      // the listener: an uncaught exception there would crash pi.
+      let url: URL | undefined;
+      try {
+        url = new URL(req.url || "/", `http://${XAI_OAUTH_REDIRECT_HOST}`);
+      } catch {
+        url = undefined;
+      }
+      if (url?.pathname !== XAI_OAUTH_REDIRECT_PATH) {
         res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
         res.end("Not found");
         return;

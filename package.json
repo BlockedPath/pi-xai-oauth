@@ -33,7 +33,8 @@
     "compatibility:check": "node scripts/verify-compatibility.js all && node scripts/verify-github-package.js",
     "compatibility:min": "node scripts/run-compatibility-matrix.js minimum",
     "compatibility:latest": "node scripts/run-compatibility-matrix.js latest",
-    "compatibility:boundaries": "npm run compatibility:min && npm run compatibility:latest"
+    "compatibility:boundaries": "npm run compatibility:min && npm run compatibility:latest",
+    "test:e2e": "e2e run"
   },
   "pi": {
     "extensions": [
@@ -51,12 +52,16 @@
     "@earendil-works/pi-coding-agent": ">=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.2.0"
   },
   "devDependencies": {
+    "@ai-sdk/openai": "^4.0.0",
     "@earendil-works/pi-ai": "1.1.0",
     "@earendil-works/pi-coding-agent": "1.1.0",
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "5.0.2",
+    "ai": "^7.0.0",
+    "e2e": "^0.19.0",
     "jiti": "^2.7.0",
     "typescript": "^7.0.2",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "zod": "^4.1.8"
   }
 }

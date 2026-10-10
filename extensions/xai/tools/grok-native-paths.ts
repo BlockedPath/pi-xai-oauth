@@ -32,10 +32,15 @@ export async function physicalWorkspaceSearchPath(cwd: string, requestedPath: st
 
 /**
  * Resolve a read/write/list path that remains inside the workspace after symlink resolution.
- * Missing leaf files are allowed when their physical parent stays inside the workspace.
+ * Missing leaf files are allowed when their physical parent stays inside the workspace,
+ * unless `mustExist` is set.
  * This is pathname-based defense in depth, not a race-resistant filesystem sandbox.
  */
-export async function containedWorkspacePath(cwd: string, requestedPath: string): Promise<string> {
+export async function containedWorkspacePath(
+  cwd: string,
+  requestedPath: string,
+  options: { mustExist?: boolean } = {},
+): Promise<string> {
   const lexicalPath = safeWorkspacePath(cwd, requestedPath);
   const workspacePath = await realpath(cwd);
   try {
@@ -47,6 +52,9 @@ export async function containedWorkspacePath(cwd: string, requestedPath: string)
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error;
   }
+  // pi's read tool tries look-alike names (NFD, curly quotes, macOS AM/PM)
+  // when a path is missing, so a read must name a file that exists as checked.
+  if (options.mustExist) throw new Error(`Path not found: ${requestedPath}`);
 
   const unresolvedLeafExists = await lstat(lexicalPath).then(
     () => true,
@@ -71,7 +79,14 @@ export async function containedWorkspacePath(cwd: string, requestedPath: string)
   return join(physicalParent, basename(lexicalPath));
 }
 
-/** Convert a contained absolute path into a cwd-relative tool path for pi builtins. */
+/**
+ * Convert a contained absolute path into a cwd-relative tool path for pi builtins.
+ *
+ * pi's file tools rewrite paths before opening them: they strip a leading `@`,
+ * expand `~`, and turn Unicode spaces into ASCII spaces. The `./` anchor stops
+ * the prefix rewrites, and paths with non-ASCII whitespace are refused, so pi
+ * opens exactly the path that was checked.
+ */
 export async function toWorkspaceToolPath(cwd: string, absolutePath: string): Promise<string> {
   const workspacePath = await realpath(cwd);
   const relativePath = relative(workspacePath, absolutePath);
@@ -79,7 +94,10 @@ export async function toWorkspaceToolPath(cwd: string, absolutePath: string): Pr
   if (relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
     throw new Error("Refusing to pass a path outside the workspace to a direct file adapter");
   }
-  return relativePath;
+  if (/[^\S ]/u.test(relativePath)) {
+    throw new Error("Refusing to pass a path with non-ASCII whitespace to a direct file adapter");
+  }
+  return `.${sep}${relativePath}`;
 }
 
 function noFollowFlag(): number {

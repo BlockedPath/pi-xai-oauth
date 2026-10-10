@@ -29,3 +29,8 @@ docs/diagrams/
 docs/research/
 prototype/
 probe-*
+
+# e2e runner output and local coding-agent MCP registrations.
+.e2e/
+.cursor/
+.mcp.json

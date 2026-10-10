@@ -183,7 +183,7 @@ export async function executeReadFile(
       "read_file PDF pages/format are unavailable in this pi adapter; use a workspace text export",
     );
   }
-  const absolutePath = await containedWorkspacePath(ctx.cwd, prepared.target_file);
+  const absolutePath = await containedWorkspacePath(ctx.cwd, prepared.target_file, { mustExist: true });
   const toolPath = await toWorkspaceToolPath(ctx.cwd, absolutePath);
   const piArgs = {
     ...readFileArgsForPi(prepared),

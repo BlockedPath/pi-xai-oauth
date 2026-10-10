@@ -171,7 +171,8 @@ function updateSettings(settingsPath = SETTINGS_PATH) {
 
   if (fs.existsSync(settingsPath)) {
     try {
-      settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+      // Pi strips a leading UTF-8 BOM (e.g. from Windows Notepad) before parsing.
+      settings = JSON.parse(fs.readFileSync(settingsPath, "utf8").replace(/^\uFEFF/, ""));
     } catch (e) {
       const backupPath = `${settingsPath}.bak-${new Date().toISOString().replace(/[:.]/g, "-")}`;
       try {

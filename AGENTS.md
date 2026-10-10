@@ -18,6 +18,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Full policy/unit/loader/CLI gate: `npm test`
 - Focused Vitest suite: `npm run test:unit -- tests/oauth/browser-login.test.ts`
 - V8 coverage: `npm run test:coverage`
+- Real Pi RPC e2e suite: `npm run test:e2e` (spawns `pi --mode rpc` with only this extension in an isolated HOME; offline, no credentials, no model calls; needs Node ^22.22.3 or >=24.8, so it stays out of `npm test` and runs in the exact-version boundary jobs instead)
 - Real Pi loader smoke: `npm run test:loader`
 - Real Pi version and isolated update-dispatch smoke: `npm run test:cli`
 - Run TypeScript: `npm run typecheck` (production, tests, fixtures, config)
@@ -48,7 +49,7 @@ Core flow: `bin/setup.js` → `pi install` → bounded catalog selection in `ext
 - Preserve explicit unsupported-version exclusions when widening Pi support; Pi 0.85.0 stays excluded, and strict-resolution negative fixtures must cover the lower sentinel, excluded releases, and the upper sentinel
 - Keep npmjs `pi-xai-oauth` canonical and publish GitHub Packages only as the exact scoped mirror `@blockedpath/pi-xai-oauth`; setup must treat both names as aliases and prevent duplicate registration
 - Install/report exact Pi matrix versions from a clean packed package; never reuse the repository lockfile for boundary jobs
-- Keep `tests/`, its fixtures, `vitest.config.mts`, and `tsconfig.json` inside the packed tarball; `scripts/run-compatibility-matrix.js` extracts the pack and runs `npm test` plus `npm run typecheck` inside it, so excluding them silently breaks both exact-Pi boundary jobs
+- Keep `tests/`, its fixtures, `vitest.config.mts`, `e2e.config.ts`, and `tsconfig.json` inside the packed tarball; `scripts/run-compatibility-matrix.js` extracts the pack and runs `npm test`, `npm run test:e2e` (telemetry disabled), and `npm run typecheck` inside it, so excluding them silently breaks both exact-Pi boundary jobs
 - Keep normal Pi dev dependencies exact at the policy's latest tested release and review candidate releases before widening support
 - Resolve `x-userid` transiently from the pinned authenticated CLI-proxy `/user` endpoint before any billing request
 - Keep `/xai-usage` explicit, and keep its optional status off by default, session-scoped, bounded, and inactive outside xAI models
@@ -102,6 +103,8 @@ pi-xai-oauth/
 │   ├── pi-versions.json # Peer range plus exact minimum/latest matrix policy
 │   └── grok-build-wire-protocol.md # Pinned xAI route/header review procedure
 ├── tests/                    # Focused typed Vitest domain suites + isolated fixtures
+│   └── e2e/                  # e2e runner suites (*.e2e.ts) over a real Pi RPC session
+├── e2e.config.ts             # e2e runner config (tools-only target; agent model unused by current suites)
 ├── vitest.config.mts         # Node isolation and measured V8 coverage floors
 ├── scripts/
 │   ├── verify-extension-loader.mjs # Small real Pi loader smoke
@@ -109,7 +112,7 @@ pi-xai-oauth/
 │   ├── verify-compatibility.js # Policy/range/registry/pack/unsupported-peer checks
 │   ├── prepare-github-package.js # Exact scoped mirror staging for GitHub Packages
 │   ├── verify-github-package.js # Mirror name/registry/version/setup parity gate
-│   └── run-compatibility-matrix.js # Clean packed exact-version test/typecheck runner
+│   └── run-compatibility-matrix.js # Clean packed exact-version test/e2e/typecheck runner
 ├── .github/workflows/
 │   └── ci.yml           # PR/main policy and exact Pi boundary matrix
 ├── package.json
