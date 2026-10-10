@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { connect } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import packageMetadata from "../../package.json";
 import {
@@ -385,6 +386,18 @@ describe("browser OAuth state and manual callbacks", () => {
                 expect(notFound.status).toBe(404);
                 expect(await notFound.text()).toBe("Not found");
                 expect(notFound.headers.get("access-control-allow-origin")).toBeNull();
+
+                // fetch cannot send an unparsable request target, so use a raw socket.
+                const malformed = await new Promise<string>((resolve, reject) => {
+                  let response = "";
+                  const socket = connect(Number(redirect.port), redirect.hostname, () => {
+                    socket.write("GET http://[ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+                  });
+                  socket.on("data", (chunk) => { response += chunk; });
+                  socket.on("end", () => resolve(response));
+                  socket.on("error", reject);
+                });
+                expect(malformed.split("\r\n")[0]).toBe("HTTP/1.1 404 Not Found");
                 expect(settled).toBe(false);
 
                 const good = new URL(redirect);
