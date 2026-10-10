@@ -148,6 +148,19 @@ describe("setup settings", () => {
       defaultModel: "claude-opus-4-6",
       defaultThinkingLevel: "medium",
     });
+
+    // Pi reads settings saved with a UTF-8 BOM, so setup must not treat them as corrupt.
+    await writeFile(
+      settingsPath,
+      `\uFEFF${JSON.stringify({ defaultProvider: "anthropic", defaultModel: "claude-opus-4-6", theme: "dark" })}`,
+    );
+    setup.updateSettings(settingsPath);
+    expect(JSON.parse(await readFile(settingsPath, "utf8"))).toEqual({
+      packages: ["npm:pi-xai-oauth"],
+      defaultProvider: "anthropic",
+      defaultModel: "claude-opus-4-6",
+      theme: "dark",
+    });
   });
   it("fills blank xAI defaults but keeps a deliberate xAI model choice", async () => {
     await mkdir(join(settingsPath, ".."), { recursive: true });

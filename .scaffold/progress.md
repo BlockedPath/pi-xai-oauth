@@ -1,3 +1,12 @@
+# Execution Progress — review fixes (path rewrites, settings BOM, callback URL)
+
+**Branch:** `fix/review-path-setup-callback` (from `main` @ a93b81b)
+
+- [x] Grok-native read_file/search_replace/list_dir handed pi a relative path that pi rewrites before opening (leading `@` stripped, `~` expanded, Unicode spaces normalized, look-alike fallback for missing reads), escaping the workspace through symlinks. Tool paths are now `./`-anchored, non-ASCII whitespace is refused, and read_file requires the checked target to exist.
+- [x] `bin/setup.js` treated a BOM-prefixed settings.json (readable by Pi) as corrupt and replaced it, overwriting the user's provider. It now strips a leading BOM like Pi.
+- [x] The browser callback server threw `ERR_INVALID_URL` out of its request listener on a malformed request target, crashing pi; it now answers 404.
+- [x] Regression tests fail on the old code; `npm test`, `npm run typecheck`, and both exact compatibility boundaries pass.
+
 # Execution Progress — v1.7.1 release
 
 **Branch:** `release/v1.7.1` (from `main` @ b6c7523)
