@@ -265,6 +265,7 @@ function verifyPackedPackage() {
       "scripts/verify-pi-cli.mjs",
       "scripts/npm-command.js",
       "vitest.config.mts",
+      "e2e.config.ts",
       "tsconfig.json",
       ...listGitVisibleFiles(path.join(repoRoot, "tests")),
     ];
