@@ -6,16 +6,13 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.7.1 - 2026-10-10
+
 ### Fixed
 
 - Fix Grok-native `read_file`, `search_replace`, and `list_dir` reaching files outside the workspace. Pi's file tools strip a leading `@`, expand `~`, turn Unicode spaces into ASCII spaces, and try look-alike names for a missing read, so a checked path such as `@link` could open a symlink that points outside. Pi now receives the exact checked path, paths with non-ASCII whitespace are refused, and `read_file` reports a missing file instead of falling back to a look-alike name.
 - Fix setup replacing a `settings.json` saved with a UTF-8 byte order mark (as Windows Notepad does). Pi reads such files, but setup treated them as corrupt and overwrote the existing provider and settings with defaults; it now strips the mark before parsing.
 - Fix a malformed request to the browser-login callback port crashing Pi. The callback server now answers 404 instead of throwing from its request handler.
-
-## 1.7.1 - 2026-10-09
-
-### Fixed
-
 - Fix `/xai-voice` dictation (and Ctrl+Space / F8) and `/xai-talk`'s Enter-to-insert transcript never appearing in the prompt in Pi's TUI. Pi restores the editor's pre-dialog draft when an extension overlay closes, and the transcript was inserted just before that restore, which erased it. Transcripts are now inserted after the overlay closes. RPC clients were not affected.
 
 ## 1.7.0 - 2026-10-09
