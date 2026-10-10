@@ -1,3 +1,10 @@
+# Execution Progress — v1.7.1 publication with review fixes
+
+**Branch:** `release/v1.7.1` (from `main` @ 5b66d82)
+
+- [x] v1.7.1 was merged in #239 but never tagged or published (npm latest stayed 1.7.0), so it ships now with the #246 fixes instead of skipping a version. CHANGELOG folds the Unreleased fixes into 1.7.1 dated 2026-10-10; README release banner and updating sections list them. No version, dependency, or peer-range changes.
+- [ ] After merge: tag `v1.7.1` on main and publish the GitHub Release; `publish.yml` runs only on `release: published`.
+
 # Execution Progress — review fixes (path rewrites, settings BOM, callback URL)
 
 **Branch:** `fix/review-path-setup-callback` (from `main` @ a93b81b)
