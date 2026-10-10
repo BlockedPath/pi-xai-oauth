@@ -31,12 +31,26 @@ type ResizeImageFn = (
 const DEFAULT_MAX_BYTES = 4.5 * 1024 * 1024;
 const ENCODE_TIMEOUT_MS = 20_000;
 
-function readSize(bytes: Buffer): { width: number; height: number } | undefined {
+/** The omp resize fallback needs ffmpeg. Pi hosts do not use this path. */
+export class MissingFfmpegError extends Error {
+  constructor() {
+    super("Image resize needs ffmpeg. Install ffmpeg and try again.");
+    this.name = "MissingFfmpegError";
+  }
+}
+
+function readSize(
+  bytes: Buffer,
+): { width: number; height: number; mimeType: "image/png" | "image/jpeg" } | undefined {
   try {
     const inspected = inspectSupportedImageBytes(bytes, {
       maxPixels: Number.MAX_SAFE_INTEGER,
     });
-    return { width: inspected.width, height: inspected.height };
+    return {
+      width: inspected.width,
+      height: inspected.height,
+      mimeType: inspected.mimeType,
+    };
   } catch {
     return undefined;
   }
@@ -106,7 +120,10 @@ async function encode(
   try {
     const output = await runFfmpeg(args, input);
     return output.length > 0 ? output : undefined;
-  } catch {
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      throw new MissingFfmpegError();
+    }
     return undefined;
   }
 }
@@ -135,7 +152,7 @@ export async function resizeImageFallback(
   if (size.width <= opts.maxWidth && size.height <= opts.maxHeight && base64Size(bytes) < opts.maxBytes) {
     return {
       data: bytes.toString("base64"),
-      mimeType: mimeType || "image/png",
+      mimeType: size.mimeType,
       originalWidth: size.width,
       originalHeight: size.height,
       width: size.width,

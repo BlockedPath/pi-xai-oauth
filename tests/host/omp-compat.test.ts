@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copyModelCompat, resolveOpenAIResponsesStream, selectResizeImage } from "../../extensions/xai/host-compat";
+import { jpegHeaderBytes } from "../fixtures/images";
 import { resizeImage, resizeImageFallback } from "../../extensions/xai/resize-image";
 
 const ONE_PIXEL_PNG = Buffer.from(
@@ -54,6 +55,19 @@ describe("omp host compatibility", () => {
       height: 1,
       wasResized: false,
     });
+  });
+
+  it("returns the MIME type from the image bytes, not the caller label", async () => {
+    const jpeg = jpegHeaderBytes(2, 3);
+    const labeled = await resizeImageFallback(jpeg, "image/png");
+    const unlabeled = await resizeImageFallback(jpeg, "");
+    expect(labeled).toMatchObject({
+      mimeType: "image/jpeg",
+      width: 2,
+      height: 3,
+      wasResized: false,
+    });
+    expect(unlabeled?.mimeType).toBe("image/jpeg");
   });
 
   it("uses Pi's resizeImage from the public helper on this host", async () => {
