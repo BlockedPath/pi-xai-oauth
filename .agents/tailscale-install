@@ -29,7 +29,9 @@ restore_policy() {
 	else
 		sudo rm -f /usr/sbin/policy-rc.d
 	fi
-	rm -f "$policy_backup"
+	# sudo: `cp -p` left the backup root-owned, and a failing EXIT trap
+	# would make the whole script (and .agents/setup) exit non-zero.
+	sudo rm -f "$policy_backup"
 }
 trap restore_policy EXIT
 printf '#!/bin/sh\nexit 101\n' | sudo tee /usr/sbin/policy-rc.d >/dev/null
