@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Joins this orb to the tailnet as an ephemeral tag:amp-orb node, using a
+# short-lived Amp workload identity token instead of a stored auth key.
+# Called from .agents/resume on activation and every wake. Skips (exit 0)
+# until Tailscale is installed and the workspace env vars are set.
+set -euo pipefail
+
+if ! command -v tailscale >/dev/null 2>&1; then
+	echo "tailscale: not installed (snapshot predates .agents/tailscale-install); skipping"
+	exit 0
+fi
+if [ -z "${TAILSCALE_CLIENT_ID:-}" ] || [ -z "${TAILSCALE_AUDIENCE:-}" ]; then
+	echo "tailscale: TAILSCALE_CLIENT_ID or TAILSCALE_AUDIENCE not set in Amp workspace env vars; skipping"
+	exit 0
+fi
+
+# Name the node after the project's repository (the checkout dir is always
+# "repo"). Tailscale appends -1, -2, ... while several of its orbs are online.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+name="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+name="${name%.git}"
+name="${name##*/}"
+[ -n "$name" ] || name="${AMP_PROJECT_ID:-orb}"
+name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//' | cut -c1-50)"
+ts_hostname="orb-${name:-unknown}"
+
+# E2B microVM orbs can expose only a link-local IPv4 interface; Tailscale
+# 1.90.1+ needs this to keep contacting the control server.
+sudo install -d /etc/systemd/system/tailscaled.service.d
+sudo tee /etc/systemd/system/tailscaled.service.d/amp-orb.conf >/dev/null <<'EOF'
+[Service]
+Environment=TS_ASSUME_NETWORK_UP_FOR_TEST=true
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable tailscaled.service
+sudo systemctl restart tailscaled.service
+
+token_file=$(mktemp)
+trap 'rm -f "$token_file"' EXIT
+amp orb id-token --audience "$TAILSCALE_AUDIENCE" --subject-scope workspace >"$token_file"
+
+# --accept-dns=false: the tailnet policy keeps orbs from reaching other
+# devices, so MagicDNS adds nothing, and leaving /etc/resolv.conf alone keeps
+# the orb's own name resolution untouched. The file: form keeps the token off
+# the command line; do not enable shell tracing in this script.
+sudo tailscale up \
+	--client-id="${TAILSCALE_CLIENT_ID}?ephemeral=true&preauthorized=true" \
+	--id-token="file:$token_file" \
+	--advertise-tags=tag:amp-orb \
+	--hostname="$ts_hostname" \
+	--accept-dns=false
+echo "tailscale: up as $ts_hostname ($(tailscale ip -4))"

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Installs Tailscale for Amp orbs. Called from .agents/setup. Does not sign in
+# and leaves tailscaled stopped and disabled, so the project snapshot carries
+# no machine identity; .agents/tailscale-up joins the tailnet on each wake.
+# Idempotent.
+set -euo pipefail
+
+if command -v tailscale >/dev/null 2>&1; then
+	echo "tailscale already installed: $(tailscale version | head -n1)"
+	exit 0
+fi
+
+curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg |
+	sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list |
+	sudo tee /etc/apt/sources.list.d/tailscale.list >/dev/null
+
+# The package enables and starts tailscaled on install. A temporary
+# policy-rc.d that exits 101 blocks that start; restore whatever was there.
+policy_backup=$(mktemp)
+if [ -e /usr/sbin/policy-rc.d ]; then
+	sudo cp -p /usr/sbin/policy-rc.d "$policy_backup"
+else
+	rm "$policy_backup"
+fi
+restore_policy() {
+	if [ -e "$policy_backup" ]; then
+		sudo cp -p "$policy_backup" /usr/sbin/policy-rc.d
+	else
+		sudo rm -f /usr/sbin/policy-rc.d
+	fi
+	rm -f "$policy_backup"
+}
+trap restore_policy EXIT
+printf '#!/bin/sh\nexit 101\n' | sudo tee /usr/sbin/policy-rc.d >/dev/null
+sudo chmod 0755 /usr/sbin/policy-rc.d
+
+sudo apt-get update
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tailscale
+sudo systemctl disable --now tailscaled.service
+echo "installed $(tailscale version | head -n1)"
