@@ -16,6 +16,9 @@ CLAUDE.md
 *.local
 .agents/*
 !.agents/setup
+!.agents/resume
+!.agents/tailscale-install
+!.agents/tailscale-up
 .amp/portals/*
 .claude/
 skills-lock.json
