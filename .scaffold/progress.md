@@ -1,3 +1,9 @@
+# Execution Progress — orb tailscaled restart only when needed
+
+**Branch:** `fix/tailscale-up-conditional-restart` (from `main` @ 11fd9e9)
+
+- [x] `.agents/tailscale-up` rewrote the `amp-orb.conf` drop-in and restarted tailscaled on every wake, dropping a live tailnet connection. It now byte-compares the drop-in, writes it only when it differs, and restarts only when it changed or tailscaled is not active. `bash -n` and shellcheck pass; a stubbed two-run harness (macOS bash 3.2/BSD cmp and Debian bookworm bash 5.2/GNU cmp) confirms fresh, unchanged-running, unchanged-stopped, and stale-drop-in cases.
+
 # Execution Progress — v1.7.1 publication with review fixes
 
 **Branch:** `release/v1.7.1-publish` (from `main` @ 5b66d82)
