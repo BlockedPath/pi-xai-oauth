@@ -52,5 +52,4 @@ install_deps() {
 step "Check Node version" check_node
 step "Pin npm resolver" pin_npm
 step "Install locked dependencies" install_deps
-step "Install Tailscale (not signed in)" .agents/tailscale-install
 step "Install Tailscale (not signed in; .agents/resume joins the tailnet)" "$repo_root/.agents/tailscale-install"
