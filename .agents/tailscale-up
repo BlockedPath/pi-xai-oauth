@@ -26,7 +26,8 @@ ts_hostname="orb-${name:-unknown}"
 
 # E2B microVM orbs can expose only a link-local IPv4 interface; Tailscale
 # 1.90.1+ needs this to keep contacting the control server. Restart only when
-# the drop-in changed or tailscaled is down, so a wake keeps a live connection.
+# the drop-in changed, tailscaled is down, or the running daemon lacks the
+# setting, so a wake keeps a live connection.
 amp_orb_conf() {
 	cat <<'EOF'
 [Service]
@@ -42,7 +43,20 @@ if ! amp_orb_conf | cmp -s - "$conf"; then
 fi
 sudo systemctl daemon-reload
 sudo systemctl enable tailscaled.service
-if [ "$conf_changed" = 1 ] || ! systemctl is-active --quiet tailscaled.service; then
+needs_restart=0
+[ "$conf_changed" = 1 ] && needs_restart=1
+if systemctl is-active --quiet tailscaled.service; then
+	# A run that wrote the drop-in but died before restarting leaves the file
+	# identical while the daemon runs without the setting, so check the
+	# running process, not just the file.
+	pid="$(systemctl show -p MainPID --value tailscaled.service)"
+	if [ -z "$pid" ] || [ "$pid" = 0 ] || ! sudo grep -qzx 'TS_ASSUME_NETWORK_UP_FOR_TEST=true' "/proc/$pid/environ" 2>/dev/null; then
+		needs_restart=1
+	fi
+else
+	needs_restart=1
+fi
+if [ "$needs_restart" = 1 ]; then
 	sudo systemctl restart tailscaled.service
 fi
 

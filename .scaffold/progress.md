@@ -1,3 +1,9 @@
+# Execution Progress — adversarial review fixes (setup dup, stranded drop-in)
+
+**Branch:** `fix/review-tailscale-setup-restart` (from `main` @ b4b7c21)
+
+- [x] Parallel fresh-context review of `a93b81b..HEAD` (#246/#248/#249/#250): security OK, correctness 3× P2, tests angle parent-verified (gpt-6.1-sol child timed out twice). Applied the two fixes worth doing now: `.agents/setup` ran `tailscale-install` twice (duplicate step removed), and `.agents/tailscale-up` could strand a written-but-never-applied drop-in if a run died before restarting — it now also restarts when the running daemon's `/proc/<MainPID>/environ` lacks `TS_ASSUME_NETWORK_UP_FOR_TEST=true`. `bash -n`, shellcheck (tailscale-up clean; setup SC2016 pre-existing), and a 6-case stubbed decision harness pass. Deferred: macOS-screenshot/NFD read fallback (deliberate, documented), committing a Tailscale harness/CI wiring, unicode-whitespace error wording.
+
 # Execution Progress — orb tailscaled restart only when needed
 
 **Branch:** `fix/tailscale-up-conditional-restart` (from `main` @ 11fd9e9)
