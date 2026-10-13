@@ -6,6 +6,13 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.7.2 - 2026-10-13
+
+### Changed
+
+- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.3.0`, with exact packed test boundaries at 0.80.1 and 1.2.0 (development dependencies and the packed `latest` matrix job). Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 1.2.0 passed the clean packed candidate run (tests, e2e, loader, CLI, typecheck) with no extension changes needed. This widening also moves the tested `latest` boundary off Pi 1.1.0: its `@earendil-works/pi-coding-agent` depends on `@earendil-works/pi-codemode` `^1.1.0`, and pi-codemode 1.2.0 (published 2026-10-12) removed the `MCP_TYPESCRIPT_PREAMBLE` export that 1.1.0 imports, so fresh installs of the 1.1.0 pair fail to load. Locked installs are unaffected; Pi 1.1.0 remains inside the supported range for them.
+- No runtime changes. Packages the Amp orb Tailscale setup scripts (`.agents/tailscale-install`, `.agents/tailscale-up`, `.agents/resume`) merged since 1.7.1 so the published tarball matches `main`. The orb setup starts `tailscaled` only when its drop-in changed or the daemon is down, and a written drop-in is no longer stranded by a duplicate setup step.
+
 ## 1.7.1 - 2026-10-10
 
 ### Fixed
