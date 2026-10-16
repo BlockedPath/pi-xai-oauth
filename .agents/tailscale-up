@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Joins this orb to the tailnet as an ephemeral tag:amp-orb node, using a
+# short-lived Amp workload identity token instead of a stored auth key.
+# Called from .agents/resume on activation and every wake. Skips (exit 0)
+# until Tailscale is installed and the workspace env vars are set.
+set -euo pipefail
+
+if ! command -v tailscale >/dev/null 2>&1; then
+	echo "tailscale: not installed (snapshot predates .agents/tailscale-install); skipping"
+	exit 0
+fi
+if [ -z "${TAILSCALE_CLIENT_ID:-}" ] || [ -z "${TAILSCALE_AUDIENCE:-}" ]; then
+	echo "tailscale: TAILSCALE_CLIENT_ID or TAILSCALE_AUDIENCE not set in Amp workspace env vars; skipping"
+	exit 0
+fi
+
+# Name the node after the project's repository (the checkout dir is always
+# "repo"). Tailscale appends -1, -2, ... while several of its orbs are online.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+name="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+name="${name%.git}"
+name="${name##*/}"
+[ -n "$name" ] || name="${AMP_PROJECT_ID:-orb}"
+name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//' | cut -c1-50)"
+ts_hostname="orb-${name:-unknown}"
+
+# E2B microVM orbs can expose only a link-local IPv4 interface; Tailscale
+# 1.90.1+ needs this to keep contacting the control server. Restart only when
+# the drop-in changed, tailscaled is down, or the running daemon lacks the
+# setting, so a wake keeps a live connection.
+amp_orb_conf() {
+	cat <<'EOF'
+[Service]
+Environment=TS_ASSUME_NETWORK_UP_FOR_TEST=true
+EOF
+}
+conf=/etc/systemd/system/tailscaled.service.d/amp-orb.conf
+conf_changed=0
+if ! amp_orb_conf | cmp -s - "$conf"; then
+	sudo install -d "$(dirname "$conf")"
+	amp_orb_conf | sudo tee "$conf" >/dev/null
+	conf_changed=1
+fi
+sudo systemctl daemon-reload
+sudo systemctl enable tailscaled.service
+needs_restart=0
+[ "$conf_changed" = 1 ] && needs_restart=1
+if systemctl is-active --quiet tailscaled.service; then
+	# A run that wrote the drop-in but died before restarting leaves the file
+	# identical while the daemon runs without the setting, so check the
+	# running process, not just the file.
+	pid="$(systemctl show -p MainPID --value tailscaled.service)"
+	if [ -z "$pid" ] || [ "$pid" = 0 ] || ! sudo grep -qzx 'TS_ASSUME_NETWORK_UP_FOR_TEST=true' "/proc/$pid/environ" 2>/dev/null; then
+		needs_restart=1
+	fi
+else
+	needs_restart=1
+fi
+if [ "$needs_restart" = 1 ]; then
+	sudo systemctl restart tailscaled.service
+fi
+
+token_file=$(mktemp)
+trap 'rm -f "$token_file"' EXIT
+amp orb id-token --audience "$TAILSCALE_AUDIENCE" --subject-scope workspace >"$token_file"
+
+# --accept-dns=false: the tailnet policy keeps orbs from reaching other
+# devices, so MagicDNS adds nothing, and leaving /etc/resolv.conf alone keeps
+# the orb's own name resolution untouched. The file: form keeps the token off
+# the command line; do not enable shell tracing in this script.
+sudo tailscale up \
+	--client-id="${TAILSCALE_CLIENT_ID}?ephemeral=true&preauthorized=true" \
+	--id-token="file:$token_file" \
+	--advertise-tags=tag:amp-orb \
+	--hostname="$ts_hostname" \
+	--accept-dns=false
+echo "tailscale: up as $ts_hostname ($(tailscale ip -4))"

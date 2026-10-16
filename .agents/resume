@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs every time the orb wakes. Keep it fast; installs live in .agents/setup.
+set -euo pipefail
+
+"$(dirname "${BASH_SOURCE[0]}")/tailscale-up" || echo "tailscale-up failed; continuing without Tailscale" >&2
