@@ -50,8 +50,19 @@ import {
   xaiJsonPostHeaders,
   xaiProxyRequestHeaders,
 } from "./wire";
+import { copyModelCompat, resolveOpenAIResponsesStream } from "./host-compat";
 
-const streamSimpleOpenAIResponses = piAiCompat.openAIResponsesApi().streamSimple;
+const resolvedOpenAIResponsesStream = resolveOpenAIResponsesStream(piAiCompat);
+if (typeof resolvedOpenAIResponsesStream !== "function") {
+  throw new Error("Pi compatibility layer has no OpenAI Responses stream");
+}
+// Keep the call shape Pi's stream already accepts. The runtime function is
+// Pi's openAIResponsesApi().streamSimple when that export exists.
+const streamSimpleOpenAIResponses = resolvedOpenAIResponsesStream as (
+  model: Model<"openai-responses">,
+  context: Context,
+  options?: SimpleStreamOptions,
+) => AsyncIterable<unknown>;
 type DelegateContext = Parameters<typeof streamSimpleOpenAIResponses>[1];
 // SAFETY: Pi 0.86 exports normalizeContext with this signature; older supported
 // versions omit it and require the original top-level prompt/tools instead.
@@ -393,6 +404,9 @@ export function streamSimpleXaiResponses(
         }
       : {}),
     api: "openai-responses" as const,
+    // omp 18.8.7 reads model.compat.storeResponses with no guard. Copy Pi's
+    // compat object when it exists, and pass an empty object only when it does not.
+    compat: copyModelCompat(model),
   };
   const delegateContext = prepareXaiDelegateContext(
     context,
