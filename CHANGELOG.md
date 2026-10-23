@@ -6,6 +6,14 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+## 1.7.3 - 2026-10-23
+
+### Changed
+
+- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.5.0`, with exact packed test boundaries at 0.80.1 and 1.4.0 (development dependencies and the packed `latest` matrix job). Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 1.3.0 and 1.4.0 both passed the clean packed candidate run (tests, e2e, loader, CLI, typecheck) with no extension changes needed. Pi 1.4.0's pi-ai breaking changes (`telemetryContext` → `telemetry`, the removed `getPiUserAgent()`, and the `resolveTranscriptTools()` signature) touch nothing this package imports, and its resumed-session tool activation change does not affect the credit-gated xAI tools, which stay opt-in through an execute-time check and the `before_agent_start` sync.
+- Pi 1.4.0 added the `xhigh` thinking level to Pi's built-in `xai` Grok 4.3 and Grok 4.5 entries. The reasoning-parity test now derives that level from Pi's catalog instead of pinning the pre-1.4 level lists, so it passes on every supported boundary. The `xai-auth` known metadata still keeps `xhigh` hidden for Grok 4.3 and Grok 4.5 until authenticated `/models-v2` evidence names it; a catalog that lists the effort already advertises it.
+- No runtime changes.
+
 ## 1.7.2 - 2026-10-13
 
 ### Changed

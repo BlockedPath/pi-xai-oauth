@@ -41,6 +41,10 @@ const supportedLevels = (model: XaiCatalogModel) =>
 const builtIn = (id: string): Model<Api> | undefined =>
   (XAI_MODELS as unknown as Record<string, Model<Api> | undefined>)[id];
 
+/** Whether a built-in model maps Pi's `xhigh` onto a real xAI effort (Pi 1.4.0+ for Grok 4.3/4.5). */
+const builtInOffersXhigh = (model: Model<Api> | undefined): boolean =>
+  (model as { thinkingLevelMap?: Record<string, unknown> } | undefined)?.thinkingLevelMap?.xhigh === "xhigh";
+
 const known = (id: string) => {
   const model = KNOWN_XAI_MODEL_METADATA.find((entry) => entry.id === id);
   if (!model) throw new Error(`missing known metadata for ${id}`);
@@ -66,6 +70,9 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     // Pi 0.84.3 (PR #8124), where grok-4.3 explicitly denies `minimal`.
     // Prior Pi lines (0.80 - 0.84.2) used completions without a thinkingLevelMap,
     // which defaulted to exposing `minimal`.
+    // Pi 1.4.0 (pi-ai 1.4.0) added `xhigh` to the built-in grok-4.3 entry; older
+    // supported lines leave it null/undefined. Derive that one level from the
+    // built-in map so the assertion holds on every supported boundary.
     const builtIn43 = builtIn("grok-4.3");
     const thinkingLevelMap = (builtIn43 as { thinkingLevelMap?: unknown } | undefined)?.thinkingLevelMap;
     if (thinkingLevelMap) {
@@ -74,6 +81,7 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
         "low",
         "medium",
         "high",
+        ...(builtInOffersXhigh(builtIn43) ? ["xhigh"] : []),
       ]);
     } else if (builtIn43) {
       expect(supportedLevels(known("grok-4.3"))).toEqual(
@@ -96,10 +104,12 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
     if (builtIn45) {
       // Built-in `xai` denies `minimal`; `xai-auth` maps Pi's `minimal` onto the
       // xAI wire value `low`, which is the same request xAI receives for `low`.
+      // Pi 1.4.0 (pi-ai 1.4.0) added `xhigh` to the built-in entry.
       expect(getSupportedThinkingLevels(builtIn45)).toEqual([
         "low",
         "medium",
         "high",
+        ...(builtInOffersXhigh(builtIn45) ? ["xhigh"] : []),
       ]);
     }
     expect(supportedLevels(known("grok-4.5"))).toEqual([
@@ -109,7 +119,10 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
       "high",
     ]);
     expect(known("grok-4.5").thinkingLevelMap?.minimal).toBe("low");
-    // Neither provider ever offers `off`, `xhigh`, or `max` for Grok 4.5.
+    // Neither provider ever offers `off` or `max` for Grok 4.5. Built-in `xai`
+    // offers `xhigh` only from Pi 1.4.0 on; `xai-auth` known metadata keeps it
+    // hidden until authenticated `/models-v2` evidence names it (the catalog
+    // path already maps a listed `xhigh`/`max` effort, see below).
     // Assert effective levels rather than the raw map shape: the supported Pi
     // range spells these differently (0.80.1 has no `max` level at all, 0.81
     // leaves built-in `xhigh`/`max` undefined, 0.82 sets them to null) while
@@ -118,7 +131,7 @@ describe("built-in xai vs xai-auth reasoning parity", () => {
       | Record<string, string | null | undefined>
       | undefined;
     for (const level of ["off", "xhigh", "max"] as const) {
-      if (builtIn45) {
+      if (builtIn45 && !(level === "xhigh" && builtInOffersXhigh(builtIn45))) {
         expect(getSupportedThinkingLevels(builtIn45)).not.toContain(level);
       }
       expect(supportedLevels(known("grok-4.5"))).not.toContain(level);
