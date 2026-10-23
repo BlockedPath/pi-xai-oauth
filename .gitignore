@@ -21,6 +21,7 @@ CLAUDE.md
 !.agents/tailscale-up
 .amp/portals/*
 .claude/
+.codex/
 skills-lock.json
 docs/diagrams/
 
