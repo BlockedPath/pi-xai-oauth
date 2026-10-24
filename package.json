@@ -56,12 +56,12 @@
     "@earendil-works/pi-ai": "1.4.0",
     "@earendil-works/pi-coding-agent": "1.4.0",
     "@types/node": "^26.0.0",
-    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/coverage-v8": "5.0.5",
     "ai": "^7.0.0",
     "e2e": "^0.21.2",
     "jiti": "^2.7.0",
     "typescript": "^7.0.2",
-    "vitest": "5.0.3",
+    "vitest": "5.0.5",
     "zod": "^4.1.8"
   }
 }
