@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -109,7 +109,9 @@ for (const { manifest } of installed) {
 const cliRelativePath = piCodingAgent.manifest.bin?.pi;
 assert.equal(typeof cliRelativePath, "string", "Pi package should expose its CLI path");
 const cliPath = join(piCodingAgent.root, cliRelativePath);
-const sandbox = await mkdtemp(join(tmpdir(), "pi-xai-cli-"));
+// Resolve symlinks (macOS /var -> /private/var): Pi 1.5.0+ hands npm the agent
+// directory's real path, so the shim's expected --prefix must use it as well.
+const sandbox = await realpath(await mkdtemp(join(tmpdir(), "pi-xai-cli-")));
 
 try {
 	const shimPath = join(sandbox, "npm-shim.mjs");
@@ -257,7 +259,11 @@ Object.defineProperty(globalThis, "fetch", {
 			recordPath: extensionRecordPath,
 		}),
 	});
-	const extensionInvocations = await readInvocations(extensionRecordPath);
+	// Pi 1.5.0+ also passes npm's quiet-output flags (no audit/funding advice);
+	// older Pi omits them. Accept exactly those two extras and nothing else.
+	const quietInstallFlags = new Set(["--no-audit", "--no-fund"]);
+	const extensionInvocations = (await readInvocations(extensionRecordPath))
+		.map((args) => args.filter((arg) => !quietInstallFlags.has(arg)));
 	assert.deepEqual(
 		extensionInvocations,
 		[[
