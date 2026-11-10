@@ -8,9 +8,10 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ### Changed
 
-- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.6.0`, with exact packed test boundaries at 0.80.1 and 1.5.0 (development dependencies and the packed `latest` matrix job); 1.6.0 is the new upper sentinel. Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 1.5.0 passed the clean packed candidate tests, e2e, loader, and typecheck with no extension changes.
+- Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.6.0`, with exact packed test boundaries at 0.80.1 and 1.5.2 (development dependencies and the packed `latest` matrix job); 1.6.0 is the new upper sentinel. Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 1.5.0 passed the clean packed candidate tests, e2e, loader, and typecheck with no extension changes.
 - Pi 1.5.0's pi-ai breaking change (the main entry no longer re-exports TypeBox, and tool arguments validate through `@earendil-works/pi-schema`) needs no migration: the Grok-native adapters already import `Type` from `typebox` itself, Pi's extension loader still provides that module, and every tool schema here is plain JSON Schema with no refinements, codecs, or custom formats.
 - The isolated `pi update npm:pi-xai-oauth` check now resolves its temporary sandbox to a real path. Pi 1.5.0 passes npm the agent directory's resolved path (so macOS `/var` becomes `/private/var`), which the previous literal-path assertion rejected; the check still verifies that the update stays inside the temporary agent directory. It also accepts the `--no-audit --no-fund` flags Pi 1.5.0 now adds to package installs, and no other extra arguments.
+- Move the exact `latest` test boundary from Pi 1.5.0 to 1.5.2. Pi 1.5.2 passed the clean packed candidate tests, e2e, loader, CLI update dispatch, and typecheck with no extension changes; Pi 1.5.1's `pi update` package summaries and its grep and OpenAI-compatible empty-`tools` changes touch nothing this package depends on.
 - No runtime changes.
 
 ## 1.7.3 - 2026-10-23
