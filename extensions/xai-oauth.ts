@@ -36,14 +36,18 @@ export default async function (pi: ExtensionAPI) {
   const providerModels = (models: readonly XaiCatalogModel[]) =>
     models.map(({ apiBackend: _apiBackend, inputProvenance: _inputProvenance, ...model }) => model);
 
+  // One stable reference: hosts that share a provider registry across sessions can then
+  // accept a catalog refresh as a models-only update instead of a new implementation.
+  const streamSimple = ((model: any, context: any, options: any) =>
+    streamSimpleXaiResponses(model, context, options, visionRouting)) as any;
+
   const providerConfig = () => ({
     name: "xAI (OAuth)",
     baseUrl: oauthResponsesRoute.baseUrl,
     api: "xai-responses" as const,
     models: providerModels(currentModels),
     authHeader: true,
-    streamSimple: ((model: any, context: any, options: any) =>
-      streamSimpleXaiResponses(model, context, options, visionRouting)) as any,
+    streamSimple,
     oauth: oauth as any,
   });
 
