@@ -6,6 +6,10 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Fixed
+
+- Fix a refreshed xAI catalog being ignored by hosts that share one provider registry across sessions, such as PI WEB. Every catalog re-registration now reuses the same `streamSimple` callback, so the host sees a models-only update. Before, a host that started while the OAuth token was expired stayed on the Grok 4.6 fallback, and enabled models such as `xai-auth/grok-4.7` matched nothing.
+
 ### Changed
 
 - Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.6.0`, with exact packed test boundaries at 0.80.1 and 1.5.2 (development dependencies and the packed `latest` matrix job); 1.6.0 is the new upper sentinel. Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 1.5.0 passed the clean packed candidate tests, e2e, loader, and typecheck with no extension changes.

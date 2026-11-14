@@ -68,7 +68,7 @@ async function loadAndLogin(catalog: any) {
     },
     onManualCodeInput: async () => manualCallback,
   });
-  return { h, credentials };
+  return { h, credentials, startup: provider };
 }
 
 describe("authenticated provider catalog lifecycle", { concurrent: false }, () => {
@@ -97,6 +97,15 @@ describe("authenticated provider catalog lifecycle", { concurrent: false }, () =
       "grok-build-latest",
       "grok-composer-2.5-fast",
     ]);
+  });
+  it("keeps provider callbacks stable when the catalog refreshes", async () => {
+    const { h, startup } = await loadAndLogin(grok47Limits);
+    const refreshed = h.providers.get("xai-auth");
+    expect(refreshed).not.toBe(startup);
+    expect(refreshed.models.map(({ id }: any) => id)).toEqual(["grok-4.7"]);
+    // Hosts with a shared registry accept a refresh only when non-model fields are unchanged.
+    expect(refreshed.streamSimple).toBe(startup.streamSimple);
+    expect(refreshed.oauth).toBe(startup.oauth);
   });
   it("registers Grok 4.7 only from the authenticated catalog", async () => {
     const { h } = await loadAndLogin({ data: [{
