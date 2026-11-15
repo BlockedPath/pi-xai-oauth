@@ -258,9 +258,22 @@ export async function compactXaiInlineImages(
     // xAI accepts only PNG/JPEG input images; transcode before budgets are allocated.
     const png = await convertToPng(reference.base64, reference.mimeType);
     if (!png) throw new Error("xAI inline image payload contains an image that could not be converted to PNG");
-    reference.base64 = png.data;
-    reference.mimeType = png.mimeType;
-    reference.encodedSize = png.data.length;
+    // Fit each intermediate to the whole transport budget at once so a batch of
+    // small WebPs cannot expand into hundreds of MiB of retained full-size PNGs.
+    const fitted = await resizeImage(Buffer.from(png.data, "base64"), png.mimeType, {
+      maxWidth: MAX_XAI_IMAGE_DIMENSION,
+      maxHeight: MAX_XAI_IMAGE_DIMENSION,
+      maxBytes: Math.floor(maxBase64Bytes) + 1,
+      jpegQuality: XAI_JPEG_QUALITY,
+    }).catch(() => null);
+    if (!fitted || fitted.data.length > maxBase64Bytes) {
+      throw new Error("xAI inline image payload exceeds the safe transport budget and could not be compacted");
+    }
+    state.aggregateEncoded += fitted.data.length - reference.encodedSize;
+    if (state.aggregateEncoded > MAX_XAI_INLINE_IMAGE_INPUT_AGGREGATE_BASE64_CHARS) throw inlineImageInputSizeError();
+    reference.base64 = fitted.data;
+    reference.mimeType = fitted.mimeType;
+    reference.encodedSize = fitted.data.length;
   }
 
   allocateInlineImageBudgets(state.references, Math.floor(maxBase64Bytes));

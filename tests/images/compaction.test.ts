@@ -64,6 +64,9 @@ describe("inline image compaction", () => {
       const inspected = await resizeImage(Buffer.from(value.split(",")[1], "base64"), "image/png", { maxWidth: 100, maxHeight: 100, maxBytes: 1e6 });
       expect([inspected?.width, inspected?.height]).toEqual([8, 8]);
     }
+    await expect(
+      compactXaiInlineImages({ input: [{ content: [{ type: "input_image", image_url: webp }] }] }, 10),
+    ).rejects.toThrow(/could not be compacted/);
   });
   it("obeys aggregate byte and dimension bounds", async () => {
     const base64 = (await readFile("preview.jpeg")).toString("base64");
