@@ -6,6 +6,10 @@ Dates below are npm publication dates. The earliest rapid-release series is grou
 
 ## Unreleased
 
+### Fixed
+
+- Local inline-image errors (too many images, input size limit, could not be compacted) now reach the user in clear text instead of the masked `xAI API error: Responses failed`. They are fixed package strings and never contain payload or upstream text.
+
 ### Changed
 
 - Extend aligned Pi peer support to `>=0.80.1 <0.85.0 || >=0.85.1 <0.88.0 || >=1.0.0 <1.6.0`, with exact packed test boundaries at 0.80.1 and 1.5.2 (development dependencies and the packed `latest` matrix job); 1.6.0 is the new upper sentinel. Pi 0.85.0 remains excluded, and unreviewed 0.99 releases stay unsupported. Pi 1.5.0 passed the clean packed candidate tests, e2e, loader, and typecheck with no extension changes.
