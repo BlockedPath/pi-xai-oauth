@@ -25,6 +25,8 @@ export interface AssistantStreamEvent {
 
 const SAFE_TEXT_ONLY_ERROR_PATTERN =
   /^xAI OAuth model [A-Za-z0-9][A-Za-z0-9._:-]{0,127} is explicitly text-only in the authenticated model catalog; no xAI request was sent$/;
+// Fixed local errors from images.ts; they carry no payload or upstream text.
+const SAFE_INLINE_IMAGE_ERROR_PATTERN = /^xAI inline image payload [a-zA-Z0-9 ,]+$/;
 export const XAI_PAYLOAD_MODEL_ERROR =
   "xAI OAuth payload hooks cannot change the selected model; no xAI request was sent";
 
@@ -93,6 +95,7 @@ export function normalizeXaiStreamEvent(
       ...error,
       errorMessage:
         SAFE_TEXT_ONLY_ERROR_PATTERN.test(error.errorMessage) ||
+        SAFE_INLINE_IMAGE_ERROR_PATTERN.test(error.errorMessage) ||
         error.errorMessage === XAI_PAYLOAD_MODEL_ERROR ||
         error.errorMessage === XAI_PAYLOAD_CANONICALIZATION_ERROR ||
         error.errorMessage === XAI_VISION_DESCRIPTION_ERROR ||

@@ -143,6 +143,25 @@ describe("Responses image preparation", () => {
     expect(requests[0].body).not.toHaveProperty("toJSON");
   });
 
+  it("reports local inline-image budget failures in clear text before fetch", async () => {
+    const stream = streamSimpleXaiResponses(
+      TEST_MODEL,
+      { messages: [{ role: "user", content: "hello", timestamp: Date.now() }] } as any,
+      {
+        apiKey: "oauth-token",
+        onPayload(payload: any) {
+          payload.input = [{
+            role: "user",
+            content: Array.from({ length: 33 }, () => ({ type: "input_image", image_url: "data:image/png;base64,AAAA" })),
+          }];
+        },
+      } as any,
+    );
+    const result = await stream.result();
+    expect(result.errorMessage).toBe("xAI inline image payload contains too many inline images");
+    expect(requests).toHaveLength(0);
+  });
+
   it("redacts direct and streaming custom serializer failures before fetch", async () => {
     await expect(
       createXaiResponse(
