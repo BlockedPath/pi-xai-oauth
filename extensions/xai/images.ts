@@ -1,6 +1,6 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resizeImage } from "@earendil-works/pi-coding-agent";
+import { convertToPng, resizeImage } from "@earendil-works/pi-coding-agent";
 import { MEDIA_MAX_DATA_URL_CHARS } from "./media/constants";
 import { toImageDataUrl } from "./media/data-url";
 import { readBoundedWorkspaceImageFileSync } from "./media/paths";
@@ -122,7 +122,8 @@ function inlineImageStructureError(): Error {
 }
 
 /**
- * Parse a PNG/JPEG data URL after rejecting oversized encoded payloads.
+ * Parse a PNG/JPEG/WebP/GIF data URL after rejecting oversized encoded payloads.
+ * WebP and GIF (formats Pi's read tool emits) are transcoded to PNG during compaction.
  * Bounds run on the raw string before whitespace stripping or decode.
  */
 function parseInlineImageDataUrl(
@@ -135,7 +136,7 @@ function parseInlineImageDataUrl(
     throw inlineImageInputSizeError();
   }
 
-  const match = /^data:(image\/(?:png|jpe?g));base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(value);
+  const match = /^data:(image\/(?:png|jpe?g|webp|gif));base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(value);
   if (!match) {
     throw new Error("xAI inline image payload contains an invalid or unsupported image data URL");
   }
@@ -251,6 +252,16 @@ export async function compactXaiInlineImages(
   };
   const clonedPayload = clonePayloadAndCollectInlineImages(payload, state);
   if (state.references.length === 0) return clonedPayload;
+
+  for (const reference of state.references) {
+    if (reference.mimeType === "image/png" || reference.mimeType === "image/jpeg") continue;
+    // xAI accepts only PNG/JPEG input images; transcode before budgets are allocated.
+    const png = await convertToPng(reference.base64, reference.mimeType);
+    if (!png) throw new Error("xAI inline image payload contains an image that could not be converted to PNG");
+    reference.base64 = png.data;
+    reference.mimeType = png.mimeType;
+    reference.encodedSize = png.data.length;
+  }
 
   allocateInlineImageBudgets(state.references, Math.floor(maxBase64Bytes));
   for (const reference of state.references) {

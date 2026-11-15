@@ -49,6 +49,22 @@ describe("inline image compaction", () => {
       urls(await compactXaiInlineImages(payload, base64.length * 2 + 1)),
     ).toEqual([url, url]);
   });
+  it("transcodes WebP and GIF inputs to PNG", async () => {
+    // 8x8 solid-red images from cwebp and sips.
+    const webp = "data:image/webp;base64,UklGRjwAAABXRUJQVlA4IDAAAADQAQCdASoIAAgAAgA0JaACdLoB+AADsAD+8MQL/yC5YXXI1/8gP+QH/ID/+PIAAAA=";
+    const gif = "data:image/gif;base64,R0lGODdhCAAIAJEAAAAAAP8AAP///wAAACwAAAAACAAIAAACB4yPqcvtXQAAOw==";
+    const result = urls(
+      await compactXaiInlineImages({
+        input: [{ content: [{ type: "input_image", image_url: webp }, { type: "input_image", image_url: gif }] }],
+      }),
+    );
+    expect(result).toHaveLength(2);
+    for (const value of result) {
+      expect(value).toMatch(/^data:image\/png;base64,/);
+      const inspected = await resizeImage(Buffer.from(value.split(",")[1], "base64"), "image/png", { maxWidth: 100, maxHeight: 100, maxBytes: 1e6 });
+      expect([inspected?.width, inspected?.height]).toEqual([8, 8]);
+    }
+  });
   it("obeys aggregate byte and dimension bounds", async () => {
     const base64 = (await readFile("preview.jpeg")).toString("base64");
     const url = `data:image/jpeg;base64,${base64}`;
