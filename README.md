@@ -891,7 +891,7 @@ If you call `xai_generate_text` directly, `image_url` may be either:
 
 ### `500 "Auth context expired"` after screenshots
 
-This xAI OAuth gateway error can be a misleading response to an oversized stateless Responses request, not an expired local token. The provider now omits consumed historical tool-result image binaries after a later assistant response and retains a text marker in their place. Current PNG/JPEG inputs are resized with high-fidelity encoding when necessary and kept within a 3 MiB aggregate base64 transport budget before any xAI request is sent.
+This xAI OAuth gateway error can be a misleading response to an oversized stateless Responses request, not an expired local token. The provider now omits consumed historical tool-result image binaries after a later assistant response and retains a text marker in their place. Current WebP/GIF inputs are first transcoded to PNG, since xAI accepts only PNG/JPEG. Current PNG/JPEG inputs are resized with high-fidelity encoding when necessary and kept within a 3 MiB aggregate base64 transport budget before any xAI request is sent.
 
 If an image cannot be decoded or compacted safely, the request fails locally with a clear image-budget error. Crop the screenshot or attach fewer current images; logging in again will not fix a payload-size failure.
 
